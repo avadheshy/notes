@@ -142,7 +142,7 @@ this command is used to write the output of the ls command in the file.
  This command is used for count the number of files in current dirctory.
 
  ## Users and Groups
- There are three types of used in system
+ There are three types of user in system
  1. Root user with user id 0 and group id 0 and home directory /root and shell is /bin/bash
  2. regular user with user and group id in range 1k-60k and home directory /home/user and shell /bin/bash
  3. Service user(ftp/ssh/apache) with user and group id in range 1-999 /var/ftp and shell /sbin/nologin
@@ -162,11 +162,11 @@ This command is used for setting password for user.This is used for changing or 
 ## su - user
 This command is used for swiching to user
 ## last 
-This command is used for chacking logs for last login user.
+This command is used for checking logs for last login user.
 ## who
 This command is used for current login user.
 ## lsof -u user 
-This command is used for chaking files open by user.
+This command is used for cheking files open by user.
 ## userdel -r user
 This command is used for deleting user and -r is used for deleting home directory files as well.
 ## groupdell group
@@ -176,7 +176,7 @@ This command is used for deleting group.
 
 # File permissions
 ## ls -l
-This command show list of file in a particular format. It start with 10 characters(first char indicates file type then next 3 usre permission and next 3 group permission and last 3 for other permission). Each 3 character indicated read write and execute permissions.(r->read,w->writeand x->execute permission)
+This command show list of file in a particular format. It start with 10 characters(first char indicates file type then next 3 user permission and next 3 group permission and last 3 for other permission). Each 3 character indicated read write and execute permissions.(r->read,w->writeand x->execute permission)
 
 ## chown -R User:group /file/dir
 This command is used for changing the ower of a file or directory. use -R in case of directory only.
@@ -218,7 +218,8 @@ This will show parent process id
 This command will kill all the python running processes.
 ## find difference betweeb arphon process and zombie process
 A process is running even after its parent is terminated or completed without waiting for its child process to complete is called arphon process. A process is completed but still its entry is showing in process table is called zombie process.
-## kill -9 PID command is to stop process forcefully and kill PID  is to stop process gracefully, child processes also will be stopped if parent process is stopped gracefully.
+## kill -9 PID 
+command is to stop process forcefully and kill PID  is to stop process gracefully, child processes also will be stopped if parent process is stopped gracefully.
 
 # Archive
 ## tar -czvf file.tar.gz /file/path
@@ -245,7 +246,8 @@ This will remove package
 ## apt remove purge package
 This will remove packe with data and configration
 
-
+# provisioning
+It means running script when vm comes up.
 
 
 
