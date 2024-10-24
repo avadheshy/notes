@@ -50,5 +50,31 @@ This will wait for user to enter the input. p is used for prompt and -sp is used
     fi
 
 
+# script for monitoring
+0 is true and other are false in script.
+cronjob
+## MM HH DOM mm DOW COMMAND
+This minute, houre day of month month day of week and commnd to run .
 
+# LOOP
+## for loop
+    for var in java python php .net c c++
+    do 
+        echo "looping..."
+    done
+
+## while loop
+    counter =0
+    while [ $counter lt 5]
+    do
+        echo "value of counter is $counter"
+        counter=$(($counter+1))
+    done
+
+# Remote execution
+In any ubuntu machine loggin with password is denied then check file /etc/ssh/sshd_config and check PasswordAuthentication no . set this to yes
+## ssh -i .ssh/id_rsa usr@ip
+This command is used in login when we ssh to system.
+## login multiple vms and install git on each machine using bash script.
+## write a bash script to push your code to vm and then deploy it on that machine.
 
