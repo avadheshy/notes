@@ -1,5 +1,7 @@
 # git 
 Git is a distributed version control system designed to track changes in files, especially code, during software development. It allows multiple developers to collaborate on a project, track changes, and manage different versions of the project over time.GitHub is a web-based platform built around Git. It provides a place to host Git repositories online, facilitating easier collaboration and project management.
+## file stages
+There are 4 stages in a git repository: 1. Untracked Files which are not added to git repository. 2 Modified have changed from last commit. 3. Indexed These file are ready to go in commit state after commit. 4 Commit : These files are ready to go on github after push.
 #  1. SETUP
 Configuring user information used across all local repositories
 ## git config --global user.name “[firstname lastname]”
