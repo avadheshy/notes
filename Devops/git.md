@@ -98,6 +98,6 @@ Save modified and staged changes
 # git stash list
 list stack-order of stashed file changes
 # git stash pop
-write working from top of stash stack
+it applies the latest stash and removes from the stash list.
 # git stash drop
-discard the changes from top of stash stack
+it removes the latest stash without applying it.
