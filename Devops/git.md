@@ -101,3 +101,5 @@ list stack-order of stashed file changes
 it applies the latest stash and removes from the stash list.
 # git stash drop
 it removes the latest stash without applying it.
+# Difference between merge and rebase
+Suppose there are 2 branches main and feature. I made 2 commits(A and B) in main branch and 3 commits (C,D&E) in feature branch.when we apply git merge feature main (merging main branch in feature branch). This will merge main branch in feature with new commit. But when we use git rebase main then feature branch commits will be appended on top of main branch and feature branch head will point its last commit with merging main branch in feature. feature branch will look like this (A->B->C->D->E) E will be the head of feature branch.
