@@ -30,6 +30,11 @@ class Product(models.Model):
     def is_in_stock(self):
         return self.stock > 0
 
+
+class Sale(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    count = models.PositiveIntegerField()  # Quantity sold
+
 # serializers.py
 
 from rest_framework import serializers
@@ -71,3 +76,29 @@ for category in categories:
     for product in category.products.all():  # No additional query, thanks to prefetch_related
         print(f"- {product.name}")
 ```
+## Calculating Total Sales for a Specific Category
+```
+category_name = "Electronics"
+
+total_sales = Sale.objects.filter(
+    product__category__name=category_name
+).aggregate(
+    total=Sum(F('product__price') * F('count'))
+)['total']
+
+print(total_sales) 
+```
+## Calculating Sales for All Categories
+
+```
+sales_by_category = Sale.objects.values(
+    'product__category__name'
+).annotate(
+    total_sales=Sum(F('product__price') * F('count'))
+)
+
+for sale in sales_by_category:
+    print(f"Category: {sale['product__category__name']}, Total Sales: {sale['total_sales']}")
+
+```
+
