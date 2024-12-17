@@ -1,3 +1,6 @@
+# difference between centerlized and distributed version controll system?
+# what is fork?
+# difference beteen clone and fork
 # git 
 Git is a distributed version control system designed to track changes in files, especially code, during software development. It allows multiple developers to collaborate on a project, track changes, and manage different versions of the project over time.GitHub is a web-based platform built around Git. It provides a place to host Git repositories online, facilitating easier collaboration and project management.
 ## file stages
