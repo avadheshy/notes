@@ -1,6 +1,18 @@
 # difference between centerlized and distributed version controll system?
+Centralized version control systems rely on a single server for all operations and require a constant connection, while distributed version control systems allow each user to have a complete local copy of the repository, enabling offline work and greater resilience.
+
 # what is fork?
+
+In software development, a fork refers to creating a personal copy of a repository, often to experiment, make changes, or develop independently, without affecting the original repository.
 # difference beteen clone and fork
+Use fork to create your version of a repository on the hosting platform.
+Use clone to download a repository to your local machine for development.
+# what is the use of cherypick(used for less number of commit) why not merge
+The git cherry-pick command is used to apply specific commits from one branch into another, whereas git merge combines all changes from one branch into another in one go. Here's why you might prefer cherry-pick over merge for a small number of commits
+``` 
+git cherry-pick <commit-hash>
+```
+
 # git 
 Git is a distributed version control system designed to track changes in files, especially code, during software development. It allows multiple developers to collaborate on a project, track changes, and manage different versions of the project over time.GitHub is a web-based platform built around Git. It provides a place to host Git repositories online, facilitating easier collaboration and project management.
 ## file stages
@@ -104,5 +116,10 @@ list stack-order of stashed file changes
 it applies the latest stash and removes from the stash list.
 # git stash drop
 it removes the latest stash without applying it.
+# git stash apply
+git stash apply applies the most recent stash (the one at the top of the stash stack) to your working directory.
+# git stash apply stash@{2}
+If you have multiple stashes, you can specify a particular stash to apply by using its reference, such as stash@{0}, stash@{1}, etc.
+
 # Difference between merge and rebase
 Suppose there are 2 branches main and feature. I made 2 commits(A and B) in main branch and 3 commits (C,D&E) in feature branch.when we apply git merge feature main (merging main branch in feature branch). This will merge main branch in feature with new commit. But when we use git rebase main then feature branch commits will be appended on top of main branch and feature branch head will point its last commit with merging main branch in feature. feature branch will look like this (A->B->C->D->E) E will be the head of feature branch.
