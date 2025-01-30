@@ -334,7 +334,6 @@ dog = Dog("Buddy", "Labrador", 3)
 print(dog.name)  # Accessible #Buddy
 
 # Accessing protected member
-print(dog._breed)  # Accessible but discouraged outside the class #Labrador
 
 # Accessing private member using getter
 print(dog.get_age()) #3
@@ -342,6 +341,9 @@ print(dog.get_age()) #3
 # Modifying private member using setter
 dog.set_age(5)
 print(dog.get_info()) #Name: Buddy, Breed: Labrador, Age:5
+J
+print(dog._breed)  # Accessible but discouraged outside the class #Labrador
+print(dog._Dog__age) #Accessible print but discouraged outside the class # 5
 ```
 # Data Abstraction 
 Abstraction hides the internal implementation details while exposing only the necessary functionality. It helps focus on “what to do” rather than “how to do it.”
