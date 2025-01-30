@@ -132,7 +132,7 @@ The client calls a method as if it’s local, and gRPC handles the underlying ne
 Built on HTTP/2, enabling multiplexing, full-duplex streaming, and binary data transfer.
 ### Streaming:
 Supports unary, client streaming, server streaming, and bidirectional streaming.
-C### ross-Language Compatibility:
+### cross-Language Compatibility:
 Protobuf enables easy interaction between clients and servers written in different languages.
 ### Code Generation:
 Simplifies development by auto-generating boilerplate code.
