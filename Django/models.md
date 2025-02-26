@@ -74,11 +74,13 @@ class YoungPerson(Person):
 No new table is created for YoungPerson.
 You can use YoungPerson to apply custom logic or behavior (e.g., the is_young method).
 # Comparison of the Inheritance Types
+```
 Feature	            Abstract Base Class	                        Multi-table Inheritance	                            Proxy Models
 Separate Table?	    No	                                        Yes	                                                No
 Field Inheritance	Yes	                                        No (only via relation)	                            Yes (inherits fields)
 Custom Behavior?	Yes	                                        Yes	                                                Yes
 Use Case	        Reusable                                    fields/methods	Extending existing models	        Customizing behavior
+```
 # When to Use Which?
 Abstract Base Classes: When you need shared fields/methods across models but don’t want separate database tables.
 
@@ -165,6 +167,7 @@ for category in categories:
     for product in category.products.all():  # No additional query, thanks to prefetch_related
         print(f"- {product.name}")
 ```
+# While writing query we should find which table with start the query.
 ## Calculating Total Sales for a Specific Category
 ```
 category_name = "Electronics"
@@ -329,3 +332,37 @@ categories_contributing_50_percent = Category.objects.annotate(
 ).filter(category_revenue__gt=0.5 * total_revenue).values('name', 'category_revenue')
 ```
 These queries not only involve combining multiple tables but also test your knowledge of aggregations, annotations, and query optimizations. Make sure you understand how joins are implicitly handled in Django when using related fields!
+
+
+ Constraints Summary
+```
+            Field Type	                        Main Constraints
+            AutoField	                        primary_key=True, auto-increment
+            CharField	                        max_length, unique=True
+            IntegerField	                    validators=[Min/MaxValueValidator]
+            FloatField	                        Prone to rounding issues
+            DecimalField	                    max_digits, decimal_places (better for money)
+            BooleanField	                    Stores True/False
+            DateTimeField	                    auto_now, auto_now_add
+            EmailField	                        Validates email format
+            URLField	                        Validates URL format
+            FileField	                        upload_to='path/'
+            ForeignKey	                        on_delete=models.CASCADE
+            OneToOneField	                    Enforces unique relationship
+            ManyToManyField	                    Creates join table
+            SlugField	                        Only letters, numbers, hyphens allowed
+            UUIDField	                        Ensures uniqueness
+            JSONField	                        Stores JSON objects
+            ChoiceField	                        Restricts predefined choices
+```
+
+STATUS_CHOICES = [
+    ('pending', 'Pending'),
+    ('shipped', 'Shipped'),
+    ('delivered', 'Delivered'),
+]
+
+status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+description = models.TextField(blank=True, null=True)
+blank=True (allows empty values).
+null=True (stores NULL instead of an empty string).
