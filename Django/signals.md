@@ -76,10 +76,6 @@ def create_user_profile(sender, instance, created, **kwargs):
 def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
 Connect the Signal in apps.py:
-
-python
-Copy
-Edit
 from django.apps import AppConfig
 
 class MyAppConfig(AppConfig):
@@ -90,9 +86,7 @@ class MyAppConfig(AppConfig):
         import myapp.signals
 Model Example (models.py):
 
-python
-Copy
-Edit
+
 from django.db import models
 from django.contrib.auth.models import User
 

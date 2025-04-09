@@ -55,7 +55,7 @@ print(dog1.name)     # (Updated instance variable) Max
 # Modify class variable
 dog1.species = "Feline"
 print(dog1.species)  # (Updated class variable)Feline
-print(dog2.species) # Charlie
+print(dog2.species) # Canine
 ```
 # Python Inheritance
 Inheritance allows a class (child class) to acquire properties and methods of another class (parent class). It supports hierarchical classification and promotes code reuse.
