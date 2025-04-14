@@ -10,6 +10,14 @@
 9. what is the difference between set and dictionary
 10. what is list and string comprehension why tupple comprehension does not support.
 11. difference between deepcopy and shallow copy.
+12. what is multithreading
+13. when to use multithreading and when multiprocessing
+14. what is the difference between is and ==
+15. what is bug in def fun(num=[])
+16. how memory is managed in python
+17. how you optimzie your code in python
+18. how handle errors in  python
+
 
 # django Iterviews questions
 1. what is orm and why we use it instead of raw sql.
@@ -31,3 +39,28 @@
 17. how to use sessions in django.
 18. what is django response life cycle
 19. what is the difference between class/function based views.
+
+# SQL 
+1.  what is normaliztion expain with example
+2.  what is denormlization explain with example
+3.  what is sharding and how it work explain
+4.  find second higest salary
+5.  what is different joins in sql and which is faster
+6.  what is the differece between where and having
+7.  find duplicate entries in a table.
+8.  what is the types of indexing 
+9.  what is default port of your db
+10. how to connect db in python
+
+# Elasitc search
+1. what is indxing
+2. what is the difference between analyzed and not analyzed field.
+3. what is tokenization in es. can we make our own tokanization.
+4. what is sharding. can we decide a doc will in indexed in particular shard.
+5. which aggregation and search is faster elastic or mongo
+
+# system degine
+1. designe a url shortenr
+2. design a rate limiter
+3. design a shoping card
+4. design a wending machine
