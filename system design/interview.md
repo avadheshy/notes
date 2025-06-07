@@ -39,6 +39,7 @@
 17. how to use sessions in django.
 18. what is django response life cycle
 19. what is the difference between class/function based views.
+20. what is the difference between django/fastapi/flask architecture.
 
 # SQL 
 1.  what is normaliztion expain with example
@@ -51,6 +52,8 @@
 8.  what is the types of indexing 
 9.  what is default port of your db
 10. how to connect db in python
+11. what is database sharding. what are different sharding algo. how to divide data equally on each shard.
+12. what is indexing in database. what are different types of indexes there are.
 
 # Elasitc search
 1. what is indxing
@@ -64,3 +67,5 @@
 2. design a rate limiter
 3. design a shoping card
 4. design a wending machine
+5. what is event driven sytems
+6. what is webhooks.
