@@ -152,10 +152,13 @@ Message Pattern	        Pub/Sub	                            Work queues, Pub/Sub
 Ideal For	            Caching, real-time tasks	        Task queuing	                        Large-scale streaming	            Simple caching
 ```
 ## When to Use What
-Redis: If you need a combination of caching, real-time data handling, or Pub/Sub messaging.
-
-RabbitMQ: When you need robust, reliable messaging and complex message routing.
-
-Kafka: For real-time analytics, event streaming, or building large-scale distributed systems.
-
-Memcached: For lightweight, fast caching with no need for persistence or advanced features.
+```
+Use Case	                             Best Choice	                                          Why
+Simple caching	                         Memcached	                                          Lightweight, fast
+Caching + simple queue	                 Redis	                                              In-memory speed + multiple data types
+Task queue with retry, ack, delay	     RabbitMQ	                                          Reliable delivery and job control
+High-throughput logging/event stream	 Kafka	                                              Persistent, replayable, highly scalable
+Real-time chat / PubSub notifications	 Redis (Pub/Sub)	                                  Low latency, easy to use
+Data pipeline / Stream processing	     Kafka	                                              Efficient for massive, persistent streams
+Fan-out job distribution	             RabbitMQ/Kafka	                                      Depending on scale and persistence needed
+```
