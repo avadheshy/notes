@@ -113,3 +113,135 @@ Reduce load on the database
 Reduce network cost
 
 Increase Read Throughput
+
+# Content Delivery Networks
+# 🌐 Content Delivery Network (CDN)
+
+A **Content Delivery Network (CDN)** is a geographically distributed network of servers that **caches and delivers content** to users from the closest location, improving speed, availability, and security.
+
+---
+
+## 🧠 How a CDN Works
+
+1. User requests a web asset (e.g., image, script, HTML).
+2. The CDN routes the request to the **nearest edge server**.
+3. If the content is **cached**, it is returned immediately (cache hit).
+4. If not, the CDN fetches it from the **origin server** (cache miss), stores it, and serves it.
+
+---
+
+## ✅ Benefits of Using a CDN
+
+| Benefit              | Description |
+|----------------------|-------------|
+| 🔄 Speed             | Reduces latency by serving from edge servers close to the user. |
+| 🔒 Security          | Offers DDoS protection, TLS/SSL offloading, bot filtering. |
+| 📈 Scalability       | Handles large traffic spikes by offloading origin server. |
+| 🧩 Reliability       | Fallbacks and multiple nodes ensure uptime. |
+| 💸 Cost Efficiency   | Reduces origin server bandwidth and compute costs. |
+
+---
+
+## 📁 What Can a CDN Cache?
+
+- Static files (images, JS, CSS, videos, PDFs)
+- HTML pages
+- Fonts and icons
+- API responses (for GET endpoints)
+- Software downloads
+
+---
+
+# 🔄 Pull CDN vs Push CDN
+
+## 📥 Pull CDN (Origin Pull)
+
+### 🔹 How It Works
+- CDN fetches content **on demand** from the origin when first requested.
+- It then caches that content for subsequent requests.
+
+### 🔁 Request Flow
+
+### ✅ Pros
+- Easy to set up
+- Automatically keeps up with updates from origin
+- Good for frequently updated content
+
+### ❌ Cons
+- First request may be slow (cache miss)
+- Relies on origin being available
+
+### ✅ Best For
+- CMS sites
+- Dynamic websites
+- API caching
+
+---
+
+## 📤 Push CDN (Content Push)
+
+### 🔹 How It Works
+- You **manually upload** static files to the CDN.
+- CDN **distributes** content to edge nodes in advance.
+
+### 🔁 Request Flow
+
+### ✅ Pros
+- Always fast response
+- No dependency on origin server
+- Ideal for large static assets
+
+### ❌ Cons
+- Requires manual management
+- Not suitable for frequently changing data
+
+### ✅ Best For
+- Static sites
+- Video streaming
+- Software distribution
+
+---
+
+## 📊 Comparison: Pull vs Push CDN
+
+| Feature              | Pull CDN                      | Push CDN                        |
+|----------------------|-------------------------------|----------------------------------|
+| Setup                | Auto-fetch from origin        | Manual upload to CDN            |
+| Ideal Use Case       | Dynamic or mixed content      | Static, large files             |
+| First Request        | May be slow (cache miss)      | Always fast                     |
+| Cache Management     | Automatic TTLs                | Manual                          |
+| Origin Dependency    | Required                      | Not required                    |
+
+---
+
+## 🏢 Popular CDN Providers
+
+| Provider        | Type(s) Supported     | Notes |
+|-----------------|------------------------|-------|
+| **Cloudflare**  | Pull (default)         | Free tier, security, edge compute |
+| **AWS CloudFront** | Push + Pull         | Integrated with S3, Lambda@Edge |
+| **Akamai**      | Push + Pull            | Enterprise-grade, very flexible |
+| **Fastly**      | Pull (mainly)          | Great for dynamic APIs and edge compute |
+| **Google Cloud CDN** | Pull            | Integrated with Google Cloud Load Balancer |
+| **Azure CDN**   | Push + Pull            | Supports blob storage integration |
+
+---
+
+## 📌 CDN Terms You Should Know
+
+| Term           | Meaning |
+|----------------|---------|
+| **Edge Server** | A CDN node close to the user |
+| **Origin Server** | Your main application/server |
+| **TTL (Time to Live)** | How long content is cached |
+| **Cache Hit** | Content is served from CDN cache |
+| **Cache Miss** | Content fetched from origin |
+| **Purge** | Manually delete cached content |
+| **Invalidation** | Refresh or replace outdated cache |
+
+---
+
+## 🔚 Conclusion
+
+Using a CDN is critical for optimizing web performance and user experience. Choosing between **pull** and **push** CDN depends on your content type, how often it changes, and how much control you want over content distribution.
+
