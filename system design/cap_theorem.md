@@ -226,3 +226,19 @@ Horizontal Scalability: Add more servers to share the load.
 Example:
 Your app handles 500 requests/sec today. Can it handle 10,000 requests/sec tomorrow by adding more machines or resources?
 
+---
+
+# 🔷 PACELC Theorem (Partition, Availability, Consistency, Else, Latency, Consistency)
+Proposed by: Daniel Abadi
+
+Summary:
+PACELC refines CAP by stating that:
+
+If there is a Partition (P), then the system must choose between Availability (A) and Consistency (C) → same as CAP.
+
+Else (E), even when the system is running normally (no partition), it faces a trade-off between Latency (L) and Consistency (C).
+
+So:
+
+PACELC = If Partition (P), then A or C; Else (E), Latency or Consistency.
+

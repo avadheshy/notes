@@ -69,6 +69,12 @@ Goal
 
 This principle aims at reducing the dependency of a high-level Class on the low-level Class by introducing an interface.
 
+---
+High-level modules should not depend on low-level modules. Both should depend on abstractions.
+Abstractions should not depend on details. Details should depend on abstractions.
+
+---
+
 # abstrction and interface
 An abstract class is a class that cannot be instantiated and can include abstract methods (methods with no implementation) as well as concrete methods (methods with implementation).
 

@@ -1,5 +1,5 @@
 # System design 30 most imp topics
-1. client server archi
+1. client server architecture
 2.  ip
 3. dns
 4. proxy/reverse proxy
