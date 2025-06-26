@@ -1,6 +1,6 @@
 # some importent topics before Interview
 1. What is decorators and how to make them
-2. Difference iterators and gernerars and they work.
+2. Difference iterators and gernerators and they work.
 3. Difference between iterable and iterator.
 4. Learn about thread and how thread works and handle race condition.
 5. Learn about oops concepts. how to access methods in multiple and multilable inheritance and how to pass arguments in their constructor. difference between class and instance variable, class/instance and static method difference and purpose.
