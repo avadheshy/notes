@@ -1,3 +1,32 @@
+
+from django.contrib.auth.models import User
+- auto_add_now it is initialized at the time of row insertion
+- auto_now upadates every time when row is modified
+
+- when we dont define related name django automaticaly defines a reverse relation
+```
+class Author(models.Model):
+    name = models.CharField(max_length=100)
+
+class Book(models.Model):
+    title = models.CharField(max_length=200)
+    author = models.ForeignKey(Author, on_delete=models.CASCADE)
+
+book = Book.objects.first()
+book.author  # returns the Author instance
+author = Author.objects.first()
+author.book_set.all()  
+author.books.all()  # more readable and customizable!
+```
+```
+class PostLike(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('user', 'post')
+```
+- A user can like a post only once. The same (user, post) pair cannot exist more than once in the PostLike table.
 Django ORM
 ```
 from django.db import models

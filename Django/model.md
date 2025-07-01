@@ -1,0 +1,234 @@
+Here’s a complete list of important concepts in Django Models you need to know to master working with Django ORM
+
+ # 1. Model Definition
+- All Django models inherit from django.db.models.Model.
+
+- Each model maps to a single database table.
+
+```
+class Product(models.Model):
+    name = models.CharField(max_length=100)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+```
+ # 2. Fields
+- Represent columns in the database.
+
+Examples:
+
+- CharField, IntegerField, TextField, BooleanField, DateTimeField
+
+- ForeignKey, OneToOneField, ManyToManyField
+
+Field Options:
+
+- null, blank, default, choices, unique, primary_key, editable, verbose_name, help_text
+  
+# 3. Relationships
+- One-to-Many: ForeignKey
+
+- One-to-One: OneToOneField
+
+- Many-to-Many: ManyToManyField
+
+- related_name for reverse lookups
+  
+# 4. Meta Class
+
+Used to define model-level behavior.
+
+Common options:
+
+- db_table: custom table name
+
+- ordering: default ordering
+
+- unique_together / constraints
+
+- verbose_name / verbose_name_plural
+  
+  ```
+  class ProductReview(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    rating = models.PositiveIntegerField()
+    review = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Review by {self.user.username} for {self.product.name}"
+
+    class Meta:
+        db_table = 'product_reviews_table'  # The table will be named product_reviews_table in the DB.
+        ordering = ['-created_at']  # 	Querysets like ProductReview.objects.all() will be ordered by -created_at.
+        unique_together = ('product', 'user')  # 	Prevents the same user from reviewing the same product more than once.
+        verbose_name = 'Product Review'  # 	Admin panel will show: Product Review
+        verbose_name_plural = 'Product Reviews'  # Admin panel will show: Product Reviews
+  ```
+  
+# 5. Model Methods
+- __str__: Human-readable name
+
+- get_absolute_url(): Returns canonical URL
+
+- Custom instance methods like is_active() or discounted_price()
+  
+# 6. Model Managers
+A Manager is an interface through which Django models interact with the database.
+Every model has at least one manager: objects by default.
+
+You can define your own to add custom query methods, filters, or defaults.
+ # Steps to Create a Custom Manager
+🔹 1. Subclass models.Manager
+```
+from django.db import models
+
+class ActiveManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_active=True)
+
+    def with_high_rating(self):
+        return self.get_queryset().filter(rating__gte=4)
+```
+🔹 2. Assign it to your model
+```
+class Product(models.Model):
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    rating = models.FloatField(default=0.0)
+
+    objects = models.Manager()        # Default manager
+    active = ActiveManager()          # Custom manager
+
+```
+# 🧪 Usage
+```
+Product.objects.all()              # Returns all products
+Product.active.all()              # Returns only active products
+Product.active.with_high_rating() # Active products with rating >= 4
+```
+
+# When to Use Custom Managers
+- Reusable filters (e.g., active(), featured())
+
+- Default query logic (e.g., hide soft-deleted rows)
+
+- Complex query building (annotate, aggregate)
+
+- Chaining query methods
+
+# Advanced: Combining with QuerySet
+You can chain custom queryset methods and keep manager-like behavior using a custom QuerySet + Manager combo.
+
+```
+class ProductQuerySet(models.QuerySet):
+    def active(self):
+        return self.filter(is_active=True)
+
+    def high_rating(self):
+        return self.filter(rating__gte=4)
+
+class ProductManager(models.Manager):
+    def get_queryset(self):
+        return ProductQuerySet(self.model, using=self._db)
+
+    def active(self):
+        return self.get_queryset().active()
+
+    def high_rating(self):
+        return self.get_queryset().high_rating()
+
+class Product(models.Model):
+    name = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    rating = models.FloatField(default=0.0)
+
+    objects = ProductManager()
+# 🧪 Usage:
+Product.objects.active().high_rating()
+Clean, chainable, and powerful.
+```
+# 7. Save and Delete
+save() — to insert/update
+
+delete() — to remove
+
+Can override save() method for custom logic (be cautious with recursion or super() usage).
+
+# 8. Signals
+Hook into model lifecycle events.
+
+Common signals: pre_save, post_save, pre_delete, post_delete
+
+
+@receiver(post_save, sender=Order)
+def send_confirmation_email(sender, instance, created, **kwargs):
+    if created:
+        send_email(instance.user)
+
+# 9. QuerySets and Managers
+Use Model.objects.filter(), .get(), .all(), .exclude(), .annotate(), .aggregate(), etc.
+
+Support for complex filtering using Q() and F() objects.
+
+# 10. Migrations
+Auto-generated by makemigrations
+
+Applied using migrate
+
+Track schema changes version-by-version
+
+# 11. Bulk Operations
+bulk_create, bulk_update, update, delete for performance
+
+Avoid .save() in loops for efficiency
+
+# 12. Constraints and Indexing
+UniqueConstraint, CheckConstraint, indexes for advanced DB behavior
+
+# 13. Model Inheritance
+Abstract Base Classes
+
+Multi-table Inheritance
+
+Proxy Models
+
+# 14. Model Validations
+Model validation ensures that data stored in your model is logically and semantically correct. Django provides methods like:
+
+clean(): For model-level custom validation.
+
+full_clean(): Runs full validation including all fields, field-specific validation, uniqueness checks, and clean().
+
+ ```
+from django.core.exceptions import ValidationError
+from django.db import models
+
+class Event(models.Model):
+    name = models.CharField(max_length=100)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def clean(self):
+        # Custom model-level validation
+        if self.end_date < self.start_date:
+            raise ValidationError("End date cannot be before start date.")
+#🧠 clean() is not automatically called when saving—more on that below.
+#event = Event(name="Hackathon", start_date="2025-07-10", end_date="2025-07-05")
+# event.full_clean()  # Raises ValidationError due to end_date < start_date
+#event.save()
+
+#If you want to ensure full_clean() is always called before saving:
+
+def save(self, *args, **kwargs):
+    self.full_clean()  # Run all validations before save
+    super().save(*args, **kwargs)
+# Be cautious: this might raise errors if not all required fields are set yet.
+```
+🔹 What it does:clean()
+- Runs full model validation, in this order:
+
+- Field-level validation (Field.clean())
+
+- Model-level validation (clean())
+
+- Uniqueness checks (validate_unique())
