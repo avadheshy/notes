@@ -1,4 +1,48 @@
-# difference between centerlized and distributed version controll system?
+- Use reset when you're working alone or on local branches, and use revert when you're working on shared or public branches. 
+  
+# git revert — Creates a New Commit That Reverses the Changes
+ Key Points:
+- It does NOT delete or remove the original commit.
+
+Instead, it creates a new commit that adds changes which cancel out the original commit’s changes.
+
+So the original commit still exists in the history — it is not removed.
+
+The codebase state changes, but the history stays intact.
+
+# Example Workflow:
+Suppose you have this history:
+
+```
+A -- B -- C -- D (HEAD)
+#Now you run:
+git revert C
+# Git will generate a new commit E, such that:
+
+A -- B -- C -- D -- E (HEAD)
+# E is a new commit that undoes the changes introduced by commit C.
+```
+Commit C is still there. It's just that its changes are "cancelled out" by E.
+# git cherry-pick <commit>
+Use: Apply a specific commit from another branch into your current branch.
+```
+git checkout feature-branch
+git cherry-pick a1b2c3d
+```
+This applies commit a1b2c3d from any branch to feature-branch, as if it was made there originally.
+
+# Use Cases:
+Porting a bug fix from one branch to another.
+
+Applying just one or two useful commits from a long feature branch without merging the whole branch.
+
+# git reset Recap (with HEAD or ID)
+```
+git reset --soft HEAD~1    # Undo last commit, keep files staged
+git reset --mixed HEAD~1   # Undo last commit, keep files but unstage
+git reset --hard HEAD~1    # Undo last commit AND all file changes
+```
+# Difference between centerlized and distributed version controll system?
 Centralized version control systems rely on a single server for all operations and require a constant connection, while distributed version control systems allow each user to have a complete local copy of the repository, enabling offline work and greater resilience.
 
 # what is fork?
@@ -123,3 +167,6 @@ If you have multiple stashes, you can specify a particular stash to apply by usi
 
 # Difference between merge and rebase
 Suppose there are 2 branches main and feature. I made 2 commits(A and B) in main branch and 3 commits (C,D&E) in feature branch.when we apply git merge feature main (merging main branch in feature branch). This will merge main branch in feature with new commit. But when we use git rebase main then feature branch commits will be appended on top of main branch and feature branch head will point its last commit with merging main branch in feature. feature branch will look like this (A->B->C->D->E) E will be the head of feature branch.
+
+---
+Rebase: Reapply commits on top of another base branch (git rebase <branch>).

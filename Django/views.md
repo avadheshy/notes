@@ -1,3 +1,9 @@
+Django’s views have three requirements:
+
+- They are callable. A view can be either function or a class-based view. CBVs inherit the method as_view() which uses a dispatch() method to call the appropriate method depending on the HTTP verb (get, post, etc)
+- They must accept an HttpRequest object as its first positional argument
+- They must return an HttpResponse object or raise an exception.
+
 #1. Function-Based Views (FBV)
 FBVs are simple Python functions that take a request and return a HttpResponse.
 
@@ -15,6 +21,21 @@ FBVs are:
 Explicit and simple to understand
 
 Great for small, one-off views
+
+# Pros
+- Simple to implement
+- Easy to read
+- Explicit code flow
+- Straightforward usage of decorators
+- good for one-off or specialized functionality
+# Cons
+- Hard to extend and reuse the code
+- Handling of HTTP methods via conditional branching
+
+---
+This function is very easy to implement and it’s very useful but the main disadvantage is that on a large Django project, usually a lot of similar functions in the views . If all objects of a Django project usually have CRUD operations so this code is repeated again and again unnecessarily and this was one of the reasons that the class-based views and generic views were created for solving that problem.
+
+---
 
 # 2. Class-Based Views (CBV)
 CBVs provide reusable logic through classes. Django provides built-in generic CBVs for common tasks.
@@ -55,6 +76,17 @@ class ProductCreateView(CreateView):
     template_name = 'products/form.html'
     success_url = reverse_lazy('product-list')
 ```
+---
+# Pros
+- Code reuseability — In CBV, a view class can be inherited by another - view class and modified for a different use case.
+- DRY — Using CBVs help to reduce code duplication
+- Code extendability — CBV can be extended to include more functionalities using Mixins
+- Code structuring — In CBVs A class based view helps you respond to different http request with different class instance methods instead of conditional branching statements inside a single function based view.
+- Built-in generic class-based views
+# Cons
+- Harder to read
+- Implicit code flow
+- Use of view decorators require extra import, or method override
 # 3. Mixins & Generic Views
 🔹 Common Mixins:
 LoginRequiredMixin – restricts access to authenticated users

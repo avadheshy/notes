@@ -1,3 +1,51 @@
+```
+myproject/
+│
+├── manage.py
+├── myproject/            ← Project package
+│   ├── __init__.py
+│   ├── settings.py       ← Project settings/configuration
+│   ├── urls.py           ← Root URLconf
+│   ├── wsgi.py           ← WSGI entry point (for deployment)
+│   └── asgi.py           ← ASGI entry point (for async support)
+│
+├── myapp/                ← Custom application
+│   ├── migrations/       ← Database migrations
+│   │   └── __init__.py
+│   ├── __init__.py
+│   ├── admin.py          ← Admin interface configuration
+│   ├── apps.py           ← App configuration
+│   ├── models.py         ← Database models
+│   ├── tests.py          ← Test cases
+│   ├── views.py          ← View logic (controllers)
+│   ├── urls.py           ← App-specific URLs (you may create this)
+│   └── serializers.py    ← (For DRF – if you're using it)
+│
+├── templates/            ← (Optional) HTML templates
+├── static/               ← (Optional) Static files (CSS/JS)
+├── media/                ← (Optional) Uploaded media files
+└── requirements.txt      ← (Optional) List of dependencies
+
+```
+```
+| File/Folder        | Description                                                   |
+| ------------------ | ------------------------------------------------------------- |
+| `manage.py`        | CLI utility to manage your project (runserver, migrate, etc.) |
+| `myproject/`       | Main settings/config for your Django project                  |
+| `settings.py`      | Contains configuration like DB, installed apps, middleware    |
+| `urls.py`          | Root URL dispatcher                                           |
+| `wsgi.py/asgi.py`  | Server gateway interface (used for deployment)                |
+| `myapp/`           | A Django app inside the project (can have multiple apps)      |
+| `models.py`        | Defines data models (ORM)                                     |
+| `views.py`         | Contains logic to handle requests/responses                   |
+| `admin.py`         | Registers models with Django admin                            |
+| `apps.py`          | App-specific config (class-based)                             |
+| `templates/`       | Stores HTML templates                                         |
+| `static/`          | Stores static files like CSS/JS/images                        |
+| `media/`           | Stores uploaded user files                                    |
+| `requirements.txt` | Python dependencies list                                      |
+
+```
 # 1. wsgi.py Web Server Gateway Interface
 This file is used for synchronous(one at a time) communication between the web server(e.g., Apache, Nginx with Gunicorn) and the Django application.
 # 2. asgy.py Asynchronous Server Gateway Interface

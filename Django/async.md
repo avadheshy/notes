@@ -137,3 +137,5 @@ Caching	                cache.set, @cache_page	    Reduce DB load and speed up v
 Background Tasks	    Celery + Redis/RabbitMQ	    Emails, report generation, scraping
 Real-Time	            Django Channels	            WebSockets, chat, notifications
 ```
+---
+Celery sends programing tasks (in api background task) and celery beat sends scheduled tasks to the task queue.If you want to run more than one worker you have to run worker command that many times. Each worker has it own pool. concorency defines size of pool for the worker.
