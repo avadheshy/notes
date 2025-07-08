@@ -21,11 +21,11 @@ def binary_search(nums, target):
 ```
 ## Problems:
 
-- 704. Binary Search (Easy)
+-  704  Binary Search (Easy)
 
-- 278. First Bad Version (Easy)
+- 278  First Bad Version (Easy)
 
-- 34. Find First and Last Position of Element in Sorted Array (Medium)
+- 34 Find First and Last Position of Element in Sorted Array (Medium)
 
 # Template 2: Lower Bound (First Element ≥ target)
 Use when you need to find the first index such that nums[i] >= target.
@@ -44,18 +44,18 @@ def lower_bound(nums, target):
     return left
 ```
 ## Problems:
-- 35. Search Insert Position (Easy)
+- 35  Search Insert Position (Easy)
 
-- 300. Longest Increasing Subsequence (Medium)
+- 300 Longest Increasing Subsequence (Medium)
 
-- 162. Find Peak Element (Medium)
+- 162 Find Peak Element (Medium)
      
 
-- 852. Peak Index in a Mountain Array (Medium)
+- 852 Peak Index in a Mountain Array (Medium)
 
-- 1901. Find a Peak Element II (Medium)
+- 1901 Find a Peak Element II (Medium)
 
-- 287. Find the Duplicate Number (Medium - tricky binary search on value)
+- 287 Find the Duplicate Number (Medium - tricky binary search on value)
 
 
 
@@ -97,15 +97,15 @@ def binary_search_answer():
 ```
 ## Problems:
 
-- 875. Koko Eating Bananas (Medium)
+- 875 Koko Eating Bananas (Medium)
 
-- 1011. Capacity To Ship Packages Within D Days (Medium)
+- 1011 Capacity To Ship Packages Within D Days (Medium)
 
-- 410. Split Array Largest Sum (Hard)
+- 410 Split Array Largest Sum (Hard)
 
-- 1482. Minimum Number of Days to Make m Bouquets (Medium)
+- 1482 Minimum Number of Days to Make m Bouquets (Medium)
 
-- 2141. Maximum Running Time of N Computers (Hard)
+- 2141 Maximum Running Time of N Computers (Hard)
 
 # Template 5: Find First or Last Occurrence
 First Occurrence:
@@ -173,9 +173,9 @@ def search_rotated(nums, target):
 ```
 # Problems:
 
-- 33. Search in Rotated Sorted Array (Medium)
+- 33 Search in Rotated Sorted Array (Medium)
 
-- 81. Search in Rotated Sorted Array II (Medium)
+- 81 Search in Rotated Sorted Array II (Medium)
 
 # Template 7: Binary Search Over Intervals (Search in Events, Schedules, etc.)
 Problem: Find next non-overlapping event, or earliest start > end of current.
@@ -238,14 +238,14 @@ def binary_search_float():
 ```
 # Problems:
 
-Maximum Average Subarray II
+- Maximum Average Subarray II
 
-Koko Eating Bananas (with floats)
+- Koko Eating Bananas (with floats)
 
-Split Array Largest Sum (float version)
-644. Maximum Average Subarray II (Hard)
+- Split Array Largest Sum (float version)
+- 644 Maximum Average Subarray II (Hard)
 
-410. Split Array Largest Sum (Hard, float version)
+- 410 Split Array Largest Sum (Hard, float version)
 
 # Template 10: Matrix Binary Search
 Problem: Matrix is sorted either row-wise or fully like 1D.
@@ -270,9 +270,9 @@ def search_matrix(matrix, target):
 ```
 # Problems:
 
-- 74. Search a 2D Matrix (Medium)
+- 74 Search a 2D Matrix (Medium)
 
-- 240. Search a 2D Matrix II (Medium)
+- 240 Search a 2D Matrix II (Medium)
 
 # Template 11: Binary Search + Greedy
 Problem: Find minimum max-group size, max distance, etc.
@@ -297,13 +297,13 @@ def min_largest_sum(nums, k):
             left = mid + 1
     return left
 ```
-✅ Problems:
+##  Problems:
 
-- 1283. Find the Smallest Divisor Given a Threshold (Medium)
+- 1283 Find the Smallest Divisor Given a Threshold (Medium)
 
-- 1201. Ugly Number III (Hard)
+- 1201 Ugly Number III (Hard)
 
-- 2226. Maximum Candies Allocated to K Children (Medium)
+- 2226 Maximum Candies Allocated to K Children (Medium)
 
 # Template 12: Multi-Dimensional Binary Search (2 Pointers + Binary Search)
 Use when your search space is over two or more arrays, or a combination of i and j.
@@ -313,7 +313,7 @@ for i in range(len(arr1)):
     j = binary_search(arr2, arr1[i])
     # combine results
 ```
-✅ Problems:
+## Problems:
 
 Median of Two Sorted Arrays (very advanced binary search)
 
@@ -338,11 +338,11 @@ def solve(index):
 ```
 # Problems:
 
-- 1235. Maximum Profit in Job Scheduling (Hard)
+- 1235 Maximum Profit in Job Scheduling (Hard)
 
-- 982. Triples with Bitwise AND Equal To Zero (Hard)
+- 982 Triples with Bitwise AND Equal To Zero (Hard)
 
-- 1547. Minimum Cost to Cut a Stick (Hard)
+- 1547 Minimum Cost to Cut a Stick (Hard)
 
 # Final Tips for Hard Problems:
 - Always think: Is the answer space sorted? Is it numeric?
@@ -368,15 +368,15 @@ def find_peak_in_mountain_array(arr):
 ```
 
 
-- 4. Median of Two Sorted Arrays (Hard)
+- 4 Median of Two Sorted Arrays (Hard)
 
-- 378. Kth Smallest Element in a Sorted Matrix (Medium)
+- 378 Kth Smallest Element in a Sorted Matrix (Medium)
 
-- 719. Find K-th Smallest Pair Distance (Hard)
-- 435. Non-overlapping Intervals (Medium)
+- 719 Find K-th Smallest Pair Distance (Hard)
+- 435 Non-overlapping Intervals (Medium)
 
-- 452. Minimum Number of Arrows to Burst Balloons (Medium)
+- 452 Minimum Number of Arrows to Burst Balloons (Medium)
 
-- 1353. Maximum Number of Events That Can Be Attended (Hard)
+- 1353 Maximum Number of Events That Can Be Attended (Hard)
 
-- 1235. Maximum Profit in Job Scheduling (Hard)
+- 1235 Maximum Profit in Job Scheduling (Hard)
