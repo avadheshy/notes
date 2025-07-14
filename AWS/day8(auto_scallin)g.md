@@ -99,6 +99,11 @@ You **cannot directly modify** instances in an Auto Scaling Group manually. Inst
 | Notifications     | Send alerts via SNS when scaling happens                     |
 
 ---
+For creating auto scaling we need 3 things
+- AMI
+- Launch template
+- Auto calling group
+---
 
 ##  Useful Resources
 
