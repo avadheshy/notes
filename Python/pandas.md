@@ -12,7 +12,7 @@ print(s)
 # 2    3
 
 # DataFrame
-df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]})
+df = pd.DataFrame({'A': [1, 2], 'B': [3, 4]}, index=[10, 20])
 print(df)
 #    A  B
 # 0  1  3
@@ -58,8 +58,15 @@ print(df.iloc[0])  # First row (position)
 print(df[df['A'] > 1])
 #    A  B
 # 1  2  4
-```
+df.loc[10]    # works, because 10 is a label
+df.iloc[0]    # works, because 0 is a position
+df.loc[0]     # ❌ KeyError: 0 is not a label
+df.iloc[10]   # ❌ IndexError: only 2 rows, no 10th position
 
+```
+- Use loc when you know the index label.
+
+- Use iloc when you want to access by position.
 ## 5. Filtering & Boolean Indexing
 
 ```python

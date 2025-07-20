@@ -16,14 +16,13 @@ def get_items():
     per_page = 10
     items = Item.query.paginate(page, per_page, False)
     return jsonify([item.serialize() for item in items.items])
+```
 2. Asynchronous Logging
 What it is: Logs are written in a background thread rather than blocking the main execution.
 
 Why it matters: Avoids performance bottlenecks from file I/O when logging frequently.
 
-python
-Copy
-Edit
+```
 import logging
 import queue
 import threading
@@ -37,14 +36,13 @@ def async_logger():
 
 logger = logging.getLogger('async')
 threading.Thread(target=async_logger, daemon=True).start()
+```
 3. Data Caching
 What it is: Frequently requested data is temporarily stored in memory using systems like Redis or Memcached.
 
 Why it matters: Significantly reduces database load and response time for repeated queries.
 
-python
-Copy
-Edit
+```
 import redis
 r = redis.Redis()
 
@@ -55,6 +53,8 @@ else:
     data = get_expensive_data()
     r.set('my_key', data, ex=3600)
     return data
+
+```
 4. Payload Compression
 What it is: Data sent over the network is compressed using formats like gzip or Brotli.
 

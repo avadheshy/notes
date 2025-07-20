@@ -124,3 +124,164 @@ Preferred Choice: Gevent is highly efficient for I/O-bound tasks due to its wide
 CPU-Intensive Tasks: Use the prefork pool to leverage multiple processors and bypass Python’s Global Interpreter Lock (GIL).
 
 Windows Platform: Use the solo pool. The Celery documentation explicitly states that “Celery is a project with minimal funding, so we don’t support Microsoft Windows. Please don’t open any issues related to the platform.”
+
+# 📧 Schedule Daily Email at 3 PM with Django, Celery, and Celery Beat
+
+## ✅ Step 1: Install Required Packages
+
+```bash
+pip install celery django-celery-beat
+```
+
+---
+
+## ✅ Step 2: Configure Celery
+
+### `myproject/celery.py`
+
+```python
+from __future__ import absolute_import
+import os
+from celery import Celery
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')
+
+app = Celery('myproject')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks()
+```
+
+### `myproject/__init__.py`
+
+```python
+from __future__ import absolute_import
+from .celery import app as celery_app
+
+__all__ = ['celery_app']
+```
+
+---
+
+## ✅ Step 3: Add Beat Scheduler Settings in `settings.py`
+
+```python
+INSTALLED_APPS = [
+    ...
+    'django_celery_beat',
+]
+
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+```
+
+Run migrations:
+
+```bash
+python manage.py migrate
+```
+
+---
+
+## ✅ Step 4: Create Email Task
+
+### `myapp/tasks.py`
+
+```python
+from celery import shared_task
+from django.core.mail import send_mail
+
+@shared_task
+def send_daily_email():
+    send_mail(
+        subject='Daily Update',
+        message='Here is your daily 3 PM update!',
+        from_email='your@email.com',
+        recipient_list=['user@example.com'],
+        fail_silently=False,
+    )
+```
+
+---
+
+## ✅ Step 5: Schedule the Task at 3 PM Daily
+
+### Option A: Using Django Admin
+
+1. Go to Admin → **Periodic Tasks**.
+2. Add **Crontab Schedule**:
+
+   * minute: `0`
+   * hour: `15`
+   * day\_of\_week: `*`
+   * day\_of\_month: `*`
+   * month\_of\_year: `*`
+3. Add **Periodic Task**:
+
+   * Name: `Daily Email at 3 PM`
+   * Task: `myapp.tasks.send_daily_email`
+   * Crontab: Select the one created above
+
+### Option B: Using Python Script
+
+```python
+from django_celery_beat.models import PeriodicTask, CrontabSchedule
+import json
+
+schedule, _ = CrontabSchedule.objects.get_or_create(
+    minute='0',
+    hour='15',
+    day_of_week='*',
+    day_of_month='*',
+    month_of_year='*'
+)
+
+PeriodicTask.objects.create(
+    crontab=schedule,
+    name='Daily Email at 3 PM',
+    task='myapp.tasks.send_daily_email',
+    args=json.dumps([]),
+)
+```
+
+---
+
+## ✅ Step 6: Run Celery and Celery Beat
+
+### 1. Run Celery Worker
+
+```bash
+celery -A myproject worker --loglevel=info
+```
+
+### 2. Run Celery Beat
+
+```bash
+celery -A myproject beat --loglevel=info
+```
+
+---
+
+## ✅ Optional Enhancements
+
+* Send to a list of users from DB
+* Use HTML templates in email
+* Track email delivery logs
+
+---
+
+# async tasks
+---
+```
+# taks.py
+from celery import shared_task
+
+@shared_task
+def notify_user(user_id):
+    print(f"Notify user with ID {user_id}")
+# other file
+from myapp.tasks import notify_user
+
+# Delay by 10 minutes (600 seconds)
+notify_user.apply_async(args=[1], countdown=600)
+
+```
+Happy Scheduling! 🎯
