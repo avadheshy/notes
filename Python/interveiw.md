@@ -149,6 +149,7 @@ print(a is c)  # True (same object)
 x = 256
 y = 256
 print(x is y)  # True (Python caches small integers)
+# Python caches small integers in the range [-5, 256] by default for performance. These are known as singleton integers.
 
 x = 257
 y = 257
@@ -5294,4 +5295,855 @@ class ConnectionPool:
     def __init__(self, create_connection, max_connections=5):
         self.create_connection = create_connection
         self.pool = Queue
+
+
+## 67. The `with` Statement and Context Management
+
+### What is the `with` Statement?
+
+The `with` statement in Python is used for context management. It ensures that setup and cleanup operations are performed automatically, even if an error occurs during execution. This is particularly useful for resource management like file handling, database connections, and thread locks.
+
+### How Context Management Works
+
+Context management is implemented through the **Context Manager Protocol**, which requires two special methods:
+
+- `__enter__()`: Called when entering the `with` block
+- `__exit__(exc_type, exc_value, traceback)`: Called when exiting the `with` block
+
+```python
+# Basic file handling with context manager
+with open('file.txt', 'r') as f:
+    content = f.read()
+# File is automatically closed here, even if an exception occurs
+```
+
+### Creating Custom Context Managers
+
+#### Method 1: Class-based Context Manager
+
+```python
+class DatabaseConnection:
+    def __init__(self, db_name):
+        self.db_name = db_name
+        self.connection = None
+    
+    def __enter__(self):
+        print(f"Connecting to {self.db_name}")
+        self.connection = f"Connection to {self.db_name}"
+        return self.connection
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        print(f"Closing connection to {self.db_name}")
+        if exc_type:
+            print(f"Exception occurred: {exc_value}")
+        return False  # Don't suppress exceptions
+
+# Usage
+with DatabaseConnection("mydb") as conn:
+    print(f"Using {conn}")
+    # Connection automatically closed
+```
+
+#### Method 2: Using `contextlib.contextmanager`
+
+```python
+from contextlib import contextmanager
+import time
+
+@contextmanager
+def timer():
+    start = time.time()
+    try:
+        yield
+    finally:
+        end = time.time()
+        print(f"Execution time: {end - start:.2f} seconds")
+
+# Usage
+with timer():
+    time.sleep(1)
+    print("Some operation")
+```
+
+## 68. Exception Handling and Logging in Production Apps
+
+### Graceful Exception Handling
+
+```python
+import logging
+import traceback
+from functools import wraps
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+def exception_handler(func):
+    """Decorator for handling exceptions gracefully"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            # Return a default value or re-raise based on requirements
+            return None
+    return wrapper
+
+@exception_handler
+def risky_operation(data):
+    # Simulate a risky operation
+    return 10 / data
+
+# Advanced exception handling with specific exception types
+def process_data(data):
+    try:
+        result = validate_data(data)
+        return process_validated_data(result)
+    except ValueError as e:
+        logger.warning(f"Data validation error: {e}")
+        return {"error": "invalid_data", "message": str(e)}
+    except ConnectionError as e:
+        logger.error(f"Connection error: {e}")
+        return {"error": "connection_failed", "message": "Service unavailable"}
+    except Exception as e:
+        logger.critical(f"Unexpected error: {e}")
+        logger.critical(traceback.format_exc())
+        return {"error": "internal_error", "message": "Something went wrong"}
+```
+
+### Production Logging Best Practices
+
+```python
+import logging
+import json
+from datetime import datetime
+
+class JSONFormatter(logging.Formatter):
+    """Custom JSON formatter for structured logging"""
+    def format(self, record):
+        log_entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+            'module': record.module,
+            'function': record.funcName,
+            'line': record.lineno
+        }
+        
+        if record.exc_info:
+            log_entry['exception'] = self.formatException(record.exc_info)
+            
+        return json.dumps(log_entry)
+
+# Setup structured logging
+def setup_logging():
+    logger = logging.getLogger()
+    handler = logging.StreamHandler()
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    return logger
+
+# Context manager for request tracking
+@contextmanager
+def request_context(request_id):
+    logger.info("Request started", extra={'request_id': request_id})
+    start_time = time.time()
+    try:
+        yield
+    finally:
+        duration = time.time() - start_time
+        logger.info("Request completed", extra={
+            'request_id': request_id,
+            'duration': duration
+        })
+```
+
+## 69. Performance: `try/except` vs `if/else`
+
+### Performance Comparison
+
+The performance difference between `try/except` and `if/else` depends on whether exceptions are actually raised:
+
+```python
+import time
+
+# Method 1: try/except (EAFP - Easier to Ask for Forgiveness than Permission)
+def eafp_approach(data_dict, key):
+    try:
+        return data_dict[key]
+    except KeyError:
+        return None
+
+# Method 2: if/else (LBYL - Look Before You Leap)
+def lbyl_approach(data_dict, key):
+    if key in data_dict:
+        return data_dict[key]
+    else:
+        return None
+
+# Performance test
+data = {str(i): i for i in range(1000)}
+
+# When key exists (common case)
+start = time.time()
+for _ in range(100000):
+    eafp_approach(data, "500")
+print(f"EAFP (key exists): {time.time() - start:.4f}s")
+
+start = time.time()
+for _ in range(100000):
+    lbyl_approach(data, "500")
+print(f"LBYL (key exists): {time.time() - start:.4f}s")
+
+# When key doesn't exist (exception case)
+start = time.time()
+for _ in range(100000):
+    eafp_approach(data, "nonexistent")
+print(f"EAFP (key missing): {time.time() - start:.4f}s")
+
+start = time.time()
+for _ in range(100000):
+    lbyl_approach(data, "nonexistent")
+print(f"LBYL (key missing): {time.time() - start:.4f}s")
+```
+
+### When to Use Each
+
+- **Use `try/except`** when exceptions are rare (EAFP is more Pythonic)
+- **Use `if/else`** when exceptions would be frequent
+- `try/except` has overhead when exceptions are raised
+- `if/else` has consistent performance regardless of conditions
+
+## 70. The `for...else` Statement
+
+The `else` clause in a `for` loop executes when the loop completes normally (not broken by `break`):
+
+```python
+# Example 1: Finding a prime number
+def is_prime(n):
+    if n < 2:
+        return False
+    
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            print(f"{n} is not prime (divisible by {i})")
+            break
+    else:
+        # This executes only if the loop wasn't broken
+        print(f"{n} is prime")
+        return True
+    return False
+
+# Example 2: Searching in a list
+def find_item(items, target):
+    for i, item in enumerate(items):
+        if item == target:
+            print(f"Found {target} at index {i}")
+            break
+    else:
+        print(f"{target} not found in list")
+
+# Example 3: Processing until condition met
+def process_until_success(attempts):
+    for attempt in range(attempts):
+        success = simulate_operation()  # Returns True/False
+        if success:
+            print(f"Success on attempt {attempt + 1}")
+            break
+        print(f"Attempt {attempt + 1} failed")
+    else:
+        print("All attempts failed")
+        raise Exception("Operation failed after all attempts")
+```
+
+## 71. Function Timeout Implementation
+
+### Method 1: Using `signal` (Unix/Linux only)
+
+```python
+import signal
+import time
+
+class TimeoutError(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Function timed out")
+
+def with_timeout(timeout_seconds):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Set the timeout handler
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_seconds)
+            
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                # Restore the old handler and cancel the alarm
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+            
+            return result
+        return wrapper
+    return decorator
+
+@with_timeout(3)
+def slow_function():
+    time.sleep(10)  # This will timeout after 3 seconds
+    return "Completed"
+```
+
+### Method 2: Using `threading` (Cross-platform)
+
+```python
+import threading
+import time
+from functools import wraps
+
+def timeout(seconds):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            result = [None]
+            exception = [None]
+            
+            def target():
+                try:
+                    result[0] = func(*args, **kwargs)
+                except Exception as e:
+                    exception[0] = e
+            
+            thread = threading.Thread(target=target)
+            thread.daemon = True
+            thread.start()
+            thread.join(seconds)
+            
+            if thread.is_alive():
+                # Force thread termination is not directly possible
+                # Thread will continue running in background
+                raise TimeoutError(f"Function timed out after {seconds} seconds")
+            
+            if exception[0]:
+                raise exception[0]
+            
+            return result[0]
+        return wrapper
+    return decorator
+
+@timeout(3)
+def slow_function():
+    time.sleep(10)
+    return "Completed"
+```
+
+### Method 3: Using `concurrent.futures` (Recommended)
+
+```python
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import time
+
+def run_with_timeout(func, timeout, *args, **kwargs):
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            print(f"Function timed out after {timeout} seconds")
+            return None
+
+def slow_function():
+    time.sleep(10)
+    return "Completed"
+
+# Usage
+result = run_with_timeout(slow_function, 3)
+print(result)  # None (timed out)
+
+# As a decorator
+def timeout_decorator(timeout_seconds):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return run_with_timeout(func, timeout_seconds, *args, **kwargs)
+        return wrapper
+    return decorator
+
+@timeout_decorator(3)
+def another_slow_function():
+    time.sleep(10)
+    return "Completed"
+```
+
+## 72. Sharing Data Between Processes in Multiprocessing
+
+### Method 1: Using `multiprocessing.Value` and `multiprocessing.Array`
+
+```python
+import multiprocessing
+import time
+
+def worker_with_shared_value(shared_value, worker_id):
+    for i in range(5):
+        with shared_value.get_lock():
+            temp = shared_value.value
+            temp += 1
+            time.sleep(0.1)  # Simulate work
+            shared_value.value = temp
+            print(f"Worker {worker_id}: {shared_value.value}")
+
+def worker_with_shared_array(shared_array, worker_id):
+    for i in range(len(shared_array)):
+        shared_array[i] = shared_array[i] + worker_id
+
+if __name__ == "__main__":
+    # Shared value
+    shared_value = multiprocessing.Value('i', 0)  # 'i' for integer
+    
+    processes = []
+    for i in range(3):
+        p = multiprocessing.Process(
+            target=worker_with_shared_value, 
+            args=(shared_value, i)
+        )
+        processes.append(p)
+        p.start()
+    
+    for p in processes:
+        p.join()
+    
+    print(f"Final value: {shared_value.value}")
+    
+    # Shared array
+    shared_array = multiprocessing.Array('d', [1.0, 2.0, 3.0, 4.0])  # 'd' for double
+    
+    processes = []
+    for i in range(2):
+        p = multiprocessing.Process(
+            target=worker_with_shared_array,
+            args=(shared_array, i + 1)
+        )
+        processes.append(p)
+        p.start()
+    
+    for p in processes:
+        p.join()
+    
+    print(f"Final array: {list(shared_array)}")
+```
+
+### Method 2: Using `multiprocessing.Manager`
+
+```python
+import multiprocessing
+from multiprocessing import Manager
+
+def worker_with_manager(shared_dict, shared_list, worker_id):
+    # Modify shared dictionary
+    shared_dict[f'worker_{worker_id}'] = f'Hello from worker {worker_id}'
+    
+    # Modify shared list
+    shared_list.append(f'Item from worker {worker_id}')
+    
+    print(f"Worker {worker_id} completed")
+
+if __name__ == "__main__":
+    with Manager() as manager:
+        # Shared dictionary and list
+        shared_dict = manager.dict()
+        shared_list = manager.list()
+        
+        processes = []
+        for i in range(3):
+            p = multiprocessing.Process(
+                target=worker_with_manager,
+                args=(shared_dict, shared_list, i)
+            )
+            processes.append(p)
+            p.start()
+        
+        for p in processes:
+            p.join()
+        
+        print(f"Shared dict: {dict(shared_dict)}")
+        print(f"Shared list: {list(shared_list)}")
+```
+
+### Method 3: Using `multiprocessing.Queue`
+
+```python
+import multiprocessing
+import time
+import random
+
+def producer(queue, producer_id):
+    for i in range(5):
+        item = f"Item {i} from producer {producer_id}"
+        queue.put(item)
+        print(f"Produced: {item}")
+        time.sleep(random.uniform(0.1, 0.5))
+
+def consumer(queue, consumer_id):
+    while True:
+        try:
+            item = queue.get(timeout=2)
+            print(f"Consumer {consumer_id} consumed: {item}")
+            time.sleep(random.uniform(0.1, 0.3))
+        except:
+            print(f"Consumer {consumer_id} timed out")
+            break
+
+if __name__ == "__main__":
+    queue = multiprocessing.Queue()
+    
+    # Start producers
+    producers = []
+    for i in range(2):
+        p = multiprocessing.Process(target=producer, args=(queue, i))
+        producers.append(p)
+        p.start()
+    
+    # Start consumers
+    consumers = []
+    for i in range(3):
+        c = multiprocessing.Process(target=consumer, args=(queue, i))
+        consumers.append(c)
+        c.start()
+    
+    # Wait for producers to complete
+    for p in producers:
+        p.join()
+    
+    # Wait a bit more for consumers to finish processing
+    time.sleep(3)
+    
+    # Terminate consumers
+    for c in consumers:
+        c.terminate()
+        c.join()
+```
+
+### Method 4: Using `multiprocessing.Pipe`
+
+```python
+import multiprocessing
+
+def sender(conn):
+    messages = ["Hello", "World", "from", "sender"]
+    for msg in messages:
+        conn.send(msg)
+        print(f"Sent: {msg}")
+    conn.close()
+
+def receiver(conn):
+    while True:
+        try:
+            msg = conn.recv()
+            print(f"Received: {msg}")
+        except EOFError:
+            break
+
+if __name__ == "__main__":
+    parent_conn, child_conn = multiprocessing.Pipe()
+    
+    sender_process = multiprocessing.Process(target=sender, args=(child_conn,))
+    receiver_process = multiprocessing.Process(target=receiver, args=(parent_conn,))
+    
+    sender_process.start()
+    receiver_process.start()
+    
+    sender_process.join()
+    receiver_process.join()
+```
+
+## 73. Implementing Caching in Python
+
+### Method 1: Using `functools.lru_cache`
+
+```python
+from functools import lru_cache
+import time
+
+@lru_cache(maxsize=128)
+def expensive_function(n):
+    """Simulate an expensive computation"""
+    print(f"Computing for {n}...")
+    time.sleep(1)  # Simulate delay
+    return n * n
+
+# Usage
+print(expensive_function(5))  # Takes 1 second
+print(expensive_function(5))  # Returns immediately from cache
+
+# Check cache info
+print(expensive_function.cache_info())
+
+# Clear cache
+expensive_function.cache_clear()
+```
+
+### Method 2: Custom Decorator-based Cache
+
+```python
+import time
+from functools import wraps
+from typing import Any, Callable, Dict, Tuple
+
+class Cache:
+    def __init__(self, maxsize: int = 128, ttl: int = None):
+        self.maxsize = maxsize
+        self.ttl = ttl
+        self.cache: Dict[Tuple, Tuple[Any, float]] = {}
+        self.access_order = []
+    
+    def _is_expired(self, timestamp: float) -> bool:
+        if self.ttl is None:
+            return False
+        return time.time() - timestamp > self.ttl
+    
+    def _evict_if_needed(self):
+        # Remove expired entries
+        if self.ttl:
+            expired_keys = [
+                key for key, (value, timestamp) in self.cache.items()
+                if self._is_expired(timestamp)
+            ]
+            for key in expired_keys:
+                del self.cache[key]
+                if key in self.access_order:
+                    self.access_order.remove(key)
+        
+        # Remove oldest entries if cache is full
+        while len(self.cache) >= self.maxsize:
+            oldest_key = self.access_order.pop(0)
+            del self.cache[oldest_key]
+    
+    def get(self, key: Tuple) -> Tuple[bool, Any]:
+        if key in self.cache:
+            value, timestamp = self.cache[key]
+            if not self._is_expired(timestamp):
+                # Move to end (most recently used)
+                self.access_order.remove(key)
+                self.access_order.append(key)
+                return True, value
+            else:
+                # Remove expired entry
+                del self.cache[key]
+                if key in self.access_order:
+                    self.access_order.remove(key)
+        return False, None
+    
+    def put(self, key: Tuple, value: Any):
+        self._evict_if_needed()
+        self.cache[key] = (value, time.time())
+        if key in self.access_order:
+            self.access_order.remove(key)
+        self.access_order.append(key)
+
+def cache_with_ttl(maxsize: int = 128, ttl: int = None):
+    def decorator(func: Callable) -> Callable:
+        cache = Cache(maxsize, ttl)
+        
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create cache key from arguments
+            key = (args, tuple(sorted(kwargs.items())))
+            
+            # Try to get from cache
+            hit, value = cache.get(key)
+            if hit:
+                return value
+            
+            # Compute value and cache it
+            result = func(*args, **kwargs)
+            cache.put(key, result)
+            return result
+        
+        wrapper.cache_info = lambda: {
+            'size': len(cache.cache),
+            'maxsize': cache.maxsize,
+            'ttl': cache.ttl
+        }
+        wrapper.cache_clear = lambda: cache.cache.clear()
+        
+        return wrapper
+    return decorator
+
+# Usage
+@cache_with_ttl(maxsize=100, ttl=60)  # Cache for 60 seconds
+def api_call(endpoint: str, params: dict = None):
+    print(f"Making API call to {endpoint}")
+    time.sleep(0.5)  # Simulate network delay
+    return f"Response from {endpoint}"
+
+print(api_call("/users", {"page": 1}))  # Makes actual call
+print(api_call("/users", {"page": 1}))  # Returns from cache
+```
+
+### Method 3: Class-based Caching
+
+```python
+class CachedComputation:
+    def __init__(self):
+        self._cache = {}
+        self._computation_count = 0
+    
+    def compute(self, x: int, y: int) -> int:
+        cache_key = (x, y)
+        
+        if cache_key in self._cache:
+            print(f"Cache hit for {cache_key}")
+            return self._cache[cache_key]
+        
+        print(f"Computing for {cache_key}")
+        self._computation_count += 1
+        
+        # Expensive computation
+        result = x ** y + y ** x
+        time.sleep(0.1)  # Simulate computation time
+        
+        self._cache[cache_key] = result
+        return result
+    
+    def get_stats(self):
+        return {
+            'cache_size': len(self._cache),
+            'computations_performed': self._computation_count
+        }
+    
+    def clear_cache(self):
+        self._cache.clear()
+
+# Usage
+calculator = CachedComputation()
+print(calculator.compute(2, 3))  # Computes
+print(calculator.compute(2, 3))  # From cache
+print(calculator.compute(3, 2))  # Computes
+print(calculator.get_stats())
+```
+
+### Method 4: Redis-based Distributed Caching
+
+```python
+import json
+import redis
+import pickle
+from functools import wraps
+from typing import Any, Callable
+
+class RedisCache:
+    def __init__(self, host='localhost', port=6379, db=0, default_ttl=3600):
+        self.redis_client = redis.Redis(host=host, port=port, db=db)
+        self.default_ttl = default_ttl
+    
+    def get(self, key: str) -> Any:
+        try:
+            data = self.redis_client.get(key)
+            if data:
+                return pickle.loads(data)
+        except Exception as e:
+            print(f"Redis get error: {e}")
+        return None
+    
+    def set(self, key: str, value: Any, ttl: int = None) -> bool:
+        try:
+            ttl = ttl or self.default_ttl
+            serialized = pickle.dumps(value)
+            return self.redis_client.setex(key, ttl, serialized)
+        except Exception as e:
+            print(f"Redis set error: {e}")
+            return False
+    
+    def delete(self, key: str) -> bool:
+        try:
+            return bool(self.redis_client.delete(key))
+        except Exception as e:
+            print(f"Redis delete error: {e}")
+            return False
+
+def redis_cache(ttl: int = 3600, key_prefix: str = ""):
+    cache = RedisCache(default_ttl=ttl)
+    
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Create cache key
+            cache_key = f"{key_prefix}{func.__name__}:{hash((args, tuple(sorted(kwargs.items()))))}"
+            
+            # Try to get from cache
+            cached_result = cache.get(cache_key)
+            if cached_result is not None:
+                print(f"Cache hit for {func.__name__}")
+                return cached_result
+            
+            # Compute and cache result
+            result = func(*args, **kwargs)
+            cache.set(cache_key, result, ttl)
+            print(f"Cached result for {func.__name__}")
+            return result
+        
+        return wrapper
+    return decorator
+
+# Usage (requires Redis server running)
+@redis_cache(ttl=300, key_prefix="myapp:")
+def fetch_user_data(user_id: int):
+    print(f"Fetching data for user {user_id}")
+    # Simulate database query
+    time.sleep(1)
+    return {"user_id": user_id, "name": f"User {user_id}", "email": f"user{user_id}@example.com"}
+
+# Example usage:
+# result1 = fetch_user_data(123)  # Fetches from "database"
+# result2 = fetch_user_data(123)  # Returns from Redis cache
+```
+
+### Performance Comparison and Best Practices
+
+```python
+import time
+from functools import lru_cache
+
+# Performance test
+def test_caching_performance():
+    @lru_cache(maxsize=128)
+    def cached_fibonacci(n):
+        if n < 2:
+            return n
+        return cached_fibonacci(n-1) + cached_fibonacci(n-2)
+    
+    def uncached_fibonacci(n):
+        if n < 2:
+            return n
+        return uncached_fibonacci(n-1) + uncached_fibonacci(n-2)
+    
+    # Test with cached version
+    start = time.time()
+    result_cached = cached_fibonacci(35)
+    cached_time = time.time() - start
+    
+    # Test with uncached version
+    start = time.time()
+    result_uncached = uncached_fibonacci(35)
+    uncached_time = time.time() - start
+    
+    print(f"Cached result: {result_cached} (Time: {cached_time:.4f}s)")
+    print(f"Uncached result: {result_uncached} (Time: {uncached_time:.4f}s)")
+    print(f"Speedup: {uncached_time/cached_time:.2f}x")
+
+# Run performance test
+test_caching_performance()
+```
 
