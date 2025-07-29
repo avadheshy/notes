@@ -1854,3 +1854,1901 @@ async def process_data_task(task_id: str, processing_data: DataProcessingTask):
             values = [item.get(field, 0) for item in data if field in item]
             avg = sum(values) / len(values) if values else 0
             result = {'operation': 'average', 'field': field, 'result':
+    
+
+# FastAPI Comprehensive Guide - Advanced Topics
+
+## 16. What are CORS, and how do you handle them in FastAPI?
+
+**CORS (Cross-Origin Resource Sharing)** is a security feature implemented by web browsers that restricts web pages from making requests to a different domain, protocol, or port than the one serving the web page.
+
+### Handling CORS in FastAPI:
+
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://mydomain.com"],  # Specific origins
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+)
+
+# For development (allow all origins)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/api/data")
+async def get_data():
+    return {"message": "Hello from FastAPI"}
+```
+
+### CORS Configuration Options:
+
+- **allow_origins**: List of allowed origins
+- **allow_credentials**: Whether to allow cookies/credentials
+- **allow_methods**: Allowed HTTP methods
+- **allow_headers**: Allowed headers
+- **expose_headers**: Headers exposed to the client
+
+## 17. How do you upload files in FastAPI?
+
+FastAPI provides excellent support for file uploads using `UploadFile` and `File`.
+
+### Basic File Upload:
+
+```python
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from typing import List
+import shutil
+import os
+
+app = FastAPI()
+
+@app.post("/upload-file/")
+async def upload_file(file: UploadFile = File(...)):
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="Only image files allowed")
+    
+    # Save file
+    file_location = f"uploads/{file.filename}"
+    with open(file_location, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    return {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "size": file.size
+    }
+
+@app.post("/upload-multiple/")
+async def upload_multiple_files(files: List[UploadFile] = File(...)):
+    file_info = []
+    for file in files:
+        file_location = f"uploads/{file.filename}"
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        file_info.append({
+            "filename": file.filename,
+            "size": file.size
+        })
+    
+    return {"uploaded_files": file_info}
+
+# File upload with additional form data
+from fastapi import Form
+
+@app.post("/upload-with-metadata/")
+async def upload_with_metadata(
+    file: UploadFile = File(...),
+    description: str = Form(...),
+    category: str = Form(...)
+):
+    return {
+        "filename": file.filename,
+        "description": description,
+        "category": category
+    }
+```
+
+### Advanced File Handling:
+
+```python
+import aiofiles
+from pathlib import Path
+
+@app.post("/upload-async/")
+async def upload_file_async(file: UploadFile = File(...)):
+    upload_dir = Path("uploads")
+    upload_dir.mkdir(exist_ok=True)
+    
+    file_path = upload_dir / file.filename
+    
+    async with aiofiles.open(file_path, 'wb') as f:
+        content = await file.read()
+        await f.write(content)
+    
+    return {"filename": file.filename, "saved_at": str(file_path)}
+```
+
+## 18. How do you implement pagination in FastAPI?
+
+Pagination is essential for handling large datasets efficiently.
+
+### Basic Pagination:
+
+```python
+from fastapi import FastAPI, Query, Depends
+from sqlalchemy.orm import Session
+from typing import List, Optional
+
+app = FastAPI()
+
+class PaginationParams:
+    def __init__(
+        self,
+        page: int = Query(1, ge=1, description="Page number"),
+        size: int = Query(20, ge=1, le=100, description="Page size")
+    ):
+        self.page = page
+        self.size = size
+        self.offset = (page - 1) * size
+
+@app.get("/items/")
+async def get_items(
+    pagination: PaginationParams = Depends(),
+    db: Session = Depends(get_db)
+):
+    # Get total count
+    total = db.query(Item).count()
+    
+    # Get paginated items
+    items = db.query(Item)\
+        .offset(pagination.offset)\
+        .limit(pagination.size)\
+        .all()
+    
+    return {
+        "items": items,
+        "pagination": {
+            "page": pagination.page,
+            "size": pagination.size,
+            "total": total,
+            "pages": (total + pagination.size - 1) // pagination.size
+        }
+    }
+```
+
+### Advanced Pagination with Filtering:
+
+```python
+from pydantic import BaseModel
+
+class ItemFilter(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+
+@app.get("/items/advanced/")
+async def get_items_advanced(
+    pagination: PaginationParams = Depends(),
+    filters: ItemFilter = Depends(),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Item)
+    
+    # Apply filters
+    if filters.name:
+        query = query.filter(Item.name.ilike(f"%{filters.name}%"))
+    if filters.category:
+        query = query.filter(Item.category == filters.category)
+    if filters.min_price:
+        query = query.filter(Item.price >= filters.min_price)
+    if filters.max_price:
+        query = query.filter(Item.price <= filters.max_price)
+    
+    total = query.count()
+    items = query.offset(pagination.offset).limit(pagination.size).all()
+    
+    return {
+        "items": items,
+        "pagination": {
+            "page": pagination.page,
+            "size": pagination.size,
+            "total": total,
+            "pages": (total + pagination.size - 1) // pagination.size,
+            "has_next": pagination.page * pagination.size < total,
+            "has_prev": pagination.page > 1
+        }
+    }
+```
+
+## 19. What is the difference between @app.get() and @app.post() in FastAPI?
+
+The main differences lie in HTTP methods, intended use, and how data is handled.
+
+### @app.get() - HTTP GET Method:
+
+```python
+@app.get("/users/{user_id}")
+async def get_user(user_id: int):
+    """
+    GET requests are used for:
+    - Retrieving data
+    - Should be idempotent (multiple calls don't change state)
+    - Parameters typically in URL path or query parameters
+    - No request body
+    """
+    return {"user_id": user_id, "name": "John Doe"}
+
+@app.get("/search")
+async def search_items(q: str, limit: int = 10):
+    """Query parameters for GET requests"""
+    return {"query": q, "limit": limit, "results": []}
+```
+
+### @app.post() - HTTP POST Method:
+
+```python
+from pydantic import BaseModel
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    age: int
+
+@app.post("/users/")
+async def create_user(user: UserCreate):
+    """
+    POST requests are used for:
+    - Creating new resources
+    - Submitting data to be processed
+    - Can change server state
+    - Data typically in request body
+    """
+    return {"message": "User created", "user": user}
+
+@app.post("/login/")
+async def login(credentials: dict):
+    """POST for sensitive data like passwords"""
+    return {"access_token": "token123"}
+```
+
+### Comparison Table:
+
+| Aspect | @app.get() | @app.post() |
+|--------|------------|-------------|
+| Purpose | Retrieve data | Create/Submit data |
+| Idempotent | Yes | No |
+| Request Body | No | Yes |
+| Caching | Cacheable | Not cacheable |
+| URL Length Limit | Yes | No (data in body) |
+| Security | Less secure for sensitive data | More secure |
+
+## 20. How can you customize exception handling in FastAPI?
+
+FastAPI provides multiple ways to handle exceptions globally and specifically.
+
+### Custom Exception Classes:
+
+```python
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+app = FastAPI()
+
+# Custom exception class
+class CustomException(Exception):
+    def __init__(self, name: str):
+        self.name = name
+
+# Global exception handler for custom exceptions
+@app.exception_handler(CustomException)
+async def custom_exception_handler(request: Request, exc: CustomException):
+    return JSONResponse(
+        status_code=418,
+        content={"message": f"Custom error occurred: {exc.name}"}
+    )
+
+# Override default HTTP exception handler
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": "HTTP Exception",
+            "detail": exc.detail,
+            "status_code": exc.status_code
+        }
+    )
+
+# Handle validation errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "Validation Error",
+            "details": exc.errors(),
+            "body": exc.body
+        }
+    )
+
+@app.get("/items/{item_id}")
+async def get_item(item_id: int):
+    if item_id == 0:
+        raise CustomException(name="Invalid item ID")
+    return {"item_id": item_id}
+```
+
+### Advanced Exception Handling:
+
+```python
+import logging
+from datetime import datetime
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class DatabaseException(Exception):
+    def __init__(self, message: str, error_code: str = None):
+        self.message = message
+        self.error_code = error_code
+        super().__init__(self.message)
+
+@app.exception_handler(DatabaseException)
+async def database_exception_handler(request: Request, exc: DatabaseException):
+    logger.error(f"Database error: {exc.message}")
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Database Error",
+            "message": exc.message,
+            "error_code": exc.error_code,
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+# Generic exception handler for unexpected errors
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unexpected error: {str(exc)}")
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred"
+        }
+    )
+```
+
+## 21. How do you handle form data in FastAPI?
+
+FastAPI can handle various types of form data including URL-encoded and multipart forms.
+
+### URL-Encoded Form Data:
+
+```python
+from fastapi import FastAPI, Form
+from pydantic import BaseModel
+
+app = FastAPI()
+
+@app.post("/login/")
+async def login(username: str = Form(...), password: str = Form(...)):
+    return {"username": username}
+
+# Multiple form fields
+@app.post("/submit-form/")
+async def submit_form(
+    name: str = Form(...),
+    email: str = Form(...),
+    age: int = Form(...),
+    subscribe: bool = Form(False)
+):
+    return {
+        "name": name,
+        "email": email,
+        "age": age,
+        "subscribe": subscribe
+    }
+```
+
+### Form Data with File Uploads:
+
+```python
+@app.post("/profile/")
+async def create_profile(
+    username: str = Form(...),
+    bio: str = Form(...),
+    avatar: UploadFile = File(None)
+):
+    profile_data = {"username": username, "bio": bio}
+    
+    if avatar:
+        profile_data["avatar"] = {
+            "filename": avatar.filename,
+            "content_type": avatar.content_type
+        }
+    
+    return profile_data
+```
+
+### Form Models with Pydantic:
+
+```python
+from typing import Optional
+
+class UserForm(BaseModel):
+    username: str
+    email: str
+    full_name: Optional[str] = None
+
+@app.post("/users/form/")
+async def create_user_form(
+    username: str = Form(...),
+    email: str = Form(...),
+    full_name: Optional[str] = Form(None)
+):
+    # Create Pydantic model from form data
+    user_data = UserForm(
+        username=username,
+        email=email,
+        full_name=full_name
+    )
+    return user_data
+```
+
+## 22. How do you handle multiple query parameters in FastAPI?
+
+FastAPI provides several ways to handle multiple query parameters effectively.
+
+### Basic Query Parameters:
+
+```python
+from typing import Optional, List
+from fastapi import Query
+
+@app.get("/search/")
+async def search_items(
+    q: Optional[str] = None,
+    skip: int = 0,
+    limit: int = Query(default=10, le=100),
+    sort_by: Optional[str] = Query(None, regex="^(name|date|price)$")
+):
+    return {
+        "query": q,
+        "skip": skip,
+        "limit": limit,
+        "sort_by": sort_by
+    }
+```
+
+### Query Parameter Lists:
+
+```python
+@app.get("/items/")
+async def get_items(
+    categories: List[str] = Query(None),
+    tags: List[str] = Query([]),
+    ids: List[int] = Query(None)
+):
+    return {
+        "categories": categories,
+        "tags": tags,
+        "ids": ids
+    }
+# URL: /items/?categories=electronics&categories=books&tags=new&ids=1&ids=2
+```
+
+### Query Parameters with Dependencies:
+
+```python
+class CommonQueryParams:
+    def __init__(
+        self,
+        skip: int = 0,
+        limit: int = Query(default=10, le=100),
+        sort: str = Query("created_at", regex="^(created_at|updated_at|name)$"),
+        order: str = Query("desc", regex="^(asc|desc)$")
+    ):
+        self.skip = skip
+        self.limit = limit
+        self.sort = sort
+        self.order = order
+
+@app.get("/products/")
+async def get_products(commons: CommonQueryParams = Depends()):
+    return {
+        "skip": commons.skip,
+        "limit": commons.limit,
+        "sort": commons.sort,
+        "order": commons.order
+    }
+```
+
+### Advanced Query Parameter Handling:
+
+```python
+from enum import Enum
+
+class SortOrder(str, Enum):
+    asc = "asc"
+    desc = "desc"
+
+class Category(str, Enum):
+    electronics = "electronics"
+    books = "books"
+    clothing = "clothing"
+
+@app.get("/advanced-search/")
+async def advanced_search(
+    q: Optional[str] = Query(None, min_length=3, max_length=50),
+    category: Optional[Category] = None,
+    min_price: Optional[float] = Query(None, ge=0),
+    max_price: Optional[float] = Query(None, ge=0),
+    in_stock: bool = Query(True),
+    sort_order: SortOrder = SortOrder.desc,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100)
+):
+    return {
+        "query": q,
+        "filters": {
+            "category": category,
+            "min_price": min_price,
+            "max_price": max_price,
+            "in_stock": in_stock
+        },
+        "sorting": {
+            "order": sort_order
+        },
+        "pagination": {
+            "page": page,
+            "per_page": per_page
+        }
+    }
+```
+
+## 23. What are request and response objects in FastAPI?
+
+Request and response objects provide access to raw HTTP data and allow customization of responses.
+
+### Request Object:
+
+```python
+from fastapi import FastAPI, Request
+from starlette.responses import JSONResponse
+
+app = FastAPI()
+
+@app.get("/request-info/")
+async def get_request_info(request: Request):
+    return {
+        "method": request.method,
+        "url": str(request.url),
+        "headers": dict(request.headers),
+        "query_params": dict(request.query_params),
+        "path_params": dict(request.path_params),
+        "client": request.client.host if request.client else None,
+        "cookies": dict(request.cookies)
+    }
+
+@app.post("/inspect-request/")
+async def inspect_request(request: Request):
+    body = await request.body()
+    json_data = await request.json() if request.headers.get("content-type") == "application/json" else None
+    
+    return {
+        "body_size": len(body),
+        "content_type": request.headers.get("content-type"),
+        "json_data": json_data
+    }
+```
+
+### Custom Response Objects:
+
+```python
+from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse, RedirectResponse
+from starlette.responses import Response
+
+app = FastAPI()
+
+@app.get("/custom-json/")
+async def custom_json():
+    content = {"message": "Custom JSON response"}
+    return JSONResponse(content=content, status_code=201, headers={"X-Custom": "header"})
+
+@app.get("/html-response/")
+async def html_response():
+    html_content = """
+    <html>
+        <head><title>Custom HTML</title></head>
+        <body><h1>Hello HTML!</h1></body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@app.get("/text-response/")
+async def text_response():
+    return PlainTextResponse("Hello, plain text!")
+
+@app.get("/redirect/")
+async def redirect():
+    return RedirectResponse(url="/new-location", status_code=302)
+
+@app.get("/custom-headers/")
+async def custom_headers():
+    response = JSONResponse({"message": "Success"})
+    response.headers["X-Custom-Header"] = "Custom Value"
+    response.set_cookie(key="session_id", value="abc123", httponly=True)
+    return response
+```
+
+### Response Models and Serialization:
+
+```python
+from pydantic import BaseModel
+from typing import List
+
+class User(BaseModel):
+    id: int
+    name: str
+    email: str
+
+class UserResponse(BaseModel):
+    user: User
+    message: str
+
+@app.get("/user/{user_id}", response_model=UserResponse)
+async def get_user(user_id: int):
+    user = User(id=user_id, name="John Doe", email="john@example.com")
+    return UserResponse(user=user, message="User retrieved successfully")
+
+# Custom response class
+class CustomResponse(Response):
+    media_type = "application/custom"
+    
+    def render(self, content) -> bytes:
+        return f"Custom: {content}".encode("utf-8")
+
+@app.get("/custom-response/")
+async def custom_response():
+    return CustomResponse("Hello Custom Response!")
+```
+
+## 24. How can you validate a specific field in a Pydantic model?
+
+Pydantic offers multiple ways to validate individual fields in models.
+
+### Field Validators:
+
+```python
+from pydantic import BaseModel, Field, validator, root_validator
+from typing import Optional
+import re
+from datetime import datetime
+
+class User(BaseModel):
+    name: str = Field(..., min_length=2, max_length=50)
+    email: str
+    age: int = Field(..., ge=0, le=120)
+    password: str
+    confirm_password: str
+    phone: Optional[str] = None
+    
+    @validator('email')
+    def validate_email(cls, v):
+        if '@' not in v:
+            raise ValueError('Invalid email format')
+        return v.lower()
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('Password must contain uppercase letter')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('Password must contain lowercase letter')
+        if not re.search(r'\d', v):
+            raise ValueError('Password must contain digit')
+        return v
+    
+    @validator('phone')
+    def validate_phone(cls, v):
+        if v is not None:
+            pattern = r'^\+?1?\d{9,15}$'
+            if not re.match(pattern, v):
+                raise ValueError('Invalid phone number format')
+        return v
+    
+    @root_validator
+    def validate_passwords_match(cls, values):
+        pw1 = values.get('password')
+        pw2 = values.get('confirm_password')
+        if pw1 is not None and pw2 is not None and pw1 != pw2:
+            raise ValueError('Passwords do not match')
+        return values
+```
+
+### Custom Field Types:
+
+```python
+from pydantic import BaseModel, validator, Field
+from typing import Union
+
+class ProductModel(BaseModel):
+    name: str
+    price: float = Field(..., gt=0)
+    category: str
+    sku: str
+    
+    @validator('sku')
+    def validate_sku(cls, v):
+        if not re.match(r'^[A-Z]{2}\d{4}$', v):
+            raise ValueError('SKU must be 2 uppercase letters followed by 4 digits')
+        return v
+    
+    @validator('category')
+    def validate_category(cls, v):
+        allowed_categories = ['electronics', 'books', 'clothing', 'home']
+        if v.lower() not in allowed_categories:
+            raise ValueError(f'Category must be one of: {allowed_categories}')
+        return v.lower()
+    
+    @validator('price')
+    def validate_price(cls, v):
+        # Round to 2 decimal places
+        return round(v, 2)
+
+# Usage in FastAPI
+@app.post("/products/")
+async def create_product(product: ProductModel):
+    return {"message": "Product created", "product": product}
+```
+
+### Advanced Validation with Context:
+
+```python
+from pydantic import BaseModel, validator, ValidationError
+
+class OrderModel(BaseModel):
+    product_id: int
+    quantity: int = Field(..., gt=0)
+    discount_code: Optional[str] = None
+    total_amount: float
+    
+    @validator('discount_code')
+    def validate_discount_code(cls, v, values):
+        if v is not None:
+            # Example: Validate discount code format
+            if not re.match(r'^[A-Z]{4}\d{2}$', v):
+                raise ValueError('Invalid discount code format')
+            
+            # You could also check against database here
+            valid_codes = ['SAVE10', 'DISC20', 'OFFER30']
+            if v not in valid_codes:
+                raise ValueError('Invalid discount code')
+        return v
+    
+    @validator('total_amount')
+    def validate_total_amount(cls, v, values):
+        quantity = values.get('quantity', 0)
+        if quantity > 0:
+            # Basic validation - could be more complex with product prices
+            if v <= 0:
+                raise ValueError('Total amount must be positive')
+        return v
+
+    class Config:
+        # Custom error messages
+        error_msg_templates = {
+            'value_error.missing': 'This field is required',
+            'value_error.number.not_gt': 'Value must be greater than {limit_value}',
+        }
+```
+
+## 25. What is the purpose of Depends() in FastAPI?
+
+`Depends()` is FastAPI's dependency injection system that allows you to declare dependencies that will be resolved automatically.
+
+### Basic Dependencies:
+
+```python
+from fastapi import FastAPI, Depends, HTTPException
+
+app = FastAPI()
+
+# Simple dependency function
+def get_current_user_id() -> int:
+    # In real app, this would extract from JWT token
+    return 123
+
+def get_db():
+    # Database connection logic
+    db = "database_connection"
+    try:
+        yield db
+    finally:
+        # Close database connection
+        pass
+
+@app.get("/profile/")
+async def get_profile(user_id: int = Depends(get_current_user_id)):
+    return {"user_id": user_id, "profile": "user profile data"}
+
+@app.get("/items/")
+async def get_items(db = Depends(get_db)):
+    # Use database connection
+    return {"items": ["item1", "item2"]}
+```
+
+### Class-Based Dependencies:
+
+```python
+class AuthService:
+    def __init__(self, api_key: str = "default-key"):
+        self.api_key = api_key
+    
+    def verify_token(self, token: str) -> bool:
+        return token == "valid-token"
+
+class DatabaseService:
+    def __init__(self):
+        self.connection = "db_connection"
+    
+    def get_user(self, user_id: int):
+        return {"id": user_id, "name": "John Doe"}
+
+def get_auth_service():
+    return AuthService(api_key="secret-key")
+
+def get_db_service():
+    return DatabaseService()
+
+@app.get("/secure-data/")
+async def get_secure_data(
+    token: str,
+    auth: AuthService = Depends(get_auth_service),
+    db: DatabaseService = Depends(get_db_service)
+):
+    if not auth.verify_token(token):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    user = db.get_user(123)
+    return {"user": user, "secure_data": "sensitive information"}
+```
+
+### Sub-Dependencies:
+
+```python
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+def get_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    return credentials.credentials
+
+def get_current_user(token: str = Depends(get_token)):
+    # Validate token and return user
+    if token != "valid-token":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"id": 1, "username": "john_doe"}
+
+def get_admin_user(current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+@app.get("/admin/users/")
+async def get_all_users(admin_user: dict = Depends(get_admin_user)):
+    return {"message": "Admin access granted", "admin": admin_user}
+```
+
+### Dependencies with Parameters:
+
+```python
+from functools import partial
+
+def create_rate_limiter(max_requests: int, window_seconds: int):
+    def rate_limiter(request: Request):
+        # Rate limiting logic here
+        client_ip = request.client.host
+        # Check if client_ip has exceeded max_requests in window_seconds
+        return True  # or raise HTTPException if rate limited
+    return rate_limiter
+
+# Create specific rate limiters
+strict_rate_limiter = create_rate_limiter(max_requests=10, window_seconds=60)
+loose_rate_limiter = create_rate_limiter(max_requests=100, window_seconds=60)
+
+@app.get("/api/strict/")
+async def strict_endpoint(request: Request, _: bool = Depends(strict_rate_limiter)):
+    return {"message": "Strict rate limiting applied"}
+
+@app.get("/api/loose/")
+async def loose_endpoint(request: Request, _: bool = Depends(loose_rate_limiter)):
+    return {"message": "Loose rate limiting applied"}
+```
+
+## 26. How do you handle global dependencies in FastAPI?
+
+Global dependencies can be applied to entire applications, routers, or groups of endpoints.
+
+### Application-Level Dependencies:
+
+```python
+from fastapi import FastAPI, Depends, HTTPException, Request
+import time
+
+# Global dependency functions
+def log_requests(request: Request):
+    start_time = time.time()
+    print(f"Request: {request.method} {request.url}")
+    return start_time
+
+def verify_api_key(api_key: str = Header(None)):
+    if api_key != "secret-api-key":
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    return api_key
+
+# Apply global dependencies to the entire app
+app = FastAPI(dependencies=[Depends(log_requests), Depends(verify_api_key)])
+
+@app.get("/items/")
+async def get_items():
+    return {"items": ["item1", "item2"]}
+
+@app.get("/users/")
+async def get_users():
+    return {"users": ["user1", "user2"]}
+```
+
+### Router-Level Dependencies:
+
+```python
+from fastapi import APIRouter
+
+# Create router with dependencies
+admin_router = APIRouter(
+    prefix="/admin",
+    dependencies=[Depends(get_admin_user), Depends(log_admin_access)]
+)
+
+def log_admin_access(current_user: dict = Depends(get_current_user)):
+    print(f"Admin access by user: {current_user['username']}")
+    return True
+
+@admin_router.get("/dashboard/")
+async def admin_dashboard():
+    return {"message": "Admin dashboard"}
+
+@admin_router.get("/settings/")
+async def admin_settings():
+    return {"message": "Admin settings"}
+
+app.include_router(admin_router)
+```
+
+### Conditional Global Dependencies:
+
+```python
+from contextlib import asynccontextmanager
+
+class GlobalDependencyManager:
+    def __init__(self):
+        self.maintenance_mode = False
+        self.rate_limit_enabled = True
+    
+    def check_maintenance_mode(self):
+        if self.maintenance_mode:
+            raise HTTPException(
+                status_code=503, 
+                detail="Service under maintenance"
+            )
+        return True
+    
+    def apply_rate_limiting(self, request: Request):
+        if self.rate_limit_enabled:
+            # Apply rate limiting logic
+            pass
+        return True
+
+dependency_manager = GlobalDependencyManager()
+
+@app.middleware("http")
+async def global_dependency_middleware(request: Request, call_next):
+    # Apply global checks
+    try:
+        dependency_manager.check_maintenance_mode()
+        dependency_manager.apply_rate_limiting(request)
+        response = await call_next(request)
+        return response
+    except HTTPException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"detail": e.detail}
+        )
+```
+
+### Scoped Dependencies:
+
+```python
+from typing import Generator
+
+class DatabaseConnection:
+    def __init__(self):
+        self.connection = "active_db_connection"
+    
+    def close(self):
+        print("Database connection closed")
+
+def get_db_connection() -> Generator[DatabaseConnection, None, None]:
+    db = DatabaseConnection()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Scoped dependency for specific endpoints
+protected_router = APIRouter(
+    prefix="/protected",
+    dependencies=[Depends(get_current_user)]
+)
+
+@protected_router.get("/data/")
+async def get_protected_data(db: DatabaseConnection = Depends(get_db_connection)):
+    return {"data": "protected data", "db_status": db.connection}
+
+app.include_router(protected_router)
+```
+
+## 27. What are asynchronous dependencies, and how can you define them in FastAPI?
+
+Asynchronous dependencies allow for non-blocking I/O operations within the dependency injection system.
+
+### Basic Async Dependencies:
+
+```python
+import asyncio
+from fastapi import FastAPI, Depends
+import httpx
+
+app = FastAPI()
+
+# Async dependency function
+async def get_external_data():
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://api.example.com/data")
+        return response.json()
+
+async def verify_async_token(token: str = Header(None)):
+    # Simulate async token verification (e.g., checking with external service)
+    await asyncio.sleep(0.1)  # Simulate network delay
+    
+    if token != "valid-async-token":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"token": token, "valid": True}
+
+@app.get("/async-data/")
+async def get_data_with_async_deps(
+    external_data: dict = Depends(get_external_data),
+    token_info: dict = Depends(verify_async_token)
+):
+    return {
+        "external_data": external_data,
+        "token_info": token_info
+    }
+```
+
+### Async Database Dependencies:
+
+```python
+import asyncpg
+from typing import AsyncGenerator
+
+class AsyncDatabase:
+    def __init__(self):
+        self.pool = None
+    
+    async def connect(self):
+        self.pool = await asyncpg.create_pool(
+            "postgresql://user:password@localhost/dbname"
+        )
+    
+    async def disconnect(self):
+        if self.pool:
+            await self.pool.close()
+    
+    async def fetch_user(self, user_id: int):
+        async with self.pool.acquire() as connection:
+            result = await connection.fetchrow(
+                "SELECT * FROM users WHERE id = $1", user_id
+            )
+            return dict(result) if result else None
+
+# Global database instance
+database = AsyncDatabase()
+
+async def get_async_db() -> AsyncGenerator[AsyncDatabase, None]:
+    if not database.pool:
+        await database.connect()
+    
+    try:
+        yield database
+    except Exception as e:
+        # Handle database errors
+        print(f"Database error: {e}")
+        raise HTTPException(status_code=500, detail="Database error")
+
+@app.get("/users/{user_id}")
+async def get_user(
+    user_id: int,
+    db: AsyncDatabase = Depends(get_async_db)
+):
+    user = await db.fetch_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+```
+
+### Async Dependencies with Caching:
+
+```python
+import aioredis
+from datetime import datetime, timedelta
+import json
+
+class AsyncCacheService:
+    def __init__(self):
+        self.redis = None
+    
+    async def connect(self):
+        self.redis = await aioredis.from_url("redis://localhost")
+    
+    async def get(self, key: str):
+        if not self.redis:
+            await self.connect()
+        
+        value = await self.redis.get(key)
+        return json.loads(value) if value else None
+    
+    async def set(self, key: str, value: dict, expire: int = 300):
+        if not self.redis:
+            await self.connect()
+        
+        await self.redis.setex(key, expire, json.dumps(value))
+
+cache_service = AsyncCacheService()
+
+async def get_cached_user_data(user_id: int = Path(...)):
+    cache_key = f"user:{user_id}"
+    
+    # Try to get from cache first
+    cached_data = await cache_service.get(cache_key)
+    if cached_data:
+        return cached_data
+    
+    # If not in cache, fetch from database (simulated)
+    await asyncio.sleep(0.5)  # Simulate database query
+    user_data = {
+        "id": user_id,
+        "name": f"User {user_id}",
+        "fetched_at": datetime.now().isoformat()
+    }
+    
+    # Cache the result
+    await cache_service.set(cache_key, user_data)
+    return user_data
+
+@app.get("/cached-users/{user_id}")
+async def get_cached_user(user_data: dict = Depends(get_cached_user_data)):
+    return user_data
+```
+
+### Async Dependencies with Background Tasks:
+
+```python
+from fastapi import BackgroundTasks
+import asyncio
+
+async def log_user_activity(user_id: int, action: str):
+    # Simulate async logging
+    await asyncio.sleep(0.1)
+    print(f"User {user_id} performed action: {action}")
+
+async def send_notification(user_id: int, message: str):
+    # Simulate async notification sending
+    await asyncio.sleep(0.2)
+    print(f"Notification sent to user {user_id}: {message}")
+
+async def get_user_with_logging(
+    user_id: int = Path(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    current_user: dict = Depends(get_current_user)
+):
+    # Add background tasks
+    background_tasks.add_task(log_user_activity, current_user["id"], "viewed_profile")
+    background_tasks.add_task(send_notification, user_id, "Profile was viewed")
+    
+    return {"user_id": user_id, "viewer": current_user["id"]}
+
+@app.get("/users/{user_id}/profile")
+async def get_user_profile(user_data: dict = Depends(get_user_with_logging)):
+    return user_data
+```
+
+## 28. How can you handle rate limiting in FastAPI?
+
+Rate limiting helps protect your API from abuse and ensures fair usage among clients.
+
+### Basic Rate Limiting with Redis:
+
+```python
+import aioredis
+import time
+from fastapi import FastAPI, Request, HTTPException, Depends
+from typing import Optional
+
+app = FastAPI()
+
+class RateLimiter:
+    def __init__(self, redis_url: str = "redis://localhost"):
+        self.redis_url = redis_url
+        self.redis = None
+    
+    async def init_redis(self):
+        if not self.redis:
+            self.redis = await aioredis.from_url(self.redis_url)
+    
+    async def is_allowed(
+        self, 
+        key: str, 
+        limit: int, 
+        window: int
+    ) -> tuple[bool, dict]:
+        await self.init_redis()
+        
+        current_time = int(time.time())
+        window_start = current_time - window
+        
+        # Use Redis sorted set to track requests
+        pipe = self.redis.pipeline()
+        
+        # Remove old entries
+        pipe.zremrangebyscore(key, 0, window_start)
+        
+        # Count current requests
+        pipe.zcard(key)
+        
+        # Add current request
+        pipe.zadd(key, {str(current_time): current_time})
+        
+        # Set expiry
+        pipe.expire(key, window)
+        
+        results = await pipe.execute()
+        current_requests = results[1]
+        
+        remaining = max(0, limit - current_requests)
+        reset_time = current_time + window
+        
+        return current_requests < limit, {
+            "limit": limit,
+            "remaining": remaining,
+            "reset": reset_time,
+            "current": current_requests
+        }
+
+rate_limiter = RateLimiter()
+
+async def apply_rate_limit(
+    request: Request,
+    limit: int = 100,
+    window: int = 3600  # 1 hour
+):
+    client_ip = request.client.host
+    key = f"rate_limit:{client_ip}"
+    
+    allowed, info = await rate_limiter.is_allowed(key, limit, window)
+    
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={
+                "X-RateLimit-Limit": str(info["limit"]),
+                "X-RateLimit-Remaining": str(info["remaining"]),
+                "X-RateLimit-Reset": str(info["reset"])
+            }
+        )
+    
+    return info
+
+@app.get("/api/data")
+async def get_data(
+    request: Request,
+    rate_info: dict = Depends(lambda r: apply_rate_limit(r, limit=10, window=60))
+):
+    return {
+        "data": "some data",
+        "rate_limit_info": rate_info
+    }
+```
+
+### Advanced Rate Limiting with Different Tiers:
+
+```python
+from enum import Enum
+from functools import wraps
+
+class UserTier(str, Enum):
+    FREE = "free"
+    PREMIUM = "premium"
+    ENTERPRISE = "enterprise"
+
+class TieredRateLimiter:
+    TIER_LIMITS = {
+        UserTier.FREE: {"requests": 100, "window": 3600},
+        UserTier.PREMIUM: {"requests": 1000, "window": 3600},
+        UserTier.ENTERPRISE: {"requests": 10000, "window": 3600}
+    }
+    
+    def __init__(self):
+        self.rate_limiter = RateLimiter()
+    
+    async def check_user_limit(
+        self, 
+        user_id: str, 
+        tier: UserTier
+    ) -> tuple[bool, dict]:
+        limits = self.TIER_LIMITS[tier]
+        key = f"user_rate_limit:{user_id}"
+        
+        return await self.rate_limiter.is_allowed(
+            key, 
+            limits["requests"], 
+            limits["window"]
+        )
+
+tiered_limiter = TieredRateLimiter()
+
+async def get_user_tier(user_id: int = Depends(get_current_user_id)) -> UserTier:
+    # In real app, fetch from database
+    user_tiers = {
+        1: UserTier.FREE,
+        2: UserTier.PREMIUM,
+        3: UserTier.ENTERPRISE
+    }
+    return user_tiers.get(user_id, UserTier.FREE)
+
+async def apply_tiered_rate_limit(
+    user_id: int = Depends(get_current_user_id),
+    user_tier: UserTier = Depends(get_user_tier)
+):
+    allowed, info = await tiered_limiter.check_user_limit(str(user_id), user_tier)
+    
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded for {user_tier} tier",
+            headers={
+                "X-RateLimit-Limit": str(info["limit"]),
+                "X-RateLimit-Remaining": str(info["remaining"]),
+                "X-RateLimit-Reset": str(info["reset"]),
+                "X-RateLimit-Tier": user_tier
+            }
+        )
+    
+    return info
+
+@app.get("/api/premium-data")
+async def get_premium_data(
+    rate_info: dict = Depends(apply_tiered_rate_limit)
+):
+    return {
+        "premium_data": "exclusive content",
+        "rate_limit_info": rate_info
+    }
+```
+
+### Rate Limiting Middleware:
+
+```python
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, rate_limiter: RateLimiter):
+        super().__init__(app)
+        self.rate_limiter = rate_limiter
+    
+    async def dispatch(self, request, call_next):
+        # Skip rate limiting for certain paths
+        if request.url.path in ["/health", "/docs", "/openapi.json"]:
+            return await call_next(request)
+        
+        client_ip = request.client.host
+        key = f"global_rate_limit:{client_ip}"
+        
+        allowed, info = await self.rate_limiter.is_allowed(key, 1000, 3600)
+        
+        if not allowed:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Global rate limit exceeded"},
+                headers={
+                    "X-RateLimit-Limit": str(info["limit"]),
+                    "X-RateLimit-Remaining": str(info["remaining"]),
+                    "X-RateLimit-Reset": str(info["reset"])
+                }
+            )
+        
+        response = await call_next(request)
+        
+        # Add rate limit headers to response
+        response.headers["X-RateLimit-Limit"] = str(info["limit"])
+        response.headers["X-RateLimit-Remaining"] = str(info["remaining"])
+        response.headers["X-RateLimit-Reset"] = str(info["reset"])
+        
+        return response
+
+# Add middleware to app
+app.add_middleware(RateLimitMiddleware, rate_limiter=rate_limiter)
+```
+
+## 29. How do you manage database connections in FastAPI?
+
+Proper database connection management is crucial for performance and reliability.
+
+### SQLAlchemy with Dependency Injection:
+
+```python
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from fastapi import Depends
+
+# Database setup
+DATABASE_URL = "postgresql://user:password@localhost/dbname"
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Database models
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    email = Column(String, unique=True, index=True)
+
+# Dependency to get database session
+def get_db() -> Session:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Usage in endpoints
+@app.get("/users/{user_id}")
+async def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+```
+
+### Async Database with AsyncPG:
+
+```python
+import asyncpg
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+class AsyncDatabaseManager:
+    def __init__(self, database_url: str):
+        self.database_url = database_url
+        self.pool: Optional[asyncpg.Pool] = None
+    
+    async def create_pool(self):
+        self.pool = await asyncpg.create_pool(
+            self.database_url,
+            min_size=10,
+            max_size=20,
+            command_timeout=60,
+            server_settings={
+                'jit': 'off'
+            }
+        )
+    
+    async def close_pool(self):
+        if self.pool:
+            await self.pool.close()
+    
+    @asynccontextmanager
+    async def get_connection(self):
+        if not self.pool:
+            await self.create_pool()
+        
+        async with self.pool.acquire() as connection:
+            try:
+                yield connection
+            except Exception as e:
+                # Log error and re-raise
+                print(f"Database error: {e}")
+                raise
+
+# Global database manager
+db_manager = AsyncDatabaseManager("postgresql://user:password@localhost/dbname")
+
+# Dependency for database connection
+async def get_async_db() -> AsyncGenerator[asyncpg.Connection, None]:
+    async with db_manager.get_connection() as connection:
+        yield connection
+
+@app.get("/async-users/{user_id}")
+async def get_async_user(
+    user_id: int, 
+    db: asyncpg.Connection = Depends(get_async_db)
+):
+    query = "SELECT id, name, email FROM users WHERE id = $1"
+    user = await db.fetchrow(query, user_id)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return dict(user)
+```
+
+### Database Connection with Health Checks:
+
+```python
+from sqlalchemy import text
+import logging
+
+logger = logging.getLogger(__name__)
+
+class DatabaseHealthCheck:
+    def __init__(self, db_session: Session):
+        self.db_session = db_session
+    
+    async def check_connection(self) -> bool:
+        try:
+            # Simple query to test connection
+            result = self.db_session.execute(text("SELECT 1"))
+            return result.scalar() == 1
+        except Exception as e:
+            logger.error(f"Database health check failed: {e}")
+            return False
+
+def get_db_with_health_check() -> Session:
+    db = SessionLocal()
+    try:
+        # Test connection before yielding
+        health_check = DatabaseHealthCheck(db)
+        if not health_check.check_connection():
+            raise HTTPException(
+                status_code=503, 
+                detail="Database unavailable"
+            )
+        yield db
+    except Exception as e:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+@app.get("/health/database")
+async def database_health(db: Session = Depends(get_db_with_health_check)):
+    return {"status": "healthy", "database": "connected"}
+```
+
+### Database Transaction Management:
+
+```python
+from contextlib import contextmanager
+from sqlalchemy.orm import Session
+
+@contextmanager
+def db_transaction(db: Session):
+    try:
+        yield db
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Database transaction failed: {e}")
+        raise
+    finally:
+        db.close()
+
+async def create_user_with_transaction(
+    user_data: dict,
+    db: Session = Depends(get_db)
+):
+    with db_transaction(db) as transaction_db:
+        # Multiple database operations in a transaction
+        user = User(**user_data)
+        transaction_db.add(user)
+        transaction_db.flush()  # Get the ID without committing
+        
+        # Additional operations
+        user_profile = UserProfile(user_id=user.id, bio="Default bio")
+        transaction_db.add(user_profile)
+        
+        # Transaction will be committed automatically
+        return {"user_id": user.id, "message": "User created successfully"}
+```
+
+## 30. How can you implement JWT-based authentication in FastAPI?
+
+JWT (JSON Web Tokens) provide a stateless way to handle authentication in FastAPI applications.
+
+### Basic JWT Implementation:
+
+```python
+from datetime import datetime, timedelta
+from typing import Optional
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+# Configuration
+SECRET_KEY = "your-secret-key-here"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        
+        # Check token expiration
+        exp = payload.get("exp")
+        if exp is None or datetime.utcnow() > datetime.fromtimestamp(exp):
+            raise credentials_exception
+            
+    except JWTError:
+        raise credentials_exception
+    
+    return payload
+
+# Authentication endpoints
+@app.post("/login")
+async def login(username: str = Form(...), password: str = Form(...)):
+    # Verify user credentials (check against database)
+    user = authenticate_user(username, password)  # Your implementation
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password"
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "user_id": user.id},
+        expires_delta=access_token_expires
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    }
+
+# Protected endpoint
+@app.get("/protected")
+async def protected_route(token_data: dict = Depends(verify_token)):
+    return {
+        "message": "This is a protected route",
+        "user": token_data.get("sub"),
+        "user_id": token_data.get("user_id")
+    }
+```
+
+### Advanced JWT with Refresh Tokens:
+
+```python
+import uuid
+from enum import Enum
+
+class TokenType(str, Enum):
+    ACCESS = "access"
+    REFRESH = "refresh"
+
+# Token storage (in production, use Redis or database)
+refresh_tokens = set()
+
+def create_tokens(user_data: dict):
+    # Create access token (short-lived)
+    access_token_expires = timedelta(minutes=15)
+    access_token = create_access_token(
+        data={**user_data, "token_type": TokenType.ACCESS},
+        expires_delta=access_token_expires
+    )
+    
+    # Create refresh token (long-lived)
+    refresh_token_expires = timedelta(days=7)
+    refresh_token_data = {
+        **user_data,
+        "token_type": TokenType.REFRESH,
+        "jti": str(uuid.uuid4())  # Unique token ID
+    }
+    refresh_token = create_access_token(
+        data=refresh_token_data,
+        expires_delta=refresh_token_expires
+    )
+    
+    # Store refresh token
+    refresh_tokens.add(refresh_token_data["jti"])
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": 15 * 60
+    }
+
+def verify_refresh_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        # Verify it's a refresh token
+        if payload.get("token_type") != TokenType.REFRESH:
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        
+        # Check if token is still valid (not revoked)
+        jti = payload.get("jti")
+        if jti not in refresh_tokens:
+            raise HTTPException(status_code=401, detail="Token revoked")
+        
+        return payload
+        
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+@app.post("/login")
+async def enhanced_login(username: str = Form(...), password: str = Form(...)):
+    user = authenticate_user(username, password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    tokens = create_tokens({"sub": user.username, "user_id": user.id})
+    return tokens
+
+@app.post("/refresh")
+async def refresh_access_token(refresh_token: str = Form(...)):
+    payload = verify_refresh_token(refresh_token)
+    
+    # Create new access token
+    new_access_token = create_access_token(
+        data={
+            "sub": payload.get("sub"),
+            "user_id": payload.get("user_id"),
+            "token_type": TokenType.ACCESS
+        },
+        expires_delta=timedelta(minutes=15)
+    )
+    
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer",
+        "expires_in": 15 * 60
+    }
+
+@app.post("/logout")
+async def logout(refresh_token: str = Form(...)):
+    payload = verify_refresh_token(refresh_token)
+    
+    # Revoke refresh token
+    jti = payload.get("jti")
+    refresh_tokens.discard(jti)
+    
+    return {"message": "Successfully logged out"}
+```
+
+### Role-Based Access Control with JWT:
+
+```python
+from functools import wraps
+from typing import List
+
+class UserRole(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+    MODERATOR = "moderator"
+
+def create_access_token_with_roles(user_data: dict, roles: List[UserRole]):
+    token_data = {
+        **user_data,
+        "roles": [role.value for role in roles],
+        "token_type": TokenType.ACCESS
+    }
+    return create_access_token(token_data, timedelta(minutes=15))
+
+def require_roles(required_roles: List[UserRole]):
+    def role_checker(token_data: dict = Depends(verify_token)):
+        user_roles = token_data.get("roles", [])
+        
+        if not any(role.value in user_roles for role in required_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
+            )
+        
+        return token_data
+    
+    return role_checker
+
+def require_admin(token_data: dict = Depends(verify_token)):
+    if UserRole.ADMIN.value not in token_data.get("roles", []):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return token_data
+
+# Protected endpoints with role requirements
+@app.get("/admin/users")
+async def get_all_users(token_data: dict = Depends(require_admin)):
+    return {"users": ["user1", "user2"], "admin": token_data.get("sub")}
+
+@app.get("/moderator/reports")
+async def get_reports(
+    token_data: dict = Depends(require_roles([UserRole.ADMIN, UserRole.MODERATOR]))
+):
+    return {"reports": ["report1", "report2"], "user": token_data.get("sub")}
+```
+

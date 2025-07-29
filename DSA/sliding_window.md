@@ -41,18 +41,7 @@ def at_most_k(nums, k):
 ---
 |  # | Problem                                                  | Type                     | Pattern                             | Link                                                                                                   |
 | -: | -------------------------------------------------------- | ------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
-|  1 | **Maximum Average Subarray I**                           | Fixed Size               | Max sum of window                   | [643](https://leetcode.com/problems/maximum-average-subarray-i/)                                       |
-|  2 | **Sliding Window Maximum**                               | Fixed Size + Deque       | Maintain max in window              | [239](https://leetcode.com/problems/sliding-window-maximum/)                                           |
-|  3 | **Minimum Size Subarray Sum**                            | Variable Size            | Shrinking when sum ≥ target         | [209](https://leetcode.com/problems/minimum-size-subarray-sum/)                                        |
-|  4 | **Longest Substring Without Repeating Characters**       | Variable Size            | Unique chars                        | [3](https://leetcode.com/problems/longest-substring-without-repeating-characters/)                     |
-|  5 | **Longest Repeating Character Replacement**              | Variable Size            | Most frequent char                  | [424](https://leetcode.com/problems/longest-repeating-character-replacement/)                          |
-|  6 | **Permutation in String**                                | Fixed Size + Freq Map    | Anagram match in window             | [567](https://leetcode.com/problems/permutation-in-string/)                                            |
-|  7 | **Minimum Window Substring**                             | Variable Size + Freq Map | Shrinking valid window              | [76](https://leetcode.com/problems/minimum-window-substring/)                                          |
-|  8 | **Longest Substring with At Most K Distinct Characters** | Variable Size            | Shrink if > K distinct              | [340](https://leetcode.com/problems/longest-substring-with-at-most-k-distinct-characters/) *(Premium)* |
-|  9 | **Fruit Into Baskets**                                   | Variable Size            | At most 2 types                     | [904](https://leetcode.com/problems/fruit-into-baskets/)                                               |
-| 10 | **Count Number of Nice Subarrays**                       | Prefix Sum + Sliding     | Exactly k odds                      | [1248](https://leetcode.com/problems/count-number-of-nice-subarrays/)                                  |
-| 11 | **Subarrays with K Different Integers**                  | Two sliding windows      | Exactly k = atMost(k) - atMost(k-1) | [992](https://leetcode.com/problems/subarrays-with-k-different-integers/)                              |
----
+|  1 | **Maximum Average Subarray I**                           | Fixed Size               | Max sum of window                   | [643]
 
 |  # | Problem                                              | Level     | Type                                | Link                                                                                                   |
 | -: | ---------------------------------------------------- | --------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
