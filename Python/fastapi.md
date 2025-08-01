@@ -3752,3 +3752,4298 @@ async def get_reports(
     return {"reports": ["report1", "report2"], "user": token_data.get("sub")}
 ```
 
+# FastAPI Advanced Topics Guide (Questions 50-59)
+
+## Question 50: How do you mock external dependencies in FastAPI tests using TestClient?
+
+FastAPI provides excellent dependency injection that makes mocking external dependencies straightforward using dependency overrides.
+
+### Basic Dependency Override Pattern
+
+```python
+# app.py
+from fastapi import FastAPI, Depends
+import httpx
+
+app = FastAPI()
+
+# External service dependency
+async def get_external_api_client():
+    async with httpx.AsyncClient() as client:
+        yield client
+
+@app.get("/users/{user_id}")
+async def get_user(user_id: int, client: httpx.AsyncClient = Depends(get_external_api_client)):
+    response = await client.get(f"https://api.example.com/users/{user_id}")
+    return response.json()
+```
+
+```python
+# test_app.py
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock
+from app import app, get_external_api_client
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+@pytest.fixture
+def mock_external_client():
+    mock_client = AsyncMock()
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"id": 1, "name": "John Doe"}
+    mock_client.get.return_value = mock_response
+    return mock_client
+
+def test_get_user_success(client, mock_external_client):
+    # Override the dependency
+    app.dependency_overrides[get_external_api_client] = lambda: mock_external_client
+    
+    response = client.get("/users/1")
+    
+    assert response.status_code == 200
+    assert response.json() == {"id": 1, "name": "John Doe"}
+    mock_external_client.get.assert_called_once_with("https://api.example.com/users/1")
+    
+    # Clean up
+    app.dependency_overrides.clear()
+```
+
+### Database Dependency Mocking
+
+```python
+# database.py
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+
+SQLALCHEMY_DATABASE_URL = "postgresql://user:pass@localhost/dbname"
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+```
+
+```python
+# test_database.py
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from fastapi.testclient import TestClient
+from app import app
+from database import get_db
+
+# Use in-memory SQLite for testing
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(bind=engine)
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+@pytest.fixture
+def client():
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+```
+
+### Complex Service Mocking with Context Managers
+
+```python
+# services.py
+class EmailService:
+    async def send_email(self, to: str, subject: str, body: str):
+        # External email service logic
+        pass
+
+class PaymentService:
+    async def process_payment(self, amount: float, token: str):
+        # External payment processing
+        pass
+
+async def get_email_service():
+    return EmailService()
+
+async def get_payment_service():
+    return PaymentService()
+```
+
+```python
+# test_services.py
+from unittest.mock import AsyncMock
+import pytest
+
+@pytest.fixture
+def mock_services():
+    mock_email = AsyncMock(spec=EmailService)
+    mock_payment = AsyncMock(spec=PaymentService)
+    
+    app.dependency_overrides[get_email_service] = lambda: mock_email
+    app.dependency_overrides[get_payment_service] = lambda: mock_payment
+    
+    yield {"email": mock_email, "payment": mock_payment}
+    
+    app.dependency_overrides.clear()
+
+def test_order_creation(client, mock_services):
+    mock_services["payment"].process_payment.return_value = {"status": "success"}
+    mock_services["email"].send_email.return_value = None
+    
+    response = client.post("/orders", json={"amount": 100.0, "email": "test@example.com"})
+    
+    assert response.status_code == 201
+    mock_services["payment"].process_payment.assert_called_once()
+    mock_services["email"].send_email.assert_called_once()
+```
+
+## Question 51: What deployment strategies do you recommend for production FastAPI apps?
+
+### Uvicorn + Gunicorn + Nginx Architecture
+
+This is the most common and recommended production setup for FastAPI applications.
+
+#### 1. Application Structure
+
+```python
+# main.py
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("Starting up...")
+    yield
+    # Shutdown
+    print("Shutting down...")
+
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+#### 2. Gunicorn Configuration
+
+```python
+# gunicorn.conf.py
+import multiprocessing
+
+# Server socket
+bind = "0.0.0.0:8000"
+backlog = 2048
+
+# Worker processes
+workers = multiprocessing.cpu_count() * 2 + 1
+worker_class = "uvicorn.workers.UvicornWorker"
+worker_connections = 1000
+max_requests = 1000
+max_requests_jitter = 50
+preload_app = True
+
+# Timeout
+timeout = 30
+keepalive = 2
+
+# Logging
+accesslog = "-"
+errorlog = "-"
+loglevel = "info"
+access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
+
+# Process naming
+proc_name = 'fastapi_app'
+
+# Security
+limit_request_line = 4094
+limit_request_fields = 100
+limit_request_field_size = 8190
+```
+
+#### 3. Nginx Configuration
+
+```nginx
+# /etc/nginx/sites-available/fastapi_app
+upstream fastapi_backend {
+    server 127.0.0.1:8000;
+    # Add more servers for load balancing
+    # server 127.0.0.1:8001;
+    # server 127.0.0.1:8002;
+}
+
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    # Redirect HTTP to HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    
+    # SSL Configuration
+    ssl_certificate /path/to/ssl/cert.pem;
+    ssl_certificate_key /path/to/ssl/private.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+    ssl_prefer_server_ciphers off;
+    
+    # Security headers
+    add_header X-Content-Type-Options nosniff;
+    add_header X-Frame-Options DENY;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1000;
+    gzip_types application/json application/javascript text/css text/javascript;
+    
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    
+    location / {
+        limit_req zone=api burst=20 nodelay;
+        
+        proxy_pass http://fastapi_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeouts
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+        
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    
+    # Static files (if any)
+    location /static/ {
+        alias /path/to/static/files/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Health check endpoint
+    location /health {
+        access_log off;
+        proxy_pass http://fastapi_backend;
+    }
+}
+```
+
+#### 4. Docker Production Setup
+
+```dockerfile
+# Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application
+COPY . .
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash app
+RUN chown -R app:app /app
+USER app
+
+# Expose port
+EXPOSE 8000
+
+# Run application
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "main:app"]
+```
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  fastapi:
+    build: .
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/dbname
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/ssl
+    depends_on:
+      - fastapi
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=dbname
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
+```
+
+#### 5. Systemd Service (Alternative to Docker)
+
+```ini
+# /etc/systemd/system/fastapi.service
+[Unit]
+Description=FastAPI application
+After=network.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/fastapi-app
+Environment=PATH=/opt/fastapi-app/venv/bin
+ExecStart=/opt/fastapi-app/venv/bin/gunicorn -c gunicorn.conf.py main:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Question 52: How do you enable logging and monitor FastAPI APIs in production?
+
+### Comprehensive Logging Setup
+
+#### 1. Structured Logging Configuration
+
+```python
+# logging_config.py
+import logging
+import logging.config
+import json
+from datetime import datetime
+from typing import Any, Dict
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+        
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        
+        # Add extra fields
+        if hasattr(record, 'request_id'):
+            log_entry["request_id"] = record.request_id
+        if hasattr(record, 'user_id'):
+            log_entry["user_id"] = record.user_id
+        if hasattr(record, 'duration'):
+            log_entry["duration"] = record.duration
+            
+        return json.dumps(log_entry)
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": JSONFormatter,
+        },
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+        "file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": "app.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "formatter": "json",
+        },
+    },
+    "loggers": {
+        "": {  # root logger
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "uvicorn": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "sqlalchemy.engine": {
+            "handlers": ["file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+    },
+}
+
+def setup_logging():
+    logging.config.dictConfig(LOGGING_CONFIG)
+```
+
+#### 2. Request/Response Logging Middleware
+
+```python
+# middleware.py
+import logging
+import time
+import uuid
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
+
+logger = logging.getLogger(__name__)
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp):
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next):
+        # Generate request ID
+        request_id = str(uuid.uuid4())
+        
+        # Add request ID to request state
+        request.state.request_id = request_id
+        
+        # Log request
+        start_time = time.time()
+        logger.info(
+            "Request started",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "url": str(request.url),
+                "user_agent": request.headers.get("user-agent"),
+                "client_ip": request.client.host,
+            }
+        )
+        
+        # Process request
+        try:
+            response = await call_next(request)
+            duration = time.time() - start_time
+            
+            # Log response
+            logger.info(
+                "Request completed",
+                extra={
+                    "request_id": request_id,
+                    "status_code": response.status_code,
+                    "duration": round(duration, 4),
+                }
+            )
+            
+            # Add request ID to response headers
+            response.headers["X-Request-ID"] = request_id
+            return response
+            
+        except Exception as e:
+            duration = time.time() - start_time
+            logger.error(
+                "Request failed",
+                extra={
+                    "request_id": request_id,
+                    "duration": round(duration, 4),
+                    "error": str(e),
+                },
+                exc_info=True
+            )
+            raise
+```
+
+#### 3. Application with Logging
+
+```python
+# main.py
+import logging
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.responses import JSONResponse
+from logging_config import setup_logging
+from middleware import LoggingMiddleware
+
+# Setup logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="FastAPI with Logging")
+
+# Add logging middleware
+app.add_middleware(LoggingMiddleware)
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    logger.error(
+        "HTTP exception occurred",
+        extra={
+            "request_id": getattr(request.state, "request_id", None),
+            "status_code": exc.status_code,
+            "detail": exc.detail,
+        }
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    logger.error(
+        "Unhandled exception occurred",
+        extra={
+            "request_id": getattr(request.state, "request_id", None),
+        },
+        exc_info=True
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
+
+@app.get("/")
+async def root():
+    logger.info("Root endpoint accessed")
+    return {"message": "Hello World"}
+
+@app.get("/error")
+async def trigger_error():
+    logger.warning("Error endpoint accessed")
+    raise HTTPException(status_code=400, "This is a test error")
+```
+
+### Production Monitoring Setup
+
+#### 1. Prometheus Metrics
+
+```python
+# metrics.py
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from fastapi import FastAPI, Response
+import time
+import psutil
+
+# Metrics
+REQUEST_COUNT = Counter(
+    'fastapi_requests_total',
+    'Total number of requests',
+    ['method', 'endpoint', 'status_code']
+)
+
+REQUEST_DURATION = Histogram(
+    'fastapi_request_duration_seconds',
+    'Request duration in seconds',
+    ['method', 'endpoint']
+)
+
+ACTIVE_REQUESTS = Gauge(
+    'fastapi_active_requests',
+    'Number of active requests'
+)
+
+SYSTEM_METRICS = {
+    'cpu_usage': Gauge('system_cpu_usage_percent', 'CPU usage percentage'),
+    'memory_usage': Gauge('system_memory_usage_percent', 'Memory usage percentage'),
+    'disk_usage': Gauge('system_disk_usage_percent', 'Disk usage percentage'),
+}
+
+class MetricsMiddleware:
+    def __init__(self, app: FastAPI):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = scope
+        method = request["method"]
+        path = request["path"]
+        
+        ACTIVE_REQUESTS.inc()
+        start_time = time.time()
+        
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            ACTIVE_REQUESTS.dec()
+            duration = time.time() - start_time
+            
+            # Record metrics (you'd need to extract status code from response)
+            REQUEST_DURATION.labels(method=method, endpoint=path).observe(duration)
+
+def update_system_metrics():
+    """Update system metrics"""
+    SYSTEM_METRICS['cpu_usage'].set(psutil.cpu_percent())
+    SYSTEM_METRICS['memory_usage'].set(psutil.virtual_memory().percent)
+    SYSTEM_METRICS['disk_usage'].set(psutil.disk_usage('/').percent)
+
+@app.get("/metrics")
+async def metrics():
+    update_system_metrics()
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain"
+    )
+```
+
+#### 2. Health Check Endpoints
+
+```python
+# health.py
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from database import get_db
+import redis
+import httpx
+from typing import Dict, Any
+
+router = APIRouter()
+
+async def check_database(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    try:
+        db.execute("SELECT 1")
+        return {"status": "healthy", "response_time": 0.001}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+
+async def check_redis() -> Dict[str, Any]:
+    try:
+        r = redis.Redis(host='localhost', port=6379, db=0)
+        r.ping()
+        return {"status": "healthy"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+
+async def check_external_service() -> Dict[str, Any]:
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get("https://httpbin.org/status/200", timeout=5.0)
+            if response.status_code == 200:
+                return {"status": "healthy"}
+            else:
+                return {"status": "unhealthy", "status_code": response.status_code}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": time.time()}
+
+@router.get("/health/detailed")
+async def detailed_health_check(db: Session = Depends(get_db)):
+    checks = {
+        "database": await check_database(db),
+        "redis": await check_redis(),
+        "external_service": await check_external_service(),
+    }
+    
+    overall_status = "healthy" if all(
+        check["status"] == "healthy" for check in checks.values()
+    ) else "unhealthy"
+    
+    return {
+        "status": overall_status,
+        "timestamp": time.time(),
+        "checks": checks
+    }
+```
+
+#### 3. APM Integration (Example with Elastic APM)
+
+```python
+# apm_config.py
+from elasticapm.contrib.starlette import make_apm_client, ElasticAPM
+
+apm_config = {
+    'SERVICE_NAME': 'fastapi-app',
+    'SECRET_TOKEN': 'your-secret-token',
+    'SERVER_URL': 'http://localhost:8200',
+    'ENVIRONMENT': 'production',
+    'DEBUG': False,
+}
+
+apm = make_apm_client(apm_config)
+
+# Add to main.py
+app.add_middleware(ElasticAPM, client=apm)
+```
+
+## Question 53: How do you manage environment-based settings using dotenv and Pydantic Settings?
+
+### Pydantic Settings Management
+
+#### 1. Complete Settings Configuration
+
+```python
+# settings.py
+from pydantic import BaseSettings, validator, Field
+from typing import Optional, List
+from enum import Enum
+import os
+
+class Environment(str, Enum):
+    DEVELOPMENT = "development"
+    TESTING = "testing"
+    STAGING = "staging"
+    PRODUCTION = "production"
+
+class DatabaseSettings(BaseSettings):
+    host: str = Field(..., env="DB_HOST")
+    port: int = Field(5432, env="DB_PORT")
+    username: str = Field(..., env="DB_USERNAME")
+    password: str = Field(..., env="DB_PASSWORD")
+    database: str = Field(..., env="DB_DATABASE")
+    
+    @property
+    def url(self) -> str:
+        return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+    
+    @property
+    def async_url(self) -> str:
+        return f"postgresql+asyncpg://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+
+class RedisSettings(BaseSettings):
+    host: str = Field("localhost", env="REDIS_HOST")
+    port: int = Field(6379, env="REDIS_PORT")
+    password: Optional[str] = Field(None, env="REDIS_PASSWORD")
+    db: int = Field(0, env="REDIS_DB")
+    
+    @property
+    def url(self) -> str:
+        if self.password:
+            return f"redis://:{self.password}@{self.host}:{self.port}/{self.db}"
+        return f"redis://{self.host}:{self.port}/{self.db}"
+
+class JWTSettings(BaseSettings):
+    secret_key: str = Field(..., env="JWT_SECRET_KEY")
+    algorithm: str = Field("HS256", env="JWT_ALGORITHM")
+    access_token_expire_minutes: int = Field(30, env="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
+    refresh_token_expire_days: int = Field(7, env="JWT_REFRESH_TOKEN_EXPIRE_DAYS")
+    
+    @validator("secret_key")
+    def validate_secret_key(cls, v):
+        if len(v) < 32:
+            raise ValueError("JWT secret key must be at least 32 characters long")
+        return v
+
+class EmailSettings(BaseSettings):
+    smtp_server: str = Field(..., env="SMTP_SERVER")
+    smtp_port: int = Field(587, env="SMTP_PORT")
+    smtp_username: str = Field(..., env="SMTP_USERNAME")
+    smtp_password: str = Field(..., env="SMTP_PASSWORD")
+    from_email: str = Field(..., env="FROM_EMAIL")
+    use_tls: bool = Field(True, env="SMTP_USE_TLS")
+
+class Settings(BaseSettings):
+    # Application settings
+    app_name: str = Field("FastAPI App", env="APP_NAME")
+    app_version: str = Field("1.0.0", env="APP_VERSION")
+    environment: Environment = Field(Environment.DEVELOPMENT, env="ENVIRONMENT")
+    debug: bool = Field(False, env="DEBUG")
+    
+    # Server settings
+    host: str = Field("127.0.0.1", env="HOST")
+    port: int = Field(8000, env="PORT")
+    workers: int = Field(1, env="WORKERS")
+    
+    # Security settings
+    allowed_hosts: List[str] = Field(["*"], env="ALLOWED_HOSTS")
+    cors_origins: List[str] = Field(["*"], env="CORS_ORIGINS")
+    
+    # Nested settings
+    database: DatabaseSettings = DatabaseSettings()
+    redis: RedisSettings = RedisSettings()
+    jwt: JWTSettings = JWTSettings()
+    email: EmailSettings = EmailSettings()
+    
+    # API settings
+    api_v1_prefix: str = Field("/api/v1", env="API_V1_PREFIX")
+    docs_url: Optional[str] = Field("/docs", env="DOCS_URL")
+    redoc_url: Optional[str] = Field("/redoc", env="REDOC_URL")
+    
+    # External services
+    external_api_url: str = Field(..., env="EXTERNAL_API_URL")
+    external_api_key: str = Field(..., env="EXTERNAL_API_KEY")
+    
+    # File storage
+    upload_dir: str = Field("uploads", env="UPLOAD_DIR")
+    max_file_size: int = Field(10485760, env="MAX_FILE_SIZE")  # 10MB
+    
+    # Logging
+    log_level: str = Field("INFO", env="LOG_LEVEL")
+    log_file: Optional[str] = Field(None, env="LOG_FILE")
+    
+    @validator("environment", pre=True)
+    def validate_environment(cls, v):
+        if isinstance(v, str):
+            return Environment(v.lower())
+        return v
+    
+    @validator("allowed_hosts", "cors_origins", pre=True)
+    def validate_list_fields(cls, v):
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",")]
+        return v
+    
+    @validator("docs_url", "redoc_url")
+    def validate_docs_urls(cls, v, values):
+        environment = values.get("environment")
+        if environment == Environment.PRODUCTION and v is not None:
+            return None  # Disable docs in production
+        return v
+    
+    @property
+    def is_development(self) -> bool:
+        return self.environment == Environment.DEVELOPMENT
+    
+    @property
+    def is_production(self) -> bool:
+        return self.environment == Environment.PRODUCTION
+    
+    @property
+    def is_testing(self) -> bool:
+        return self.environment == Environment.TESTING
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
+        # Support for nested env vars
+        env_nested_delimiter = "__"
+
+# Global settings instance
+settings = Settings()
+```
+
+#### 2. Environment-Specific Configuration Files
+
+```bash
+# .env.development
+ENVIRONMENT=development
+DEBUG=true
+DB_HOST=localhost
+DB_USERNAME=dev_user
+DB_PASSWORD=dev_password
+DB_DATABASE=dev_db
+JWT_SECRET_KEY=your-super-secret-development-key-here
+DOCS_URL=/docs
+REDOC_URL=/redoc
+LOG_LEVEL=DEBUG
+```
+
+```bash
+# .env.production
+ENVIRONMENT=production
+DEBUG=false
+DB_HOST=prod-db-server
+DB_USERNAME=prod_user
+DB_PASSWORD=secure_prod_password
+DB_DATABASE=prod_db
+JWT_SECRET_KEY=your-super-secure-production-key-32chars
+DOCS_URL=null
+REDOC_URL=null
+LOG_LEVEL=INFO
+ALLOWED_HOSTS=yourdomain.com,api.yourdomain.com
+CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+```
+
+```bash
+# .env.testing
+ENVIRONMENT=testing
+DEBUG=false
+DB_HOST=localhost
+DB_USERNAME=test_user
+DB_PASSWORD=test_password
+DB_DATABASE=test_db
+JWT_SECRET_KEY=test-secret-key-for-testing-only
+LOG_LEVEL=WARNING
+```
+
+#### 3. Settings Factory Pattern
+
+```python
+# config.py
+from functools import lru_cache
+from typing import Type
+import os
+
+@lru_cache()
+def get_settings() -> Settings:
+    # Determine environment
+    env = os.getenv("ENVIRONMENT", "development").lower()
+    
+    # Load appropriate .env file
+    env_file = f".env.{env}"
+    if os.path.exists(env_file):
+        return Settings(_env_file=env_file)
+    else:
+        return Settings()
+
+# Usage in FastAPI
+from fastapi import Depends
+
+async def get_app_settings() -> Settings:
+    return get_settings()
+```
+
+#### 4. Application Integration
+
+```python
+# main.py
+from fastapi import FastAPI, Depends
+from config import get_settings, Settings
+from database import create_database_engine
+from middleware import setup_middleware
+
+def create_app() -> FastAPI:
+    settings = get_settings()
+    
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.app_version,
+        docs_url=settings.docs_url,
+        redoc_url=settings.redoc_url,
+        debug=settings.debug,
+    )
+    
+    # Setup middleware based on settings
+    setup_middleware(app, settings)
+    
+    # Create database engine
+    create_database_engine(settings.database.url)
+    
+    return app
+
+app = create_app()
+
+@app.get("/config")
+async def get_config(settings: Settings = Depends(get_app_settings)):
+    # Return non-sensitive config info
+    return {
+        "app_name": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.environment,
+        "debug": settings.debug,
+        "api_prefix": settings.api_v1_prefix,
+    }
+```
+
+#### 5. Testing with Different Settings
+
+```python
+# test_settings.py
+import pytest
+from config import Settings
+import tempfile
+import os
+
+@pytest.fixture
+def test_settings():
+    # Create temporary .env file for testing
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.env', delete=False) as f:
+        f.write("""
+ENVIRONMENT=testing
+DEBUG=false
+DB_HOST=test-db
+DB_USERNAME=test_user
+DB_PASSWORD=test_pass
+DB_DATABASE=test_db
+JWT_SECRET_KEY=test-secret-key-for-testing-purposes
+        """)
+        f.flush()
+        
+        # Load settings from temporary file
+        settings = Settings(_env_file=f.name)
+        
+        yield settings
+        
+        # Cleanup
+        os.unlink(f.name)
+
+def test_settings_loading(test_settings):
+    assert test_settings.environment == "testing"
+    assert test_settings.debug is False
+    assert test_settings.database.host == "test-db"
+    assert test_settings.is_testing is True
+```
+
+## Question 54: How do you implement refresh tokens and access token rotation with JWT in FastAPI?
+
+### Complete JWT Authentication System with Refresh Tokens
+
+#### 1. Token Models and Schemas
+
+```python
+# auth_models.py
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+class TokenPayload(BaseModel):
+    sub: Optional[str] = None
+    exp: Optional[int] = None
+    iat: Optional[int] = None
+    jti: Optional[str] = None  # JWT ID for refresh token
+    token_type: Optional[str] = None  # "access" or "refresh"
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+```
+
+#### 2. JWT Service Implementation
+
+```python
+# jwt_service.py
+import jwt
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
+import uuid
+from passlib.context import CryptContext
+from config import get_settings
+import redis
+import json
+
+settings = get_settings()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Redis client for storing refresh tokens
+redis_client = redis.Redis(
+    host=settings.redis.host,
+    port=settings.redis.port,
+    password=settings.redis.password,
+    db=settings.redis.db,
+    decode_responses=True
+)
+
+class JWTService:
+    def __init__(self):
+        self.secret_key = settings.jwt.secret_key
+        self.algorithm = settings.jwt.algorithm
+        self.access_token_expire_minutes = settings.jwt.access_token_expire_minutes
+        self.refresh_token_expire_days = settings.jwt.refresh_token_expire_days
+
+    def create_access_token(self, data: Dict[str, Any]) -> str:
+        to_encode = data.copy()
+        expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+        
+        to_encode.update({
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "token_type": "access"
+        })
+        
+        return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+
+    def create_refresh_token(self, data: Dict[str, Any]) -> str:
+        to_encode = data.copy()
+        expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+        jti = str(uuid.uuid4())  # Unique token ID
+        
+        to_encode.update({
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "jti": jti,
+            "token_type": "refresh"
+        })
+        
+        refresh_token = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+        
+        # Store refresh token in Redis with expiration
+        token_data = {
+            "user_id": data.get("sub"),
+            "jti": jti,
+            "created_at": datetime.utcnow().isoformat(),
+            "is_active": True
+        }
+        
+        redis_key = f"refresh_token:{jti}"
+        redis_client.setex(
+            redis_key,
+            timedelta(days=self.refresh_token_expire_days),
+            json.dumps(token_data)
+        )
+        
+        return refresh_token
+
+    def verify_token(self, token: str, token_type: str = "access") -> Optional[TokenPayload]:
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            
+            # Verify token type
+            if payload.get("token_type") != token_type:
+                return None
+            
+            # For refresh tokens, verify it exists in Redis and is active
+            if token_type == "refresh":
+                jti = payload.get("jti")
+                if not jti:
+                    return None
+                
+                redis_key = f"refresh_token:{jti}"
+                token_data = redis_client.get(redis_key)
+                
+                if not token_data:
+                    return None
+                
+                token_info = json.loads(token_data)
+                if not token_info.get("is_active", False):
+                    return None
+            
+            return TokenPayload(**payload)
+            
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.JWTError:
+            return None
+
+    def revoke_refresh_token(self, jti: str) -> bool:
+        """Revoke a refresh token by marking it as inactive"""
+        redis_key = f"refresh_token:{jti}"
+        token_data = redis_client.get(redis_key)
+        
+        if token_data:
+            token_info = json.loads(token_data)
+            token_info["is_active"] = False
+            redis_client.setex(
+                redis_key,
+                timedelta(days=self.refresh_token_expire_days),
+                json.dumps(token_info)
+            )
+            return True
+        return False
+
+    def revoke_all_user_tokens(self, user_id: str) -> int:
+        """Revoke all refresh tokens for a user"""
+        pattern = "refresh_token:*"
+        revoked_count = 0
+        
+        for key in redis_client.scan_iter(match=pattern):
+            token_data = redis_client.get(key)
+            if token_data:
+                token_info = json.loads(token_data)
+                if token_info.get("user_id") == user_id and token_info.get("is_active"):
+                    token_info["is_active"] = False
+                    redis_client.setex(
+                        key,
+                        timedelta(days=self.refresh_token_expire_days),
+                        json.dumps(token_info)
+                    )
+                    revoked_count += 1
+        
+        return revoked_count
+
+    def get_user_active_tokens(self, user_id: str) -> list:
+        """Get all active refresh tokens for a user"""
+        pattern = "refresh_token:*"
+        tokens = []
+        
+        for key in redis_client.scan_iter(match=pattern):
+            token_data = redis_client.get(key)
+            if token_data:
+                token_info = json.loads(token_data)
+                if (token_info.get("user_id") == user_id and 
+                    token_info.get("is_active")):
+                    tokens.append(token_info)
+        
+        return tokens
+
+jwt_service = JWTService()
+```
+
+#### 3. Authentication Dependencies
+
+```python
+# auth_dependencies.py
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jwt_service import jwt_service, TokenPayload
+from database import get_db
+from models import User
+from sqlalchemy.orm import Session
+
+security = HTTPBearer()
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    token_payload = jwt_service.verify_token(credentials.credentials, "access")
+    if token_payload is None or token_payload.sub is None:
+        raise credentials_exception
+    
+    user = db.query(User).filter(User.id == token_payload.sub).first()
+    if user is None:
+        raise credentials_exception
+    
+    return user
+
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    return current_user
+```
+
+#### 4. Authentication Routes
+
+```python
+# auth_routes.py
+from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.security import HTTPBearer
+from sqlalchemy.orm import Session
+from database import get_db
+from models import User
+from auth_models import Token, LoginRequest, RefreshTokenRequest
+from jwt_service import jwt_service
+from auth_dependencies import get_current_active_user
+from passlib.context import CryptContext
+import logging
+
+router = APIRouter(prefix="/auth", tags=["authentication"])
+security = HTTPBearer()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger(__name__)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def authenticate_user(db: Session, username: str, password: str) -> User:
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not verify_password(password, user.hashed_password):
+        return None
+    return user
+
+@router.post("/login", response_model=Token)
+async def login(
+    login_data: LoginRequest,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    user = authenticate_user(db, login_data.username, login_data.password)
+    if not user:
+        logger.warning(f"Failed login attempt for username: {login_data.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    
+    # Create tokens
+    token_data = {"sub": str(user.id), "username": user.username}
+    access_token = jwt_service.create_access_token(token_data)
+    refresh_token = jwt_service.create_refresh_token(token_data)
+    
+    # Set refresh token as HTTP-only cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,  # Set to False for development
+        samesite="strict",
+        max_age=jwt_service.refresh_token_expire_days * 24 * 60 * 60
+    )
+    
+    logger.info(f"User {user.username} logged in successfully")
+    
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=jwt_service.access_token_expire_minutes * 60
+    )
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(
+    refresh_data: RefreshTokenRequest,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    # Verify refresh token
+    token_payload = jwt_service.verify_token(refresh_data.refresh_token, "refresh")
+    if token_payload is None or token_payload.sub is None:
+        raise credentials_exception
+    
+    # Get user
+    user = db.query(User).filter(User.id == token_payload.sub).first()
+    if user is None or not user.is_active:
+        raise credentials_exception
+    
+    # Revoke old refresh token
+    if token_payload.jti:
+        jwt_service.revoke_refresh_token(token_payload.jti)
+    
+    # Create new tokens (token rotation)
+    token_data = {"sub": str(user.id), "username": user.username}
+    new_access_token = jwt_service.create_access_token(token_data)
+    new_refresh_token = jwt_service.create_refresh_token(token_data)
+    
+    # Update refresh token cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=jwt_service.refresh_token_expire_days * 24 * 60 * 60
+    )
+    
+    logger.info(f"Tokens refreshed for user {user.username}")
+    
+    return Token(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        expires_in=jwt_service.access_token_expire_minutes * 60
+    )
+
+@router.post("/logout")
+async def logout(
+    response: Response,
+    refresh_data: RefreshTokenRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    # Verify and revoke refresh token
+    token_payload = jwt_service.verify_token(refresh_data.refresh_token, "refresh")
+    if token_payload and token_payload.jti:
+        jwt_service.revoke_refresh_token(token_payload.jti)
+    
+    # Clear refresh token cookie
+    response.delete_cookie(key="refresh_token")
+    
+    logger.info(f"User {current_user.username} logged out")
+    return {"message": "Successfully logged out"}
+
+@router.post("/logout-all")
+async def logout_all_devices(
+    response: Response,
+    current_user: User = Depends(get_current_active_user)
+):
+    # Revoke all refresh tokens for the user
+    revoked_count = jwt_service.revoke_all_user_tokens(str(current_user.id))
+    
+    # Clear refresh token cookie
+    response.delete_cookie(key="refresh_token")
+    
+    logger.info(f"All tokens revoked for user {current_user.username}, count: {revoked_count}")
+    return {"message": f"Logged out from {revoked_count} devices"}
+
+@router.get("/me")
+async def get_current_user_info(
+    current_user: User = Depends(get_current_active_user)
+):
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "is_active": current_user.is_active,
+    }
+
+@router.get("/sessions")
+async def get_active_sessions(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all active sessions (refresh tokens) for the current user"""
+    active_tokens = jwt_service.get_user_active_tokens(str(current_user.id))
+    return {
+        "active_sessions": len(active_tokens),
+        "sessions": [
+            {
+                "jti": token["jti"],
+                "created_at": token["created_at"],
+            }
+            for token in active_tokens
+        ]
+    }
+```
+
+#### 5. Frontend Integration Example
+
+```javascript
+// auth.js - Frontend token management
+class AuthService {
+    constructor() {
+        this.baseURL = 'http://localhost:8000/auth';
+        this.accessToken = localStorage.getItem('access_token');
+    }
+
+    async login(username, password) {
+        const response = await fetch(`${this.baseURL}/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+            credentials: 'include', // Include cookies
+        });
+
+        if (!response.ok) {
+            throw new Error('Login failed');
+        }
+
+        const data = await response.json();
+        this.accessToken = data.access_token;
+        localStorage.setItem('access_token', data.access_token);
+        
+        return data;
+    }
+
+    async refreshToken() {
+        const response = await fetch(`${this.baseURL}/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                refresh_token: this.getRefreshTokenFromCookie()
+            }),
+            credentials: 'include',
+        });
+
+        if (!response.ok) {
+            this.logout();
+            throw new Error('Token refresh failed');
+        }
+
+        const data = await response.json();
+        this.accessToken = data.access_token;
+        localStorage.setItem('access_token', data.access_token);
+        
+        return data;
+    }
+
+    async apiCall(url, options = {}) {
+        // Add authorization header
+        const headers = {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+            ...options.headers,
+        };
+
+        let response = await fetch(url, {
+            ...options,
+            headers,
+            credentials: 'include',
+        });
+
+        // If token expired, try to refresh
+        if (response.status === 401) {
+            try {
+                await this.refreshToken();
+                // Retry with new token
+                headers['Authorization'] = `Bearer ${this.accessToken}`;
+                response = await fetch(url, {
+                    ...options,
+                    headers,
+                    credentials: 'include',
+                });
+            } catch (error) {
+                this.logout();
+                throw error;
+            }
+        }
+
+        return response;
+    }
+
+    logout() {
+        this.accessToken = null;
+        localStorage.removeItem('access_token');
+        // Redirect to login page
+        window.location.href = '/login';
+    }
+
+    getRefreshTokenFromCookie() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'refresh_token') {
+                return value;
+            }
+        }
+        return null;
+    }
+}
+
+const authService = new AuthService();
+```
+
+## Question 55: How do you secure WebSockets or background tasks in FastAPI with user identity?
+
+### WebSocket Authentication and Authorization
+
+#### 1. WebSocket Authentication Setup
+
+```python
+# websocket_auth.py
+from fastapi import WebSocket, WebSocketDisconnect, HTTPException, Query
+from jwt_service import jwt_service
+from typing import Optional, Dict, List
+import json
+import logging
+from models import User
+from database import SessionLocal
+
+logger = logging.getLogger(__name__)
+
+class ConnectionManager:
+    def __init__(self):
+        # Store active connections with user information
+        self.active_connections: Dict[str, Dict] = {}
+        # Store connections by user ID for easy lookup
+        self.user_connections: Dict[str, List[str]] = {}
+
+    async def connect(self, websocket: WebSocket, connection_id: str, user: User):
+        await websocket.accept()
+        
+        # Store connection info
+        self.active_connections[connection_id] = {
+            "websocket": websocket,
+            "user": user,
+            "user_id": str(user.id),
+            "username": user.username,
+        }
+        
+        # Track user connections
+        user_id = str(user.id)
+        if user_id not in self.user_connections:
+            self.user_connections[user_id] = []
+        self.user_connections[user_id].append(connection_id)
+        
+        logger.info(f"WebSocket connected: {user.username} ({connection_id})")
+
+    def disconnect(self, connection_id: str):
+        if connection_id in self.active_connections:
+            connection_info = self.active_connections[connection_id]
+            user_id = connection_info["user_id"]
+            username = connection_info["username"]
+            
+            # Remove from active connections
+            del self.active_connections[connection_id]
+            
+            # Remove from user connections
+            if user_id in self.user_connections:
+                self.user_connections[user_id].remove(connection_id)
+                if not self.user_connections[user_id]:
+                    del self.user_connections[user_id]
+            
+            logger.info(f"WebSocket disconnected: {username} ({connection_id})")
+
+    async def send_personal_message(self, message: str, connection_id: str):
+        if connection_id in self.active_connections:
+            websocket = self.active_connections[connection_id]["websocket"]
+            await websocket.send_text(message)
+
+    async def send_to_user(self, message: str, user_id: str):
+        """Send message to all connections of a specific user"""
+        if user_id in self.user_connections:
+            for connection_id in self.user_connections[user_id]:
+                await self.send_personal_message(message, connection_id)
+
+    async def broadcast(self, message: str, exclude_user_id: Optional[str] = None):
+        """Broadcast message to all connected users except excluded user"""
+        for connection_id, connection_info in self.active_connections.items():
+            if exclude_user_id and connection_info["user_id"] == exclude_user_id:
+                continue
+            await self.send_personal_message(message, connection_id)
+
+    async def send_to_users(self, message: str, user_ids: List[str]):
+        """Send message to specific users"""
+        for user_id in user_ids:
+            await self.send_to_user(message, user_id)
+
+    def get_user_info(self, connection_id: str) -> Optional[User]:
+        if connection_id in self.active_connections:
+            return self.active_connections[connection_id]["user"]
+        return None
+
+    def get_connected_users(self) -> List[Dict]:
+        """Get list of all connected users"""
+        users = []
+        for connection_info in self.active_connections.values():
+            user_info = {
+                "user_id": connection_info["user_id"],
+                "username": connection_info["username"],
+            }
+            if user_info not in users:
+                users.append(user_info)
+        return users
+
+manager = ConnectionManager()
+
+async def authenticate_websocket_user(token: str) -> Optional[User]:
+    """Authenticate user from WebSocket token"""
+    try:
+        # Verify JWT token
+        token_payload = jwt_service.verify_token(token, "access")
+        if not token_payload or not token_payload.sub:
+            return None
+        
+        # Get user from database
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == token_payload.sub).first()
+            if user and user.is_active:
+                return user
+        finally:
+            db.close()
+        
+        return None
+    except Exception as e:
+        logger.error(f"WebSocket authentication error: {str(e)}")
+        return None
+```
+
+#### 2. WebSocket Routes with Authentication
+
+```python
+# websocket_routes.py
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
+from websocket_auth import manager, authenticate_websocket_user
+from typing import Optional
+import json
+import uuid
+import logging
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+@router.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    # Authenticate user
+    user = await authenticate_websocket_user(token)
+    if not user:
+        await websocket.close(code=4001, reason="Authentication failed")
+        return
+    
+    connection_id = str(uuid.uuid4())
+    
+    try:
+        await manager.connect(websocket, connection_id, user)
+        
+        # Send welcome message
+        await manager.send_personal_message(
+            json.dumps({
+                "type": "welcome",
+                "message": f"Welcome {user.username}!",
+                "user_id": str(user.id)
+            }),
+            connection_id
+        )
+        
+        # Notify other users about new connection
+        await manager.broadcast(
+            json.dumps({
+                "type": "user_joined",
+                "username": user.username,
+                "user_id": str(user.id)
+            }),
+            exclude_user_id=str(user.id)
+        )
+        
+        while True:
+            # Receive message from client
+            data = await websocket.receive_text()
+            
+            try:
+                message_data = json.loads(data)
+                await handle_websocket_message(message_data, connection_id)
+            except json.JSONDecodeError:
+                await manager.send_personal_message(
+                    json.dumps({
+                        "type": "error",
+                        "message": "Invalid JSON format"
+                    }),
+                    connection_id
+                )
+                
+    except WebSocketDisconnect:
+        manager.disconnect(connection_id)
+        
+        # Notify other users about disconnection
+        await manager.broadcast(
+            json.dumps({
+                "type": "user_left",
+                "username": user.username,
+                "user_id": str(user.id)
+            }),
+            exclude_user_id=str(user.id)
+        )
+
+async def handle_websocket_message(message_data: dict, connection_id: str):
+    """Handle different types of WebSocket messages"""
+    user = manager.get_user_info(connection_id)
+    if not user:
+        return
+    
+    message_type = message_data.get("type")
+    
+    if message_type == "chat":
+        # Handle chat message
+        await handle_chat_message(message_data, connection_id, user)
+    elif message_type == "private_message":
+        # Handle private message
+        await handle_private_message(message_data, connection_id, user)
+    elif message_type == "typing":
+        # Handle typing indicator
+        await handle_typing_indicator(message_data, connection_id, user)
+    else:
+        await manager.send_personal_message(
+            json.dumps({
+                "type": "error",
+                "message": f"Unknown message type: {message_type}"
+            }),
+            connection_id
+        )
+
+async def handle_chat_message(message_data: dict, connection_id: str, user):
+    """Handle public chat messages"""
+    message = message_data.get("message", "")
+    if not message.strip():
+        return
+    
+    # Broadcast message to all users
+    await manager.broadcast(
+        json.dumps({
+            "type": "chat",
+            "message": message,
+            "username": user.username,
+            "user_id": str(user.id),
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    )
+    
+    logger.info(f"Chat message from {user.username}: {message}")
+
+async def handle_private_message(message_data: dict, connection_id: str, user):
+    """Handle private messages between users"""
+    target_user_id = message_data.get("target_user_id")
+    message = message_data.get("message", "")
+    
+    if not target_user_id or not message.strip():
+        await manager.send_personal_message(
+            json.dumps({
+                "type": "error",
+                "message": "Target user ID and message are required"
+            }),
+            connection_id
+        )
+        return
+    
+    # Send to target user
+    await manager.send_to_user(
+        json.dumps({
+            "type": "private_message",
+            "message": message,
+            "from_username": user.username,
+            "from_user_id": str(user.id),
+            "timestamp": datetime.utcnow().isoformat()
+        }),
+        target_user_id
+    )
+    
+    # Send confirmation to sender
+    await manager.send_personal_message(
+        json.dumps({
+            "type": "private_message_sent",
+            "message": message,
+            "to_user_id": target_user_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }),
+        connection_id
+    )
+
+async def handle_typing_indicator(message_data: dict, connection_id: str, user):
+    """Handle typing indicators"""
+    is_typing = message_data.get("is_typing", False)
+    
+    await manager.broadcast(
+        json.dumps({
+            "type": "typing",
+            "username": user.username,
+            "user_id": str(user.id),
+            "is_typing": is_typing
+        }),
+        exclude_user_id=str(user.id)
+    )
+
+@router.get("/ws/users")
+async def get_connected_users():
+    """Get list of currently connected users"""
+    return {"connected_users": manager.get_connected_users()}
+```
+
+### Background Task Security
+
+#### 3. Secure Background Task System
+
+```python
+# background_tasks.py
+from celery import Celery
+from sqlalchemy.orm import Session
+from database import SessionLocal
+from models import User, Task
+from typing import Optional, Dict, Any
+import logging
+from datetime import datetime
+from jwt_service import jwt_service
+
+logger = logging.getLogger(__name__)
+
+# Celery setup
+celery_app = Celery(
+    "fastapi_tasks",
+    broker="redis://localhost:6379/0",
+    backend="redis://localhost:6379/0"
+)
+
+class SecureTaskManager:
+    """Manager for secure background tasks with user context"""
+    
+    @staticmethod
+    def create_task_with_user(
+        task_func,
+        user_id: str,
+        task_data: Dict[str, Any],
+        task_type: str = "general"
+    ):
+        """Create a background task with user context"""
+        # Store task in database with user association
+        db = SessionLocal()
+        try:
+            task = Task(
+                user_id=user_id,
+                task_type=task_type,
+                status="pending",
+                created_at=datetime.utcnow(),
+                task_data=task_data
+            )
+            db.add(task)
+            db.commit()
+            db.refresh(task)
+            
+            # Execute Celery task with task ID and user ID
+            result = task_func.delay(str(task.id), user_id, task_data)
+            
+            # Update task with Celery task ID
+            task.celery_task_id = result.id
+            db.commit()
+            
+            logger.info(f"Created task {task.id} for user {user_id}")
+            return task.id
+            
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_user_tasks(user_id: str, status: Optional[str] = None) -> list:
+        """Get tasks for a specific user"""
+        db = SessionLocal()
+        try:
+            query = db.query(Task).filter(Task.user_id == user_id)
+            if status:
+                query = query.filter(Task.status == status)
+            return query.all()
+        finally:
+            db.close()
+
+    @staticmethod
+    def update_task_status(task_id: str, status: str, result: Optional[Dict] = None):
+        """Update task status and result"""
+        db = SessionLocal()
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if task:
+                task.status = status
+                task.updated_at = datetime.utcnow()
+                if result:
+                    task.result = result
+                db.commit()
+                logger.info(f"Updated task {task_id} status to {status}")
+        finally:
+            db.close()
+
+# Secure task decorators
+def secure_task(task_type: str = "general"):
+    """Decorator for creating secure Celery tasks"""
+    def decorator(func):
+        @celery_app.task(bind=True)
+        def wrapper(self, task_id: str, user_id: str, task_data: Dict[str, Any]):
+            try:
+                # Verify user exists and is active
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.id == user_id).first()
+                    if not user or not user.is_active:
+                        raise ValueError(f"Invalid or inactive user: {user_id}")
+                finally:
+                    db.close()
+                
+                # Update task status to running
+                SecureTaskManager.update_task_status(task_id, "running")
+                
+                # Execute the actual task function
+                result = func(task_id, user_id, task_data)
+                
+                # Update task status to completed
+                SecureTaskManager.update_task_status(task_id, "completed", result)
+                
+                return result
+                
+            except Exception as e:
+                logger.error(f"Task {task_id} failed: {str(e)}")
+                SecureTaskManager.update_task_status(
+                    task_id, 
+                    "failed", 
+                    {"error": str(e)}
+                )
+                raise
+        
+        wrapper.original_func = func
+        wrapper.task_type = task_type
+        return wrapper
+    return decorator
+
+# Example secure background tasks
+@secure_task("email")
+def send_email_task(task_id: str, user_id: str, task_data: Dict[str, Any]):
+    """Send email background task with user context"""
+    recipient = task_data.get("recipient")
+    subject = task_data.get("subject")
+    body = task_data.get("body")
+    
+    # Verify user has permission to send email
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user.can_send_emails:
+            raise PermissionError("User does not have email sending permissions")
+    finally:
+        db.close()
+    
+    # Simulate email sending
+    import time
+    time.sleep(2)
+    
+    logger.info(f"Email sent to {recipient} by user {user_id}")
+    return {"status": "sent", "recipient": recipient}
+
+@secure_task("report")
+def generate_report_task(task_id: str, user_id: str, task_data: Dict[str, Any]):
+    """Generate report background task with user context"""
+    report_type = task_data.get("report_type")
+    filters = task_data.get("filters", {})
+    
+    # Verify user has access to requested data
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user.has_role("analyst") and report_type == "sensitive":
+            raise PermissionError("User does not have access to sensitive reports")
+    finally:
+        db.close()
+    
+    # Generate report
+    report_data = {
+        "report_type": report_type,
+        "generated_by": user_id,
+        "data": "Report content here...",
+        "generated_at": datetime.utcnow().isoformat()
+    }
+    
+    logger.info(f"Report generated for user {user_id}")
+    return report_data
+
+@secure_task("file_processing")
+def process_file_task(task_id: str, user_id: str, task_data: Dict[str, Any]):
+    """Process uploaded file with user context"""
+    file_path = task_data.get("file_path")
+    processing_type = task_data.get("processing_type")
+    
+    # Verify user owns the file
+    db = SessionLocal()
+    try:
+        from models import UserFile
+        file_record = db.query(UserFile).filter(
+            UserFile.file_path == file_path,
+            UserFile.user_id == user_id
+        ).first()
+        
+        if not file_record:
+            raise PermissionError("User does not have access to this file")
+    finally:
+        db.close()
+    
+    # Process file
+    import time
+    time.sleep(5)  # Simulate processing
+    
+    processed_data = {
+        "file_path": file_path,
+        "processing_type": processing_type,
+        "processed_at": datetime.utcnow().isoformat(),
+        "result": "File processed successfully"
+    }
+    
+    logger.info(f"File processed for user {user_id}")
+    return processed_data
+
+# Task management API routes
+@router.post("/tasks/email")
+async def create_email_task(
+    email_data: dict,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create an email sending task"""
+    task_id = SecureTaskManager.create_task_with_user(
+        send_email_task,
+        str(current_user.id),
+        email_data,
+        "email"
+    )
+    
+    return {"task_id": task_id, "status": "created"}
+
+@router.post("/tasks/report")
+async def create_report_task(
+    report_data: dict,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Create a report generation task"""
+    task_id = SecureTaskManager.create_task_with_user(
+        generate_report_task,
+        str(current_user.id),
+        report_data,
+        "report"
+    )
+    
+    return {"task_id": task_id, "status": "created"}
+
+@router.get("/tasks")
+async def get_user_tasks(
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all tasks for the current user"""
+    tasks = SecureTaskManager.get_user_tasks(str(current_user.id), status)
+    
+    return {
+        "tasks": [
+            {
+                "id": task.id,
+                "task_type": task.task_type,
+                "status": task.status,
+                "created_at": task.created_at.isoformat(),
+                "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+                "result": task.result
+            }
+            for task in tasks
+        ]
+    }
+
+@router.get("/tasks/{task_id}")
+async def get_task_status(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get status of a specific task"""
+    db = SessionLocal()
+    try:
+        task = db.query(Task).filter(
+            Task.id == task_id,
+            Task.user_id == str(current_user.id)
+        ).first()
+        
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        return {
+            "id": task.id,
+            "task_type": task.task_type,
+            "status": task.status,
+            "created_at": task.created_at.isoformat(),
+            "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+            "result": task.result
+        }
+    finally:
+        db.close()
+```
+
+#### 4. WebSocket Authentication with Frontend
+
+```javascript
+// websocket_client.js
+class SecureWebSocket {
+    constructor(baseURL) {
+        this.baseURL = baseURL;
+        this.websocket = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.reconnectDelay = 1000;
+        this.messageHandlers = new Map();
+    }
+
+    async connect() {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            throw new Error('No access token available');
+        }
+
+        const wsURL = `${this.baseURL}/ws/${token}`;
+        
+        try {
+            this.websocket = new WebSocket(wsURL);
+            this.setupEventHandlers();
+            
+            return new Promise((resolve, reject) => {
+                this.websocket.onopen = () => {
+                    console.log('WebSocket connected');
+                    this.reconnectAttempts = 0;
+                    resolve();
+                };
+                
+                this.websocket.onerror = (error) => {
+                    console.error('WebSocket connection error:', error);
+                    reject(error);
+                };
+            });
+        } catch (error) {
+            console.error('Failed to create WebSocket connection:', error);
+            throw error;
+        }
+    }
+
+    setupEventHandlers() {
+        this.websocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+
+        this.websocket.onclose = (event) => {
+            console.log('WebSocket connection closed:', event.code, event.reason);
+            
+            if (event.code === 4001) {
+                // Authentication failed
+                console.error('WebSocket authentication failed');
+                // Redirect to login or refresh token
+                this.handleAuthenticationError();
+            } else {
+                // Try to reconnect
+                this.handleReconnect();
+            }
+        };
+
+        this.websocket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+    }
+
+    handleMessage(data) {
+        const messageType = data.type;
+        
+        if (this.messageHandlers.has(messageType)) {
+            this.messageHandlers.get(messageType)(data);
+        } else {
+            console.log('Unhandled message type:', messageType, data);
+        }
+    }
+
+    onMessage(messageType, handler) {
+        this.messageHandlers.set(messageType, handler);
+    }
+
+    sendMessage(messageType, data) {
+        if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+            const message = {
+                type: messageType,
+                ...data
+            };
+            this.websocket.send(JSON.stringify(message));
+        } else {
+            console.error('WebSocket is not connected');
+        }
+    }
+
+    sendChatMessage(message) {
+        this.sendMessage('chat', { message });
+    }
+
+    sendPrivateMessage(targetUserId, message) {
+        this.sendMessage('private_message', {
+            target_user_id: targetUserId,
+            message
+        });
+    }
+
+    sendTypingIndicator(isTyping) {
+        this.sendMessage('typing', { is_typing: isTyping });
+    }
+
+    async handleAuthenticationError() {
+        // Try to refresh token
+        try {
+            const authService = new AuthService();
+            await authService.refreshToken();
+            // Reconnect with new token
+            await this.connect();
+        } catch (error) {
+            // Redirect to login
+            window.location.href = '/login';
+        }
+    }
+
+    handleReconnect() {
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const delay = this.reconnectDelay * this.reconnectAttempts;
+            
+            console.log(`Attempting to reconnect in ${delay}ms... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+            
+            setTimeout(async () => {
+                try {
+                    await this.connect();
+                } catch (error) {
+                    console.error('Reconnection failed:', error);
+                }
+            }, delay);
+        } else {
+            console.error('Max reconnection attempts reached');
+        }
+    }
+
+    disconnect() {
+        if (this.websocket) {
+            this.websocket.close();
+            this.websocket = null;
+        }
+    }
+}
+
+// Usage example
+const ws = new SecureWebSocket('ws://localhost:8000');
+
+// Set up message handlers
+ws.onMessage('welcome', (data) => {
+    console.log('Welcome message:', data.message);
+});
+
+ws.onMessage('chat', (data) => {
+    displayChatMessage(data.username, data.message, data.timestamp);
+});
+
+ws.onMessage('private_message', (data) => {
+    displayPrivateMessage(data.from_username, data.message, data.timestamp);
+});
+
+ws.onMessage('typing', (data) => {
+    showTypingIndicator(data.username, data.is_typing);
+});
+
+// Connect to WebSocket
+ws.connect().catch(console.error);
+```
+
+## Question 56: What are scopes in OAuth2, and how can FastAPI enforce them per route?
+
+### OAuth2 Scopes Implementation
+
+#### 1. Scope Definition and Management
+
+```python
+# oauth2_scopes.py
+from enum import Enum
+from typing import List, Dict, Set
+from dataclasses import dataclass
+
+class OAuth2Scope(str, Enum):
+    # User scopes
+    USER_READ = "user:read"
+    USER_WRITE = "user:write"
+    USER_DELETE = "user:delete"
+    
+    # Profile scopes
+    PROFILE_READ = "profile:read"
+    PROFILE_WRITE = "profile:write"
+    
+    # Admin scopes
+    ADMIN_READ = "admin:read"
+    ADMIN_WRITE = "admin:write"
+    ADMIN_DELETE = "admin:delete"
+    
+    # Resource scopes
+    POSTS_READ = "posts:read"
+    POSTS_WRITE = "posts:write"
+    POSTS_DELETE = "posts:delete"
+    
+    # File scopes
+    FILES_READ = "files:read"
+    FILES_WRITE = "files:write"
+    FILES_DELETE = "files:delete"
+    
+    # Analytics scopes
+    ANALYTICS_READ = "analytics:read"
+    ANALYTICS_WRITE = "analytics:write"
+    
+    # System scopes
+    SYSTEM_READ = "system:read"
+    SYSTEM_WRITE = "system:write"
+
+@dataclass
+class ScopeInfo:
+    name: str
+    description: str
+    category: str
+    is_sensitive: bool = False
+
+# Scope definitions with descriptions
+SCOPE_DEFINITIONS: Dict[OAuth2Scope, ScopeInfo] = {
+    OAuth2Scope.USER_READ: ScopeInfo(
+        "Read User Data",
+        "Read basic user information",
+        "user"
+    ),
+    OAuth2Scope.USER_WRITE: ScopeInfo(
+        "Write User Data",
+        "Create and update user information",
+        "user"
+    ),
+    OAuth2Scope.USER_DELETE: ScopeInfo(
+        "Delete Users",
+        "Delete user accounts",
+        "user",
+        is_sensitive=True
+    ),
+    OAuth2Scope.PROFILE_READ: ScopeInfo(
+        "Read Profile",
+        "Read user profile information",
+        "profile"
+    ),
+    OAuth2Scope.PROFILE_WRITE: ScopeInfo(
+        "Write Profile",
+        "Update user profile information",
+        "profile"
+    ),
+    OAuth2Scope.ADMIN_READ: ScopeInfo(
+        "Admin Read",
+        "Read administrative data",
+        "admin",
+        is_sensitive=True
+    ),
+    OAuth2Scope.ADMIN_WRITE: ScopeInfo(
+        "Admin Write",
+        "Perform administrative operations",
+        "admin",
+        is_sensitive=True
+    ),
+    OAuth2Scope.ADMIN_DELETE: ScopeInfo(
+        "Admin Delete",
+        "Delete administrative data",
+        "admin",
+        is_sensitive=True
+    ),
+    # ... add more scope definitions
+}
+
+# Role-based scope mappings
+ROLE_SCOPES: Dict[str, Set[OAuth2Scope]] = {
+    "user": {
+        OAuth2Scope.USER_READ,
+        OAuth2Scope.PROFILE_READ,
+        OAuth2Scope.PROFILE_WRITE,
+        OAuth2Scope.POSTS_READ,
+        OAuth2Scope.FILES_READ,
+    },
+    "moderator": {
+        OAuth2Scope.USER_READ,
+        OAuth2Scope.PROFILE_READ,
+        OAuth2Scope.PROFILE_WRITE,
+        OAuth2Scope.POSTS_READ,
+        OAuth2Scope.POSTS_WRITE,
+        OAuth2Scope.POSTS_DELETE,
+        OAuth2Scope.FILES_READ,
+        OAuth2Scope.FILES_WRITE,
+    },
+    "admin": {
+        OAuth2Scope.USER_READ,
+        OAuth2Scope.USER_WRITE,
+        OAuth2Scope.USER_DELETE,
+        OAuth2Scope.PROFILE_READ,
+        OAuth2Scope.PROFILE_WRITE,
+        OAuth2Scope.ADMIN_READ,
+        OAuth2Scope.ADMIN_WRITE,
+        OAuth2Scope.ADMIN_DELETE,
+        OAuth2Scope.POSTS_READ,
+        OAuth2Scope.POSTS_WRITE,
+        OAuth2Scope.POSTS_DELETE,
+        OAuth2Scope.FILES_READ,
+        OAuth2Scope.FILES_WRITE,
+        OAuth2Scope.FILES_DELETE,
+        OAuth2Scope.ANALYTICS_READ,
+        OAuth2Scope.ANALYTICS_WRITE,
+        OAuth2Scope.SYSTEM_READ,
+        OAuth2Scope.SYSTEM_WRITE,
+    },
+    "system": {
+        # All scopes for system access
+        *OAuth2Scope.__members__.values()
+    }
+}
+
+class ScopeManager:
+    @staticmethod
+    def get_scopes_for_role(role: str) -> Set[OAuth2Scope]:
+        """Get all scopes for a given role"""
+        return ROLE_SCOPES.get(role, set())
+    
+    @staticmethod
+    def get_scopes_for_roles(roles: List[str]) -> Set[OAuth2Scope]:
+        """Get combined scopes for multiple roles"""
+        combined_scopes = set()
+        for role in roles:
+            combined_scopes.update(ROLE_SCOPES.get(role, set()))
+        return combined_scopes
+    
+    @staticmethod
+    def validate_scopes(requested_scopes: List[str]) -> List[OAuth2Scope]:
+        """Validate and convert string scopes to OAuth2Scope enum"""
+        valid_scopes = []
+        for scope_str in requested_scopes:
+            try:
+                scope = OAuth2Scope(scope_str)
+                valid_scopes.append(scope)
+            except ValueError:
+                pass  # Invalid scope, skip it
+        return valid_scopes
+    
+    @staticmethod
+    def check_scope_permission(user_scopes: Set[OAuth2Scope], required_scopes: List[OAuth2Scope]) -> bool:
+        """Check if user has all required scopes"""
+        return set(required_scopes).issubset(user_scopes)
+```
+
+#### 2. OAuth2 Security with Scopes
+
+```python
+# oauth2_security.py
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jwt_service import jwt_service
+from oauth2_scopes import OAuth2Scope, ScopeManager
+from models import User, UserRole
+from database import get_db
+from sqlalchemy.orm import Session
+from typing import List, Set, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+security = HTTPBearer()
+
+class OAuth2SecurityManager:
+    def __init__(self):
+        self.scope_manager = ScopeManager()
+    
+    async def get_current_user_with_scopes(
+        self,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: Session = Depends(get_db)
+    ) -> tuple[User, Set[OAuth2Scope]]:
+        """Get current user and their scopes"""
+        credentials_exception = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+        # Verify JWT token
+        token_payload = jwt_service.verify_token(credentials.credentials, "access")
+        if not token_payload or not token_payload.sub:
+            raise credentials_exception
+        
+        # Get user from database
+        user = db.query(User).filter(User.id == token_payload.sub).first()
+        if not user or not user.is_active:
+            raise credentials_exception
+        
+        # Get user roles and calculate scopes
+        user_roles = [role.name for role in user.roles]
+        user_scopes = self.scope_manager.get_scopes_for_roles(user_roles)
+        
+        # Add any additional scopes from token (if present)
+        token_scopes = getattr(token_payload, 'scopes', [])
+        if token_scopes:
+            additional_scopes = self.scope_manager.validate_scopes(token_scopes)
+            user_scopes.update(additional_scopes)
+        
+        return user, user_scopes
+    
+    def require_scopes(self, *required_scopes: OAuth2Scope):
+        """Dependency factory for requiring specific scopes"""
+        async def check_scopes(
+            user_and_scopes: tuple[User, Set[OAuth2Scope]] = Depends(self.get_current_user_with_scopes)
+        ) -> User:
+            user, user_scopes = user_and_scopes
+            
+            if not self.scope_manager.check_scope_permission(user_scopes, list(required_scopes)):
+                missing_scopes = set(required_scopes) - user_scopes
+                logger.warning(
+                    f"User {user.username} missing scopes: {[s.value for s in missing_scopes]}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Insufficient permissions. Missing scopes: {[s.value for s in missing_scopes]}"
+                )
+            
+            return user
+        
+        return check_scopes
+    
+    def require_any_scope(self, *required_scopes: OAuth2Scope):
+        """Dependency factory for requiring any of the specified scopes"""
+        async def check_any_scope(
+            user_and_scopes: tuple[User, Set[OAuth2Scope]] = Depends(self.get_current_user_with_scopes)
+        ) -> User:
+            user, user_scopes = user_and_scopes
+            
+            if not any(scope in user_scopes for scope in required_scopes):
+                logger.warning(
+                    f"User {user.username} missing any of required scopes: {[s.value for s in required_scopes]}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Insufficient permissions. Need one of: {[s.value for s in required_scopes]}"
+                )
+            
+            return user
+        
+        return check_any_scope
+
+oauth2_security = OAuth2SecurityManager()
+```
+
+#### 3. Enhanced JWT Service with Scopes
+
+```python
+# enhanced_jwt_service.py (additions to existing jwt_service.py)
+from oauth2_scopes import OAuth2Scope, ScopeManager
+from typing import List
+
+class EnhancedJWTService(JWTService):
+    def __init__(self):
+        super().__init__()
+        self.scope_manager = ScopeManager()
+    
+    def create_access_token_with_scopes(
+        self, 
+        data: Dict[str, Any], 
+        scopes: List[OAuth2Scope]
+    ) -> str:
+        """Create access token with specific scopes"""
+        to_encode = data.copy()
+        expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+        
+        to_encode.update({
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "token_type": "access",
+            "scopes": [scope.value for scope in scopes]
+        })
+        
+        return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+    
+    def create_tokens_for_user(
+        self, 
+        user: User, 
+        requested_scopes: Optional[List[str]] = None
+    ) -> Dict[str, str]:
+        """Create tokens for user with appropriate scopes"""
+        # Get user roles and calculate available scopes
+        user_roles = [role.name for role in user.roles]
+        available_scopes = self.scope_manager.get_scopes_for_roles(user_roles)
+        
+        # Filter requested scopes to only include available ones
+        if requested_scopes:
+            valid_requested_scopes = self.scope_manager.validate_scopes(requested_scopes)
+            granted_scopes = [
+                scope for scope in valid_requested_scopes 
+                if scope in available_scopes
+            ]
+        else:
+            granted_scopes = list(available_scopes)
+        
+        token_data = {
+            "sub": str(user.id),
+            "username": user.username,
+            "roles": user_roles
+        }
+        
+        access_token = self.create_access_token_with_scopes(token_data, granted_scopes)
+        refresh_token = self.create_refresh_token(token_data)
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "granted_scopes": [scope.value for scope in granted_scopes]
+        }
+
+enhanced_jwt_service = EnhancedJWTService()
+```
+
+#### 4. Route Implementation with Scopes
+
+```python
+# scoped_routes.py
+from fastapi import APIRouter, Depends, HTTPException, Query
+from oauth2_security import oauth2_security
+from oauth2_scopes import OAuth2Scope
+from models import User, Post
+from typing import List, Optional
+
+router = APIRouter()
+
+# User management routes
+@router.get("/users", dependencies=[Depends(oauth2_security.require_scopes(OAuth2Scope.USER_READ))])
+async def get_users(
+    limit: int = Query(10, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """Get users - requires user:read scope"""
+    # Implementation
+    return {"users": [], "total": 0}
+
+@router.post("/users", dependencies=[Depends(oauth2_security.require_scopes(OAuth2Scope.USER_WRITE))])
+async def create_user(user_data: dict):
+    """Create user - requires user:write scope"""
+    # Implementation
+    return {"message": "User created"}
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    current_user: User = Depends(oauth2_security.require_scopes(OAuth2Scope.USER_DELETE))
+):
+    """Delete user - requires user:delete scope"""
+    # Implementation
+    return {"message": f"User {user_id} deleted"}
+
+# Profile routes
+@router.get("/profile")
+async def get_profile(
+    current_user: User = Depends(oauth2_security.require_scopes(OAuth2Scope.PROFILE_READ))
+):
+    """Get user profile - requires profile:read scope"""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email
+    }
+
+@router.put("/profile")
+async def update_profile(
+    profile_data: dict,
+    current_user: User = Depends(oauth2_security.require_scopes(OAuth2Scope.PROFILE_WRITE))
+):
+    """Update user profile - requires profile:write scope"""
+    # Implementation
+    return {"message": "Profile updated"}
+
+# Admin routes
+@router.get("/admin/users")
+async def admin_get_users(
+    current_user: User = Depends(oauth2_security.require_scopes(OAuth2Scope.ADMIN_READ))
+):
+    """Admin user management - requires admin:read scope"""
+    # Implementation
+    return {"admin_users": []}
+
+@router.post("/admin/system/maintenance")
+async def system_maintenance(
+    current_user: User = Depends(oauth2_security.require_scopes(
+        OAuth2Scope.ADMIN_WRITE, 
+        OAuth2Scope.SYSTEM_WRITE
+    ))
+):
+    """System maintenance - requires both admin:write and system:write scopes"""
+    # Implementation
+    return {"message": "Maintenance mode enabled"}
+
+# Posts with flexible scope requirements
+@router.get("/posts")
+async def get_posts(
+    current_user: User = Depends(oauth2_security.require_any_scope(
+        OAuth2Scope.POSTS_READ,
+        OAuth2Scope.ADMIN_READ
+    ))
+):
+    """Get posts - requires posts:read OR admin:read scope"""
+    # Implementation
+    return {"posts": []}
+
+@router.delete("/posts/{post_id}")
+async def delete_post(
+    post_id: str,
+    current_user: User = Depends(oauth2_security.require_any_scope(
+        OAuth2Scope.POSTS_DELETE,
+        OAuth2Scope.ADMIN_DELETE
+    ))
+):
+    """Delete post - requires posts:delete OR admin:delete scope"""
+    # Implementation
+    return {"message": f"Post {post_id} deleted"}
+
+# Conditional scope-based access
+@router.get("/analytics")
+async def get_analytics(
+    user_and_scopes = Depends(oauth2_security.get_current_user_with_scopes)
+):
+    """Get analytics with different data based on scopes"""
+    user, user_scopes = user_and_scopes
+    
+    analytics_data = {"basic_stats": {"users": 100, "posts": 500}}
+    
+    # Add detailed analytics if user has analytics:read scope
+    if OAuth2Scope.ANALYTICS_READ in user_scopes:
+        analytics_data["detailed_stats"] = {
+            "revenue": 10000,
+            "conversion_rate": 0.05,
+            "user_growth": 0.15
+        }
+    
+    # Add sensitive analytics if user has admin scope
+    if OAuth2Scope.ADMIN_READ in user_scopes:
+        analytics_data["sensitive_stats"] = {
+            "server_costs": 5000,
+            "profit_margin": 0.3,
+            "churn_rate": 0.02
+        }
+    
+    return analytics_data
+
+# Scope information endpoint
+@router.get("/oauth2/scopes")
+async def get_available_scopes():
+    """Get information about available OAuth2 scopes"""
+    from oauth2_scopes import SCOPE_DEFINITIONS
+    
+    scopes_info = {}
+    for scope, info in SCOPE_DEFINITIONS.items():
+        scopes_info[scope.value] = {
+            "name": info.name,
+            "description": info.description,
+            "category": info.category,
+            "is_sensitive": info.is_sensitive
+        }
+    
+    return {"scopes": scopes_info}
+
+@router.get("/oauth2/my-scopes")
+async def get_my_scopes(
+    user_and_scopes = Depends(oauth2_security.get_current_user_with_scopes)
+):
+    """Get current user's granted scopes"""
+    user, user_scopes = user_and_scopes
+    
+    return {
+        "user_id": str(user.id),
+        "username": user.username,
+        "scopes": [scope.value for scope in user_scopes],
+        "roles": [role.name for role in user.roles]
+    }
+```
+
+#### 5. OAuth2 Authorization Flow with Scopes
+
+```python
+# oauth2_auth_flow.py
+from fastapi import APIRouter, Depends, HTTPException, Form, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
+from database import get_db
+from models import User, OAuth2Client, OAuth2AuthorizationCode
+from oauth2_scopes import OAuth2Scope, ScopeManager, SCOPE_DEFINITIONS
+from enhanced_jwt_service import enhanced_jwt_service
+from typing import List, Optional
+import secrets
+import urllib.parse
+from datetime import datetime, timedelta
+
+router = APIRouter(prefix="/oauth2", tags=["OAuth2"])
+
+class OAuth2AuthorizationServer:
+    def __init__(self):
+        self.scope_manager = ScopeManager()
+    
+    async def validate_client(self, client_id: str, db: Session) -> Optional[OAuth2Client]:
+        """Validate OAuth2 client"""
+        return db.query(OAuth2Client).filter(
+            OAuth2Client.client_id == client_id,
+            OAuth2Client.is_active == True
+        ).first()
+    
+    async def validate_redirect_uri(self, client: OAuth2Client, redirect_uri: str) -> bool:
+        """Validate redirect URI against registered URIs"""
+        return redirect_uri in client.redirect_uris
+    
+    def validate_scopes(self, requested_scopes: List[str], client: OAuth2Client) -> List[OAuth2Scope]:
+        """Validate requested scopes against client allowed scopes"""
+        valid_scopes = self.scope_manager.validate_scopes(requested_scopes)
+        client_allowed_scopes = self.scope_manager.validate_scopes(client.allowed_scopes)
+        
+        # Only return scopes that are both valid and allowed for this client
+        return [scope for scope in valid_scopes if scope in client_allowed_scopes]
+
+oauth2_server = OAuth2AuthorizationServer()
+
+@router.get("/authorize")
+async def authorization_endpoint(
+    request: Request,
+    response_type: str = Query(...),
+    client_id: str = Query(...),
+    redirect_uri: str = Query(...),
+    scope: str = Query(""),
+    state: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """OAuth2 authorization endpoint"""
+    
+    # Validate response_type
+    if response_type != "code":
+        raise HTTPException(status_code=400, detail="Unsupported response_type")
+    
+    # Validate client
+    client = await oauth2_server.validate_client(client_id, db)
+    if not client:
+        raise HTTPException(status_code=400, detail="Invalid client_id")
+    
+    # Validate redirect_uri
+    if not await oauth2_server.validate_redirect_uri(client, redirect_uri):
+        raise HTTPException(status_code=400, detail="Invalid redirect_uri")
+    
+    # Parse and validate scopes
+    requested_scopes = scope.split() if scope else []
+    valid_scopes = oauth2_server.validate_scopes(requested_scopes, client)
+    
+    # Store authorization request in session or database
+    auth_request = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "scopes": [s.value for s in valid_scopes],
+        "state": state
+    }
+    
+    # Check if user is already authenticated
+    # (In real implementation, check session/JWT token)
+    user_authenticated = False  # Placeholder
+    
+    if not user_authenticated:
+        # Redirect to login with authorization parameters
+        login_url = f"/login?{urllib.parse.urlencode(auth_request)}"
+        return RedirectResponse(url=login_url)
+    
+    # Show consent screen
+    return await show_consent_screen(auth_request, valid_scopes, client, db)
+
+async def show_consent_screen(auth_request: dict, scopes: List[OAuth2Scope], client: OAuth2Client, db: Session):
+    """Show OAuth2 consent screen"""
+    scope_details = []
+    for scope in scopes:
+        if scope in SCOPE_DEFINITIONS:
+            scope_info = SCOPE_DEFINITIONS[scope]
+            scope_details.append({
+                "scope": scope.value,
+                "name": scope_info.name,
+                "description": scope_info.description,
+                "is_sensitive": scope_info.is_sensitive
+            })
+    
+    consent_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Authorize {client.name}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }}
+            .app-info {{ background: #f5f5f5; padding: 20px; border-radius: 5px; margin-bottom: 20px; }}
+            .scope {{ padding: 10px; border-bottom: 1px solid #eee; }}
+            .scope.sensitive {{ background: #fff3cd; }}
+            .buttons {{ margin-top: 20px; }}
+            button {{ padding: 10px 20px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; }}
+            .approve {{ background: #28a745; color: white; }}
+            .deny {{ background: #dc3545; color: white; }}
+        </style>
+    </head>
+    <body>
+        <div class="app-info">
+            <h2>{client.name}</h2>
+            <p>{client.description}</p>
+            <p>wants to access your account with the following permissions:</p>
+        </div>
+        
+        <div class="scopes">
+            {chr(10).join([
+                f'<div class="scope{"  sensitive" if s["is_sensitive"] else ""}">'
+                f'<strong>{s["name"]}</strong><br>'
+                f'<small>{s["description"]}</small>'
+                f'</div>'
+                for s in scope_details
+            ])}
+        </div>
+        
+        <form method="post" action="/oauth2/consent">
+            <input type="hidden" name="client_id" value="{auth_request['client_id']}">
+            <input type="hidden" name="redirect_uri" value="{auth_request['redirect_uri']}">
+            <input type="hidden" name="scopes" value="{' '.join(auth_request['scopes'])}">
+            <input type="hidden" name="state" value="{auth_request.get('state', '')}">
+            
+            <div class="buttons">
+                <button type="submit" name="action" value="approve" class="approve">Authorize</button>
+                <button type="submit" name="action" value="deny" class="deny">Deny</button>
+            </div>
+        </form>
+    </body>
+    </html>
+    """
+    
+    return HTMLResponse(content=consent_html)
+
+@router.post("/consent")
+async def consent_endpoint(
+    action: str = Form(...),
+    client_id: str = Form(...),
+    redirect_uri: str = Form(...),
+    scopes: str = Form(""),
+    state: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_user)  # Assume user is authenticated
+):
+    """Handle user consent"""
+    current_user = None  # Placeholder - get from authentication
+    
+    if action != "approve":
+        # User denied authorization
+        error_params = {"error": "access_denied"}
+        if state:
+            error_params["state"] = state
+        error_url = f"{redirect_uri}?{urllib.parse.urlencode(error_params)}"
+        return RedirectResponse(url=error_url)
+    
+    # Generate authorization code
+    auth_code = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(minutes=10)  # 10 minute expiry
+    
+    # Store authorization code
+    db_auth_code = OAuth2AuthorizationCode(
+        code=auth_code,
+        client_id=client_id,
+        user_id=str(current_user.id),
+        redirect_uri=redirect_uri,
+        scopes=scopes.split(),
+        expires_at=expires_at
+    )
+    db.add(db_auth_code)
+    db.commit()
+    
+    # Redirect back to client with authorization code
+    callback_params = {"code": auth_code}
+    if state:
+        callback_params["state"] = state
+    
+    callback_url = f"{redirect_uri}?{urllib.parse.urlencode(callback_params)}"
+    return RedirectResponse(url=callback_url)
+
+@router.post("/token")
+async def token_endpoint(
+    grant_type: str = Form(...),
+    code: Optional[str] = Form(None),
+    redirect_uri: Optional[str] = Form(None),
+    client_id: str = Form(...),
+    client_secret: str = Form(...),
+    scope: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """OAuth2 token endpoint"""
+    
+    # Validate client credentials
+    client = db.query(OAuth2Client).filter(
+        OAuth2Client.client_id == client_id,
+        OAuth2Client.client_secret == client_secret,
+        OAuth2Client.is_active == True
+    ).first()
+    
+    if not client:
+        raise HTTPException(status_code=401, detail="Invalid client credentials")
+    
+    if grant_type == "authorization_code":
+        # Authorization code flow
+        if not code or not redirect_uri:
+            raise HTTPException(status_code=400, detail="Missing code or redirect_uri")
+        
+        # Validate authorization code
+        auth_code_record = db.query(OAuth2AuthorizationCode).filter(
+            OAuth2AuthorizationCode.code == code,
+            OAuth2AuthorizationCode.client_id == client_id,
+            OAuth2AuthorizationCode.redirect_uri == redirect_uri,
+            OAuth2AuthorizationCode.is_used == False,
+            OAuth2AuthorizationCode.expires_at > datetime.utcnow()
+        ).first()
+        
+        if not auth_code_record:
+            raise HTTPException(status_code=400, detail="Invalid or expired authorization code")
+        
+        # Mark code as used
+        auth_code_record.is_used = True
+        db.commit()
+        
+        # Get user
+        user = db.query(User).filter(User.id == auth_code_record.user_id).first()
+        if not user or not user.is_active:
+            raise HTTPException(status_code=400, detail="Invalid user")
+        
+        # Create tokens with granted scopes
+        token_data = enhanced_jwt_service.create_tokens_for_user(
+            user, 
+            auth_code_record.scopes
+        )
+        
+        return {
+            "access_token": token_data["access_token"],
+            "refresh_token": token_data["refresh_token"],
+            "token_type": "bearer",
+            "expires_in": enhanced_jwt_service.access_token_expire_minutes * 60,
+            "scope": " ".join(token_data["granted_scopes"])
+        }
+    
+    elif grant_type == "client_credentials":
+        # Client credentials flow (for machine-to-machine)
+        requested_scopes = scope.split() if scope else []
+        valid_scopes = oauth2_server.validate_scopes(requested_scopes, client)
+        
+        # Create token for client (no user context)
+        token_data = {
+            "sub": client.client_id,
+            "client_id": client.client_id,
+            "token_type": "client_credentials"
+        }
+        
+        access_token = enhanced_jwt_service.create_access_token_with_scopes(
+            token_data, 
+            valid_scopes
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": enhanced_jwt_service.access_token_expire_minutes * 60,
+            "scope": " ".join([s.value for s in valid_scopes])
+        }
+    
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported grant_type")
+```
+
+## Question 57: How do you customize the OpenAPI schema or documentation UI in FastAPI?
+
+### Complete OpenAPI Customization
+
+#### 1. Basic OpenAPI Schema Customization
+
+```python
+# openapi_customization.py
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.staticfiles import StaticFiles
+from typing import Dict, Any, Optional
+import json
+
+def create_custom_openapi_schema(app: FastAPI) -> Dict[str, Any]:
+    """Create customized OpenAPI schema"""
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="Advanced FastAPI Application",
+        version="2.0.0",
+        description="""
+        ## Advanced FastAPI Application with OAuth2 and Scopes
+        
+        This API demonstrates advanced FastAPI features including:
+        
+        * **OAuth2 Authentication** with scopes
+        * **JWT Token Management** with refresh tokens
+        * **WebSocket Support** with authentication
+        * **Background Tasks** with user context
+        * **Multi-tenancy** support
+        * **Rate Limiting** and security
+        
+        ### Authentication
+        
+        This API uses OAuth2 with JWT tokens. To authenticate:
+        
+        1. Obtain an access token from `/auth/login`
+        2. Include the token in the Authorization header: `Bearer <token>`
+        3. Tokens include scopes that determine available operations
+        
+        ### Rate Limits
+        
+        * **Standard users**: 1000 requests/hour
+        * **Premium users**: 10000 requests/hour
+        * **Admin users**: Unlimited
+        
+        ### Support
+        
+        For support, contact: support@example.com
+        """,
+        routes=app.routes,
+        contact={
+            "name": "API Support Team",
+            "url": "https://example.com/contact",
+            "email": "support@example.com"
+        },
+        license_info={
+            "name": "MIT License",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        servers=[
+            {
+                "url": "https://api.example.com",
+                "description": "Production server"
+            },
+            {
+                "url": "https://staging-api.example.com", 
+                "description": "Staging server"
+            },
+            {
+                "url": "http://localhost:8000",
+                "description": "Development server"
+            }
+        ]
+    )
+    
+    # Add custom security schemes
+    openapi_schema["components"]["securitySchemes"] = {
+        "OAuth2": {
+            "type": "oauth2",
+            "flows": {
+                "authorizationCode": {
+                    "authorizationUrl": "/oauth2/authorize",
+                    "tokenUrl": "/oauth2/token",
+                    "scopes": {
+                        "user:read": "Read user information",
+                        "user:write": "Write user information", 
+                        "user:delete": "Delete users",
+                        "profile:read": "Read user profile",
+                        "profile:write": "Write user profile",
+                        "admin:read": "Read admin data",
+                        "admin:write": "Write admin data",
+                        "admin:delete": "Delete admin data",
+                        "posts:read": "Read posts",
+                        "posts:write": "Write posts",
+                        "posts:delete": "Delete posts",
+                        "files:read": "Read files",
+                        "files:write": "Write files",
+                        "files:delete": "Delete files",
+                        "analytics:read": "Read analytics",
+                        "analytics:write": "Write analytics",
+                        "system:read": "Read system data",
+                        "system:write": "Write system data"
+                    }
+                },
+                "clientCredentials": {
+                    "tokenUrl": "/oauth2/token",
+                    "scopes": {
+                        "api:read": "Read API data",
+                        "api:write": "Write API data"
+                    }
+                }
+            }
+        },
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        },
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key"
+        }
+    }
+    
+    # Add custom tags with descriptions
+    openapi_schema["tags"] = [
+        {
+            "name": "authentication",
+            "description": "Authentication and authorization operations",
+            "externalDocs": {
+                "description": "Auth documentation",
+                "url": "https://docs.example.com/auth"
+            }
+        },
+        {
+            "name": "users",
+            "description": "User management operations"
+        },
+        {
+            "name": "posts", 
+            "description": "Blog post operations"
+        },
+        {
+            "name": "admin",
+            "description": "Administrative operations",
+            "externalDocs": {
+                "description": "Admin guide",
+                "url": "https://docs.example.com/admin"
+            }
+        },
+        {
+            "name": "websockets",
+            "description": "Real-time WebSocket connections"
+        },
+        {
+            "name": "files",
+            "description": "File upload and management"
+        }
+    ]
+    
+    # Add custom extensions
+    openapi_schema["x-logo"] = {
+        "url": "https://example.com/logo.png",
+        "altText": "API Logo"
+    }
+    
+    # Add API versioning info
+    openapi_schema["x-api-id"] = "advanced-fastapi-api"
+    openapi_schema["x-audience"] = "external"
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+def customize_openapi_operation(
+    operation_id: str,
+    summary: str,
+    description: str,
+    tags: list,
+    responses: Optional[Dict] = None,
+    security: Optional[list] = None,
+    deprecated: bool = False
+):
+    """Decorator to customize OpenAPI operation details"""
+    def decorator(func):
+        # Store metadata on function
+        func.__openapi_operation__ = {
+            "operation_id": operation_id,
+            "summary": summary, 
+            "description": description,
+            "tags": tags,
+            "responses": responses or {},
+            "security": security,
+            "deprecated": deprecated
+        }
+        return func
+    return decorator
+```
+
+#### 2. Custom Documentation UI
+
+```python
+# custom_docs.py
+from fastapi import FastAPI, Request
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+import json
+
+def setup_custom_docs(app: FastAPI):
+    """Setup custom documentation endpoints"""
+    
+    # Mount static files for custom assets
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    
+    # Custom Swagger UI
+    @app.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui_html():
+        return get_swagger_ui_html(
+            openapi_url="/openapi.json",
+            title=f"{app.title} - Interactive API Documentation",
+            swagger_js_url="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
+            swagger_css_url="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css",
+            swagger_ui_parameters={
+                "deepLinking": True,
+                "displayRequestDuration": True,
+                "docExpansion": "none",
+                "operationsSorter": "method",
+                "tagsSorter": "alpha",
+                "filter": True,
+                "tryItOutEnabled": True,
+                "persistAuthorization": True,
+                "displayOperationId": True,
+                "showExtensions": True,
+                "showCommonExtensions": True,
+                "defaultModelsExpandDepth": 2,
+                "defaultModelExpandDepth": 2,
+                "requestInterceptor": """
+                (request) => {
+                    // Add custom headers or modify requests
+                    request.headers['X-Custom-Header'] = 'SwaggerUI';
+                    return request;
+                }
+                """,
+                "responseInterceptor": """
+                (response) => {
+                    // Log responses or modify them
+                    console.log('API Response:', response);
+                    return response;
+                }
+                """
+            }
+        )
+    
+    # Custom ReDoc
+    @app.get("/redoc", include_in_schema=False)
+    async def custom_redoc_html():
+        return get_redoc_html(
+            openapi_url="/openapi.json",
+            title=f"{app.title} - API Reference",
+            redoc_js_url="https://unpkg.com/redoc@next/bundles/redoc.standalone.js",
+            with_google_fonts=True,
+            redoc_options={
+                "nativeScrollbars": True,
+                "theme": {
+                    "colors": {
+                        "primary": {
+                            "main": "#1976d2"
+                        }
+                    },
+                    "typography": {
+                        "fontSize": "14px",
+                        "fontFamily": "Arial, sans-serif",
+                        "headings": {
+                            "fontFamily": "Arial, sans-serif",
+                            "fontWeight": "600"
+                        },
+                        "code": {
+                            "fontSize": "13px",
+                            "fontFamily": "'Courier New', monospace"
+                        }
+                    },
+                    "sidebar": {
+                        "width": "300px"
+                    }
+                },
+                "hideDownloadButton": False,
+                "disableSearch": False,
+                "expandResponses": "200,201",
+                "requiredPropsFirst": True,
+                "sortPropsAlphabetically": True,
+                "showExtensions": True,
+                "hideHostname": False,
+                "expandSingleSchemaField": True,
+                "menuToggle": True,
+                "scrollYOffset": 0,
+                "hideLoading": False
+            }
+        )
+    
+    # Custom API explorer with additional features
+    @app.get("/api-explorer", include_in_schema=False)
+    async def api_explorer():
+        html_content = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>API Explorer - Advanced FastAPI</title>
+            <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; }
+                .header { background: #1976d2; color: white; padding: 20px; text-align: center; }
+                .nav { background: #f5f5f5; padding: 10px; text-align: center; }
+                .nav a { margin: 0 15px; text-decoration: none; color: #1976d2; font-weight: bold; }
+                .nav a:hover { text-decoration: underline; }
+                .content { padding: 20px; }
+                .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0; }
+                .feature-card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; }
+                .feature-card h3 { color: #1976d2; }
+                #swagger-ui { margin-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Advanced FastAPI - API Explorer</h1>
+                <p>Comprehensive API documentation and testing interface</p>
+            </div>
+            
+            <div class="nav">
+                <a href="#overview">Overview</a>
+                <a href="#authentication">Authentication</a>
+                <a href="#endpoints">Endpoints</a>
+                <a href="#websockets">WebSockets</a>
+                <a href="#examples">Examples</a>
+            </div>
+            
+            <div class="content">
+                <div id="overview">
+                    <h2>API Overview</h2>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h3>🔐 OAuth2 Authentication</h3>
+                            <p>Secure authentication with JWT tokens and fine-grained scopes</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🔄 Real-time WebSockets</h3>
+                            <p>Bi-directional communication with authentication support</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>⚡ Background Tasks</h3>
+                            <p>Asynchronous task processing with user context</p>
+                        </div>
+                        <div class="feature-card">
+                            <h3>🏢 Multi-tenancy</h3>
+                            <p>Support for multiple tenants with data isolation</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="swagger-ui"></div>
+            </div>
+            
+            <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+            <script>
+                const ui = SwaggerUIBundle({
+                    url: '/openapi.json',
+                    dom_id: '#swagger-ui',
+                    deepLinking: true,
+                    presets: [
+                        SwaggerUIBundle.presets.apis,
+                        SwaggerUIBundle.presets.standalone
+                    ],
+                    plugins: [
+                        SwaggerUIBundle.plugins.DownloadUrl
+                    ],
+                    layout: "StandaloneLayout",
+                    displayRequestDuration: true,
+                    docExpansion: "list",
+                    filter: true,
+                    showExtensions: true,
+                    showCommonExtensions: true,
+                    tryItOutEnabled: true,
+                    persistAuthorization: true,
+                    onComplete: function() {
+                        console.log('Swagger UI loaded');
+                        // Add custom JavaScript functionality
+                        addCustomFeatures();
+                    }
+                });
+                
+                function addCustomFeatures() {
+                    // Add custom buttons or functionality
+                    const toolbar = document.querySelector('.topbar');
+                    if (toolbar) {
+                        const customButton = document.createElement('button');
+                        customButton.textContent = 'Generate SDK';
+                        customButton.style.cssText = 'margin-left: 10px; padding: 8px 16px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;';
+                        customButton.onclick = function() {
+                            alert('SDK generation would be implemented here');
+                        };
+                        toolbar.appendChild(customButton);
+                    }
+                }
+                
+                // Add keyboard shortcuts
+                document.addEventListener('keydown', function(e) {
+                    // Ctrl+K to focus search
+                    if (e.ctrlKey && e.key === 'k') {
+                        e.preventDefault();
+                        const searchInput = document.querySelector('.filter input');
+                        if (searchInput) searchInput.focus();
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+    
+    # OpenAPI JSON with custom processing
+    @app.get("/openapi.json", include_in_schema=False)
+    async def get_openapi_json():
+        return app.openapi()
+    
+    # Alternative format exports
+    @app.get("/openapi.yaml", include_in_schema=False)
+    async def get_openapi_yaml():
+        import yaml
+        openapi_dict = app.openapi()
+        yaml_content = yaml.dump(openapi_dict, default_flow_style=False)
+        return Response(content=yaml_content, media_type="text/yaml")
+    
+    @app.get("/postman-collection", include_in_schema=False)
+    async def get_postman_collection():
+        """Generate Postman collection from OpenAPI spec"""
+        openapi_dict = app.openapi()
+        
+        # Convert OpenAPI to Postman collection format
+        postman_collection = {
+            "info": {
+                "name": openapi_dict["info"]["title"],
+                "description": openapi_dict["info"]["description"],
+                "version": openapi_dict["info"]["version"],
+                "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+            },
+            "item": [],
+            "auth": {
+                "type": "oauth2",
+                "oauth2": [
+                    {"key": "authUrl", "value": "/oauth2/authorize", "type": "string"},
+                    {"key": "accessTokenUrl", "value": "/oauth2/token", "type": "string"},
+                    {"key": "scope", "value": "user:read profile:read", "type": "string"}
+                ]
+            }
+        }
+
+
+# Advanced FastAPI: Multi-tenancy, API Versioning & GraphQL Integration
+
+## 58. How would you implement multi-tenancy in FastAPI (e.g., subdomain-based or DB-schema based)?
+
+Multi-tenancy allows a single application instance to serve multiple tenants while keeping their data isolated. Here are several approaches:
+
+### Subdomain-based Multi-tenancy
+
+```python
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.middleware.base import BaseHTTPMiddleware
+import re
+
+app = FastAPI()
+
+class TenantMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        host = request.headers.get("host", "")
+        
+        # Extract subdomain
+        subdomain_match = re.match(r"^([^.]+)\.example\.com", host)
+        if subdomain_match:
+            tenant_id = subdomain_match.group(1)
+            request.state.tenant_id = tenant_id
+        else:
+            request.state.tenant_id = "default"
+        
+        response = await call_next(request)
+        return response
+
+app.add_middleware(TenantMiddleware)
+
+def get_tenant_id(request: Request) -> str:
+    return getattr(request.state, "tenant_id", "default")
+
+@app.get("/users")
+async def get_users(tenant_id: str = Depends(get_tenant_id)):
+    # Query users for specific tenant
+    return {"tenant": tenant_id, "users": []}
+```
+
+### Database Schema-based Multi-tenancy
+
+```python
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker, Session
+from fastapi import Depends, HTTPException
+import asyncpg
+
+class TenantDatabaseManager:
+    def __init__(self, base_url: str):
+        self.base_url = base_url
+        self.engines = {}
+    
+    def get_tenant_engine(self, tenant_id: str):
+        if tenant_id not in self.engines:
+            # Create separate database per tenant
+            db_url = f"{self.base_url}/tenant_{tenant_id}"
+            self.engines[tenant_id] = create_engine(db_url)
+        return self.engines[tenant_id]
+    
+    def get_tenant_session(self, tenant_id: str) -> Session:
+        engine = self.get_tenant_engine(tenant_id)
+        SessionLocal = sessionmaker(bind=engine)
+        return SessionLocal()
+
+# Schema-based approach (single database, multiple schemas)
+class SchemaBasedTenancy:
+    def __init__(self, database_url: str):
+        self.engine = create_engine(database_url)
+        self.SessionLocal = sessionmaker(bind=self.engine)
+    
+    def get_tenant_session(self, tenant_id: str) -> Session:
+        session = self.SessionLocal()
+        # Set schema for this session
+        session.execute(text(f"SET search_path TO tenant_{tenant_id}"))
+        return session
+
+# Usage in FastAPI
+tenant_manager = SchemaBasedTenancy("postgresql://user:pass@localhost/mydb")
+
+async def get_db_session(tenant_id: str = Depends(get_tenant_id)):
+    session = tenant_manager.get_tenant_session(tenant_id)
+    try:
+        yield session
+    finally:
+        session.close()
+
+@app.get("/tenant-data")
+async def get_tenant_data(
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_db_session)
+):
+    # Data is automatically isolated by schema
+    result = db.execute(text("SELECT * FROM users"))
+    return {"tenant": tenant_id, "data": result.fetchall()}
+```
+
+### Header-based Multi-tenancy
+
+```python
+from fastapi import Header, HTTPException
+
+async def get_tenant_from_header(x_tenant_id: str = Header(...)):
+    if not x_tenant_id:
+        raise HTTPException(status_code=400, detail="Tenant ID required")
+    return x_tenant_id
+
+@app.get("/api/data")
+async def get_data(tenant_id: str = Depends(get_tenant_from_header)):
+    return {"tenant": tenant_id, "message": "Tenant isolated data"}
+```
+
+### Row-level Multi-tenancy
+
+```python
+from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy import Column, Integer, String, ForeignKey
+
+Base = declarative_base()
+
+class Tenant(Base):
+    __tablename__ = "tenants"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    tenant_id = Column(Integer, ForeignKey("tenants.id"))
+    tenant = relationship("Tenant")
+
+# Repository with tenant filtering
+class UserRepository:
+    def __init__(self, db: Session, tenant_id: str):
+        self.db = db
+        self.tenant_id = tenant_id
+    
+    def get_users(self):
+        return self.db.query(User).filter(User.tenant_id == self.tenant_id).all()
+    
+    def create_user(self, user_data: dict):
+        user_data["tenant_id"] = self.tenant_id
+        user = User(**user_data)
+        self.db.add(user)
+        self.db.commit()
+        return user
+
+@app.get("/users")
+async def list_users(
+    tenant_id: str = Depends(get_tenant_id),
+    db: Session = Depends(get_db_session)
+):
+    repo = UserRepository(db, tenant_id)
+    users = repo.get_users()
+    return {"users": users}
+```
+
+## 59. How do you version your OpenAPI documentation and avoid breaking client contracts?
+
+API versioning is crucial for maintaining backward compatibility. Here are several strategies:
+
+### URL Path Versioning
+
+```python
+from fastapi import FastAPI
+from fastapi.routing import APIRouter
+
+app = FastAPI()
+
+# Version 1 API
+v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
+
+@v1_router.get("/users")
+async def get_users_v1():
+    return {"users": [], "version": "1.0"}
+
+# Version 2 API with breaking changes
+v2_router = APIRouter(prefix="/api/v2", tags=["v2"])
+
+@v2_router.get("/users")
+async def get_users_v2():
+    return {
+        "data": {"users": []},
+        "meta": {"version": "2.0", "total": 0}
+    }
+
+app.include_router(v1_router)
+app.include_router(v2_router)
+```
+
+### Header-based Versioning
+
+```python
+from fastapi import Header, HTTPException
+from typing import Optional
+
+async def get_api_version(accept_version: Optional[str] = Header(None, alias="Accept-Version")):
+    if accept_version is None:
+        return "1.0"  # Default version
+    
+    if accept_version not in ["1.0", "2.0"]:
+        raise HTTPException(status_code=400, detail="Unsupported API version")
+    
+    return accept_version
+
+@app.get("/users")
+async def get_users(version: str = Depends(get_api_version)):
+    if version == "1.0":
+        return {"users": []}
+    elif version == "2.0":
+        return {"data": {"users": []}, "meta": {"version": "2.0"}}
+```
+
+### Content Negotiation Versioning
+
+```python
+from fastapi import Request
+import json
+
+def parse_accept_header(accept_header: str) -> str:
+    # Parse application/vnd.myapi.v2+json
+    if "vnd.myapi.v2" in accept_header:
+        return "2.0"
+    elif "vnd.myapi.v1" in accept_header:
+        return "1.0"
+    return "1.0"  # Default
+
+@app.get("/users")
+async def get_users(request: Request):
+    accept_header = request.headers.get("accept", "")
+    version = parse_accept_header(accept_header)
+    
+    if version == "2.0":
+        return {"data": {"users": []}}
+    return {"users": []}
+```
+
+### Separate OpenAPI Documentation per Version
+
+```python
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
+def create_versioned_app(version: str) -> FastAPI:
+    app = FastAPI(
+        title=f"My API v{version}",
+        version=version,
+        docs_url=f"/docs/v{version}",
+        redoc_url=f"/redoc/v{version}",
+        openapi_url=f"/openapi/v{version}.json"
+    )
+    
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        
+        openapi_schema = get_openapi(
+            title=f"My API v{version}",
+            version=version,
+            description=f"API version {version} documentation",
+            routes=app.routes,
+        )
+        
+        # Add version-specific information
+        openapi_schema["info"]["x-api-version"] = version
+        app.openapi_schema = openapi_schema
+        return app.openapi_schema
+    
+    app.openapi = custom_openapi
+    return app
+
+# Create separate apps for each version
+v1_app = create_versioned_app("1.0")
+v2_app = create_versioned_app("2.0")
+
+main_app = FastAPI()
+main_app.mount("/v1", v1_app)
+main_app.mount("/v2", v2_app)
+```
+
+### Backward Compatibility Strategies
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, Union
+
+# Flexible response models
+class UserV1(BaseModel):
+    id: int
+    name: str
+
+class UserV2(BaseModel):
+    id: int
+    full_name: str = Field(alias="name")  # Backward compatible
+    email: Optional[str] = None
+
+class VersionedResponse(BaseModel):
+    data: Union[UserV1, UserV2]
+    version: str
+
+@app.get("/users/{user_id}")
+async def get_user(
+    user_id: int,
+    version: str = Depends(get_api_version)
+) -> VersionedResponse:
+    # Fetch user data
+    user_data = {"id": user_id, "name": "John Doe", "email": "john@example.com"}
+    
+    if version == "1.0":
+        user = UserV1(**user_data)
+    else:
+        user = UserV2(**user_data)
+    
+    return VersionedResponse(data=user, version=version)
+```
+
+### Deprecation Warnings
+
+```python
+from fastapi import FastAPI, Response
+import warnings
+
+@app.get("/legacy-endpoint")
+async def legacy_endpoint(response: Response):
+    # Add deprecation headers
+    response.headers["Warning"] = '299 - "Deprecated API"'
+    response.headers["Sunset"] = "2024-12-31"
+    response.headers["Link"] = '</api/v2/new-endpoint>; rel="successor-version"'
+    
+    warnings.warn("This endpoint is deprecated", DeprecationWarning)
+    return {"message": "This endpoint is deprecated"}
+```
+
+## 60. Can FastAPI be used with GraphQL? How?
+
+Yes, FastAPI can be integrated with GraphQL using libraries like Strawberry, Graphene, or Ariadne. Here are different approaches:
+
+### Using Strawberry GraphQL
+
+```python
+from fastapi import FastAPI
+import strawberry
+from strawberry.fastapi import GraphQLRouter
+from typing import List, Optional
+
+# Define GraphQL types
+@strawberry.type
+class User:
+    id: int
+    name: str
+    email: str
+
+@strawberry.type
+class Post:
+    id: int
+    title: str
+    content: str
+    author_id: int
+
+# Sample data
+users_db = [
+    User(id=1, name="John Doe", email="john@example.com"),
+    User(id=2, name="Jane Smith", email="jane@example.com")
+]
+
+posts_db = [
+    Post(id=1, title="Hello World", content="First post", author_id=1),
+    Post(id=2, title="GraphQL with FastAPI", content="Second post", author_id=1)
+]
+
+# Define queries
+@strawberry.type
+class Query:
+    @strawberry.field
+    def users(self) -> List[User]:
+        return users_db
+    
+    @strawberry.field
+    def user(self, id: int) -> Optional[User]:
+        return next((user for user in users_db if user.id == id), None)
+    
+    @strawberry.field
+    def posts(self) -> List[Post]:
+        return posts_db
+    
+    @strawberry.field
+    def posts_by_user(self, author_id: int) -> List[Post]:
+        return [post for post in posts_db if post.author_id == author_id]
+
+# Define mutations
+@strawberry.input
+class CreateUserInput:
+    name: str
+    email: str
+
+@strawberry.type
+class Mutation:
+    @strawberry.mutation
+    def create_user(self, input: CreateUserInput) -> User:
+        new_id = max(user.id for user in users_db) + 1
+        new_user = User(id=new_id, name=input.name, email=input.email)
+        users_db.append(new_user)
+        return new_user
+
+# Create schema
+schema = strawberry.Schema(query=Query, mutation=Mutation)
+
+# FastAPI app
+app = FastAPI()
+
+# Add GraphQL endpoint
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/graphql")
+
+# Optional: Add REST endpoints alongside GraphQL
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+```
+
+### Using Graphene with FastAPI
+
+```python
+from fastapi import FastAPI
+import graphene
+from starlette.graphql import GraphQLApp
+
+class User(graphene.ObjectType):
+    id = graphene.Int()
+    name = graphene.String()
+    email = graphene.String()
+
+class Query(graphene.ObjectType):
+    users = graphene.List(User)
+    user = graphene.Field(User, id=graphene.Int(required=True))
+    
+    def resolve_users(self, info):
+        return [
+            {"id": 1, "name": "John Doe", "email": "john@example.com"},
+            {"id": 2, "name": "Jane Smith", "email": "jane@example.com"}
+        ]
+    
+    def resolve_user(self, info, id):
+        users = self.resolve_users(info)
+        return next((user for user in users if user["id"] == id), None)
+
+class CreateUser(graphene.Mutation):
+    class Arguments:
+        name = graphene.String(required=True)
+        email = graphene.String(required=True)
+    
+    user = graphene.Field(User)
+    
+    def mutate(self, info, name, email):
+        # Create user logic here
+        new_user = {"id": 3, "name": name, "email": email}
+        return CreateUser(user=new_user)
+
+class Mutation(graphene.ObjectType):
+    create_user = CreateUser.Field()
+
+schema = graphene.Schema(query=Query, mutation=Mutation)
+
+app = FastAPI()
+app.add_route("/graphql", GraphQLApp(schema=schema))
+```
+
+### Advanced GraphQL Integration with Database
+
+```python
+import strawberry
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from typing import List, Optional
+import asyncio
+
+# Database models (using SQLAlchemy)
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship, declarative_base
+
+Base = declarative_base()
+
+class UserModel(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    email = Column(String)
+    posts = relationship("PostModel", back_populates="author")
+
+class PostModel(Base):
+    __tablename__ = "posts"
+    id = Column(Integer, primary_key=True)
+    title = Column(String)
+    content = Column(String)
+    author_id = Column(Integer, ForeignKey("users.id"))
+    author = relationship("UserModel", back_populates="posts")
+
+# GraphQL types
+@strawberry.type
+class User:
+    id: int
+    name: str
+    email: str
+    
+    @strawberry.field
+    async def posts(self, info) -> List['Post']:
+        # Access database session from context
+        db: Session = info.context["db"]
+        posts = db.query(PostModel).filter(PostModel.author_id == self.id).all()
+        return [Post(id=p.id, title=p.title, content=p.content, author_id=p.author_id) for p in posts]
+
+@strawberry.type
+class Post:
+    id: int
+    title: str
+    content: str
+    author_id: int
+    
+    @strawberry.field
+    async def author(self, info) -> Optional[User]:
+        db: Session = info.context["db"]
+        user = db.query(UserModel).filter(UserModel.id == self.author_id).first()
+        if user:
+            return User(id=user.id, name=user.name, email=user.email)
+        return None
+
+# Context provider
+async def get_context(db: Session = Depends(get_db)):
+    return {"db": db}
+
+# Queries with database integration
+@strawberry.type
+class Query:
+    @strawberry.field
+    async def users(self, info) -> List[User]:
+        db: Session = info.context["db"]
+        users = db.query(UserModel).all()
+        return [User(id=u.id, name=u.name, email=u.email) for u in users]
+    
+    @strawberry.field
+    async def user(self, info, id: int) -> Optional[User]:
+        db: Session = info.context["db"]
+        user = db.query(UserModel).filter(UserModel.id == id).first()
+        if user:
+            return User(id=user.id, name=user.name, email=user.email)
+        return None
+
+# Schema with context
+schema = strawberry.Schema(query=Query)
+
+# GraphQL app with dependency injection
+from strawberry.fastapi import GraphQLRouter
+
+graphql_app = GraphQLRouter(
+    schema,
+    context_getter=get_context
+)
+app.include_router(graphql_app, prefix="/graphql")
+```
+
+### Subscription Support with WebSockets
+
+```python
+import strawberry
+from strawberry.types import Info
+from typing import AsyncGenerator
+import asyncio
+
+@strawberry.type
+class Subscription:
+    @strawberry.subscription
+    async def user_updates(self, info: Info) -> AsyncGenerator[User, None]:
+        # Simulate real-time updates
+        while True:
+            await asyncio.sleep(1)
+            # Yield updated user data
+            yield User(id=1, name="Updated User", email="updated@example.com")
+    
+    @strawberry.subscription
+    async def post_created(self, info: Info) -> AsyncGenerator[Post, None]:
+        # Listen for new posts
+        while True:
+            await asyncio.sleep(5)
+            yield Post(id=999, title="New Post", content="Real-time post", author_id=1)
+
+# Add subscription to schema
+schema = strawberry.Schema(
+    query=Query,
+    mutation=Mutation,
+    subscription=Subscription
+)
+
+# WebSocket support
+from strawberry.fastapi import GraphQLRouter
+
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/graphql")
+```
+
+### Hybrid REST + GraphQL API
+
+```python
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI(title="Hybrid REST + GraphQL API")
+
+# REST endpoints
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
+@app.post("/api/users", response_model=User)
+async def create_user_rest(user: UserCreate):
+    # REST endpoint for user creation
+    return {"id": 1, "name": user.name, "email": user.email}
+
+@app.get("/api/users/{user_id}")
+async def get_user_rest(user_id: int):
+    # REST endpoint for single user
+    return {"id": user_id, "name": "John Doe", "email": "john@example.com"}
+
+# GraphQL endpoint
+app.include_router(graphql_app, prefix="/graphql")
+
+# Documentation endpoints
+@app.get("/")
+async def root():
+    return {
+        "message": "Hybrid API with REST and GraphQL",
+        "rest_docs": "/docs",
+        "graphql_playground": "/graphql"
+    }
+```
+
+This comprehensive guide covers multi-tenancy implementation strategies, API versioning best practices, and GraphQL integration with FastAPI. Each approach has its trade-offs, and the choice depends on your specific requirements for scalability, maintainability, and client needs.
