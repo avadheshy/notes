@@ -1,3 +1,6 @@
+```
+super(). is equal to parent.
+```
 # Python OOPs Concepts
 ## Python Class
 A class is a collection of objects. Classes are blueprints for creating objects. A class defines a set of attributes and methods that the created objects (instances) can have. Classes are created by keyword class.
@@ -145,7 +148,7 @@ class Parent(Grandparent):
         super().__init__(surname)  # Call Grandparent's constructor
         self.father_name = father_name
 
-    def func2(self):
+    def func1(self):
         print(f"This is a function from Parent. Father: {self.father_name}, Surname: {self.surname}")
 
 class Grandchild(Parent):
@@ -154,16 +157,17 @@ class Grandchild(Parent):
         super().__init__(surname, father_name)  # Call Parent's constructor
         self.child_name = child_name
 
-    def func3(self):
+    def func1(self):
         print(f"This is a function from Grandchild. Name: {self.child_name}, Father: {self.father_name}, Surname: {self.surname}")
 
 # Testing
 print("\nMultilevel Inheritance:")
 gc = Grandchild("Sharma", "Rajesh", "Avadhesh")
-gc.func1()  # Calls Grandparent's function
-gc.func2()  # Calls Parent's function
-gc.func3()  # Calls Grandchild's function
-
+print('\n')
+gc.func1()
+super(Grandchild,gc).func1() #  parent func1
+Grandparent.func1(gc)  # Grandparent's func1()
+super(Parent, gc).func1()  # This will go to Grandparent's func1
 ```
 
 ## Hierarchical Inheritance:

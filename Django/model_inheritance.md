@@ -199,8 +199,11 @@ for sale in sales_by_category:
 Get the total revenue for each product and group it by category.
 
 ```
+from django.db.models import Sum, F, ExpressionWrapper, FloatFiel
 product_category_sales = Product.objects.annotate(
-    total_revenue=Sum(F('sale__count') * F('price'))
+    total_revenue=Sum(
+        ExpressionWrapper(F('sale__count') * F('price'), output_field=FloatField())
+    )
 ).values('category__name', 'name', 'total_revenue')
 ```
 # 2. Find the top 3 best-selling products in each category
