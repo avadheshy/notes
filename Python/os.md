@@ -1,3 +1,11 @@
+```
+1. what is opreating system its type and its functions.
+2. what is process controlle block .
+3. what is the difference between thread and process.
+4. what are different states in a process.
+5 what are diffrent types of scheduler and thier work.
+```
+
 # Operating System Interview Questions & Answers
 
 ## 1. What is an Operating System? What are its main functions?
