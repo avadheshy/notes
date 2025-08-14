@@ -1408,3 +1408,29 @@ Docker is a powerful containerization platform that revolutionizes application d
 - [Docker Compose Reference](https://docs.docker.com/compose/compose-file/)
 
 Happy containerizing! 
+
+---
+---
+- container shares host os kernel so it not required os per application.
+- container offers isolation not virtualization.
+- containers are os virtualization.
+- vms are hardware virtualization.
+- vms need os
+- container dont need os
+- container uses host os for compute resources.
+- docker manages container
+- docker is runtime environment.
+- add docker engine image for more details
+- usemod -aG docker ubuntu # this command is used to add ubuntu user in docker group
+- containers runs from image
+- images are called repository in dockerhub
+- exec and -it is used to login intract with the container
+- docker inspect is give meta data
+- when we run a docker conatiner it runs cmd then entrypoint
+- there are 2 ways to store container data volume and bindmount
+- volume is managed by the docker
+- bindmount is used to inject data from host machine to container
+- if there is a entrypoint with command and no arguments the user have to pass argumment.
+- if entrypoint and cmd are used together then cmd will be the default argument. if user provide argument then it will overwrite cmd argument.
+- docker volume prune
+- docker system prune

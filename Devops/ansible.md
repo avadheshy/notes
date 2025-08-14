@@ -1175,3 +1175,61 @@ ansible-galaxy collection install community.general
 ---
 
 This comprehensive guide covers all the essential Ansible concepts you need to master automation. Start with the basics and gradually work your way through the advanced topics. Remember to practice with real examples and always test your playbooks in a safe environment before production use.
+
+---
+---
+- there are adhoc commands which are executed in terminal directly instead of adding them in playbook.
+- in configuration management first state is checked if it is same what we want to chnage then it is not applied otherwise it will be applied. configuration management commands are idempotent while scripting is not.
+- variable at host level is given more prority than group and then file level. host>group>file
+- playbook is collection of play
+- -v/vv/vvv/vvvv is used for verbocity. which shows logs 
+-  --syntax-check is used for syntax check of the paybook
+-  -C is used for dry run the playbook . it is similr to actual output but not applied.
+-  copy files from one server to other server can be done using ansible.
+- we can use ansible when same task has to perform on different serveres. like db installation , ssh key adding or something else.
+- ansible make a python script and dumps that script on server and run  on that . there may be some python dependencies in playbook .
+- socket file in linux is used to connect process together.
+  
+# order of configuration file
+- when you want to change defaults then you have to change configuaration file.
+```
+1. ansible_config (environmemt variable if set)
+2. ansible.cfg (in the current directory) mostly used.
+3. ~/.ansible.cfg (in the home directory)
+4. /etc/ansible/ansible.cfg (in the globel directory)
+```
+# variable
+there can be diffrent ways to define variable
+- 0  variable from command line has highest prority.
+- 1 inside the playbook
+  ```
+  vars:
+    http_port:80
+  ```
+- 2 inside the invetory file
+```
+# group vars
+group_vars/all # for all group
+group_var/group_name # for specific group
+host_var/host_name # for specific name
+# there is something called role variable.
+we use variable name like "{{var_name}}"
+
+we generally define varible in file instead of playbook.
+
+```
+- there are something called fact variable which give information about something like hostname/os family name etc.
+- we can store the output of a task in a variabel so that it can be used latter.
+  
+# fact variable
+- when any playbook execute ansible executes gathering facts for all host. it calles setup module.
+- you can desable using  gathering_facts=False 
+# provisoning serever
+- when is similar to if condition . if when condition is true then task releted to that condition wil execute.
+- loop returns item as variable.
+- in copy we can use source and content.
+- template is also can be use for copy
+- when we running the playbook it starts service each time.
+- notify and handeler can be used to restart the service only when there is a change.
+- template and handler module is impartant.
+- roles is used for reusability purpose
