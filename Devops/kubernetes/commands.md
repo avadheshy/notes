@@ -1,3 +1,25 @@
+# creation
+kubectl create -f cafeapppod.yaml
+kubectl create ns kubecafe
+
+kubectl apply -f cafe-service.yaml
+# get 
+kubectl get pod/pods
+kubectl get nodes
+kubectl get deployments
+kubectl get svc
+kubectl get namespace
+kubectl get rs
+
+
+# 
+minikube service cafe-service
+
+
+# deletion
+kubectl delete deployment my-webapp
+
+
 # 1. Basic Cluster Information
 
 ## Get cluster status

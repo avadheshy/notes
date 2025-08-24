@@ -114,7 +114,7 @@ Understanding the concept of virtual servers and instances. Key components of an
   - Create a Key pair for logging purpose(make it for every envirnment)
   - Make a security Group (That will be attach to ec2 Network Interface)
   - And name and tags to ec2 instance.
-  - select AMI & elect Instance type
+  - select AMI & select Instance type
   - select key pair and security Group
   - cofigure storge and launch instance
   # elastic ip

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raj Nath Yadav - Transport Bill</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #fff;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      border: 2px solid #000;
+      padding: 15px;
+      background: #fff;
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .company {
+      text-align: center;
+      margin: 10px 0;
+    }
+    .company .title {
+      font-size: 26px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .company .subtitle {
+      font-size: 14px;
+    }
+    .address {
+      text-align: center;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .form-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+    .form-row .left {
+      flex: 1;
+    }
+    .form-row span {
+      border-bottom: 1px solid #000;
+      display: inline-block;
+      min-width: 200px;
+      height: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #000;
+      text-align: center;
+      height: 25px;
+      font-size: 12px;
+    }
+    th {
+      background: #f5f5f5;
+      font-weight: bold;
+    }
+    .pan {
+      text-align: center;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+      font-size: 12px;
+    }
+    .terms {
+      font-size: 11px;
+      margin-top: 10px;
+    }
+    .bank {
+      margin-top: 10px;
+    }
+    .totals {
+      border: 1px solid #000;
+      width: 180px;
+      padding: 8px;
+    }
+    .totals div {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #000;
+      padding: 3px 0;
+    }
+    .totals div:last-child {
+      border: none;
+    }
+    .signature {
+      text-align: center;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    @media print {
+      button { display: none; }
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-top">
+      <div>Subject To Panvel Jurisdiction</div>
+      <div>Mob.: 9987181787 <br> 8928999214</div>
+    </div>
+
+    <div class="company">
+      <div style="font-size:40px;">🚚</div>
+      <div class="title">RAJ NATH YADAV</div>
+      <div class="subtitle">TRANSPORT CONTRACTORS</div>
+    </div>
+
+    <div class="address">
+      JNPT ROAD, NAER BLR COMPANY, GAVAN PHATA, TAL PANVEL, DIST. RAIGAD.
+    </div>
+
+    <div class="form-row">
+      <div class="left">M/s. <span></span></div>
+      <div>Bill No.: <span style="min-width:100px"></span></div>
+    </div>
+    <div class="form-row">
+      <div></div>
+      <div>Date: <span style="min-width:100px"></span></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:80px;">Date</th>
+          <th style="width:100px;">Vehicle No.</th>
+          <th style="width:220px;">Particulars</th>
+          <th style="width:80px;">Weight</th>
+          <th style="width:80px;">Advance</th>
+          <th style="width:80px;">Amount</th>
+        </tr>
+      </thead>
+      <tbody id="billTable"></tbody>
+    </table>
+
+    <div class="pan">PAN NO.: AQXPY2443C</div>
+
+    <div class="footer">
+      <div>
+        <div><strong>Rupees in Words:</strong> <span style="border-bottom:1px solid #000; min-width:300px; display:inline-block;"></span></div>
+        <div class="terms">
+          1. Pay by A/c. Payee Cheque only.<br>
+          2. Payment should be made within 15 days after the submission of bill.<br>
+          3. Interest @ 18 p.a. will be charged if bill remain unpaid after submission of bill.<br>
+          E. & O. E.
+        </div>
+        <div class="bank">
+          <strong>BANK</strong> : IDFC FIRST BANK<br>
+          <strong>BRANCH</strong> : KALAMBOLI<br>
+          <strong>A/C. No.</strong> : 10170831628<br>
+          <strong>IFSC</strong> : IDFB0040143
+        </div>
+      </div>
+      <div class="totals">
+        <div><strong>TOTAL</strong> <span style="width:70px; border-bottom:1px solid #000;"></span></div>
+        <div><strong>ADVANCE</strong> <span style="width:70px; border-bottom:1px solid #000;"></span></div>
+        <div><strong>BALANCE</strong> <span style="width:70px; border-bottom:1px solid #000;"></span></div>
+        <div class="signature">For RAJ NATH YADAV</div>
+      </div>
+    </div>
+  </div>
+
+  <button onclick="window.print()" style="margin:20px auto; display:block; padding:10px 20px; background:#007bff; color:#fff; border:none; border-radius:5px; cursor:pointer;">Print Bill</button>
+
+  <script>
+    // Fill table with 22 empty rows
+    const table = document.getElementById("billTable");
+    for (let i = 0; i < 22; i++) {
+      const row = table.insertRow();
+      for (let j = 0; j < 6; j++) {
+        const cell = row.insertCell();
+        cell.innerHTML = "&nbsp;";
+      }
+    }
+  </script>
+</body>
+</html>

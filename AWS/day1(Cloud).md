@@ -1,8 +1,12 @@
 # What is Cloud (Cloud Computing) ? 
 Cloud computing refers to the delivery of computing services—like servers, storage, databases, networking, software, analytics, and intelligence—over the internet ("the cloud") instead of using local computers or servers.
 
+Basically: “Cloud computing” is the act of consuming or providing IT services via the cloud.
+
 ---
 Cloud = Renting computing resources over the internet instead of owning them.
+
+Basically: “The Cloud” is the environment where everything lives and runs.
 
 ---
 ```
@@ -27,6 +31,7 @@ Each behaves like a separate computer — but all are running on one physical ma
 | **OS-level (Containers)** | Virtualization at OS level (lightweight)     | Docker, LXC      |
 
 ```
+![image](./iaas_paas_saas.webp)
 # Key Components:
 - Hypervisor: Software that enables virtualization (e.g., VMware, VirtualBox, KVM).
 

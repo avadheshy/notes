@@ -1,5 +1,5 @@
 #  Amazon VPC (Virtual Private Cloud)
-
+![image](./AWS-EC2-Instance-types.png)
 Amazon VPC allows you to **launch AWS resources** in a **logically isolated virtual network**. You have complete control over your virtual networking environment, including IP ranges, subnets, route tables, internet gateways, and security.
 
 ---
@@ -153,3 +153,31 @@ Your Local Machine
 
 ```
 - for jump sever create security group in that vpc.
+
+
+# udemy
+class a private ip 10.0.0.0 - 10.255.255.255
+class b private ip 172.16.0.0-172.31.255.255
+class c 192.168.0.0- 192.168.255.255
+- first ip is network address
+- last ip is broad cost address
+
+vpc range 172.20.0.0/16
+4 subnets : 2 pub sub 2 priv sub
+Region us east 1
+2 zones us east 1a/1b
+
+172.20.1.0/24 pub sub[us east 1a]
+172.20.2.0/24 pub sub[us east 1b]
+172.20.3.0/24 priv sub [us east 1a]
+172.20.4.0/24 priv sub [us east 1b]
+- internet gateway
+- 2 Natgatway
+- 2 elastic ip
+- 2 Route Tables 1 Pub 1 priv sub
+- 1 bostan host
+- 1 nacl
+- 1 more vpc for vpc pearing
+- traffic going to internet gateway will be public sub net
+- traffic going to nat gateway will private subnet
+

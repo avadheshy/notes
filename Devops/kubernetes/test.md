@@ -46,6 +46,10 @@ kops validate cluster --name=crazycoder.shop --state=s3://kops2015
 # delete cluster
 kops delete cluster --name=crazycoder.shop --state=s3://kops2015 --yes 
 ```
+# making infress
+```
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.3/deploy/static/provider/aws/deploy.yaml
+```
 ---
 read config file
 what is kube config file
