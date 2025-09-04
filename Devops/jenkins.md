@@ -2,6 +2,7 @@
 how to make variable name of the file base on each build like $build_id $version
 you can add variable name with  timestamp pulgin >manage jenkins>set timestamp
 - publish artifact to s3 bucket
+- what is the difference between tools and plugin
 # CI/CD with Jenkins - Django & Java Complete Guide
 
 ## Table of Contents

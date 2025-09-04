@@ -1,6 +1,94 @@
 #  Amazon VPC (Virtual Private Cloud)
 ![image](./AWS-EC2-Instance-types.png)
 Amazon VPC allows you to **launch AWS resources** in a **logically isolated virtual network**. You have complete control over your virtual networking environment, including IP ranges, subnets, route tables, internet gateways, and security.
+# AWS VPC Architecture Setup (Public + Private Subnets with Load Balancer)
+
+## 1. VPC Basics
+- A **VPC** can only exist in **one AWS Region**.
+- A VPC can span multiple **Availability Zones (AZs)**.
+- For cross-region or cross-VPC communication, use **VPC Peering** or **Transit Gateway**.
+
+---
+
+## 2. VPC Setup
+1. **Create a VPC** (using only VPC mode, not default).
+2. **Create Subnets**:
+   - Public subnets across different AZs.
+   - Private subnets across different AZs.
+
+---
+
+## 3. Internet Connectivity
+1. **Create an Internet Gateway (IGW)** and attach it to the VPC.
+2. **Public Route Table**:
+   - Route `0.0.0.0/0` → Internet Gateway.
+   - Associate with public subnets.
+3. **Enable auto-assign public IPs** for public subnets so instances receive public IPs.
+
+---
+
+## 4. NAT Gateway
+1. **Create an Elastic IP (EIP)**.
+2. **Create a NAT Gateway** in a public subnet and associate with the EIP.
+3. **Private Route Table**:
+   - Route `0.0.0.0/0` → NAT Gateway.
+   - Associate with private subnets.
+
+---
+
+## 5. Security
+- **Security Groups**:
+  - Load Balancer SG → Allows HTTP/HTTPS from the internet.
+  - App SG → Allows traffic from Load Balancer SG.
+  - DB SG → Allows traffic only from App SG.
+  - Bastion SG → Allows SSH from trusted IPs.
+- **Network ACLs (optional)** for subnet-level stateless rules.
+
+---
+
+## 6. Bastion Host
+- Create a Bastion Host (Jump Box) in a public subnet.
+- Use it to SSH into EC2 instances in private subnets.
+- (Recommended) Use **AWS Systems Manager Session Manager** instead of Bastion for secure access.
+
+---
+
+## 7. Load Balancer
+- Deploy an **Application Load Balancer (ALB)** in public subnets across multiple AZs.
+- Forward traffic to EC2 instances in private subnets (App servers).
+- For domain names, point **Route 53 DNS** to the Load Balancer.
+
+---
+
+## 8. Application & Database
+- **Private Subnet**:
+  - Deploy Application servers.
+  - Deploy Database (e.g., RDS) in private subnets.
+- DB should only allow connections from App Security Group, not directly from the internet.
+- Create a **DB Subnet Group** for RDS spanning private subnets across AZs.
+
+---
+
+## 9. High Availability (HA)
+- Always create **subnets across at least 2 AZs** for fault tolerance.
+- Create **NAT Gateways in each AZ** if high availability is required.
+- Load Balancer automatically spans multiple AZs.
+
+---
+
+## 10. Final Architecture Overview
+- **Public Subnet**: Load Balancer + Bastion Host + NAT Gateway.
+- **Private Subnet**: Application servers + Database.
+- **Internet Gateway**: Provides internet access to public subnet resources.
+- **NAT Gateway**: Allows private subnet resources to access the internet securely.
+- **Routing**:
+  - Public Subnet → IGW
+  - Private Subnet → NAT Gateway
+- **Access**:
+  - Bastion/SSM → Access private instances.
+  - Load Balancer → Public entry point to the app.
+
+---
 
 ---
 
