@@ -1,0 +1,1 @@
+- when we deploy muliple machines for same application with one db. How write operations are performed.

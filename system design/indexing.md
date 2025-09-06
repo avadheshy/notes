@@ -1,3 +1,24 @@
+
+- **Index types**: Primary, Secondary, Clustered.
+- **Dense Index** → entry for every record.
+- **Sparse Index** → entry per block/page.
+- **Primary Index** → built on primary key, no duplicates. Can be sparse (if clustered) or dense.
+- **Secondary Index** → always dense, duplicates allowed (handled via pointer list/multiple entries).
+- **Clustered Index** → defines physical order of data, only one per table, duplicates grouped with block chaining.
+
+- **B+ Tree** → best for range queries.
+
+- **Hash Index** → best for exact matches.
+
+- **Bitmap Index** → efficient for logical operations on low-cardinality columns.
+
+- **Composite Index** → multi-column indexing.
+
+- **Covering Index** → query served directly from index without base table lookup.
+
+- **Tradeoff** → faster reads, slower writes, more storage usage.
+
+
 # 📊 Database Indexes: Complete Guide
 
 This document provides a comprehensive overview of database indexing concepts, types, and implementation strategies.

@@ -1,6 +1,28 @@
 # System design 30 most imp topics
+## Key concepts
+- scalabilty (vertical/horizontal)
+- Performance (Latency/Through put)
+- Availability
+- Reliabilty (Replication/Redundency/failover mechanism)
+- Consistancy/Eventual consistancy
+- Cap theorem
+- Data Storage and retrival
+- Acid Transactions
+- Consistance hashing
+- Rate Limiting
+- Network communications
+- Security and Privacy (Authentication/Autherization/encryption)
+## Building Blogs
+- Applications servers
+- Laod Balancer
+- Data Base
+- Caching
+- Message Queues
+- Storage system
+- Proxy Server
+- CDN
 1. client server architecture
-2.  ip
+2.  ip adress
 3. dns
 4. proxy/reverse proxy
 5. latency
