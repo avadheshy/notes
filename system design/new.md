@@ -10,7 +10,7 @@
 - Acid Transactions
 - Consistance hashing
 - Rate Limiting
-- Network communications
+- Network communications(n/w protocols,apis, msg queues,event driven artchiture)
 - Security and Privacy (Authentication/Autherization/encryption)
 ## Building Blogs
 - Applications servers
