@@ -410,6 +410,11 @@ The attribute ‘X’ can assume only those values which are assumed by the attr
 - In fact, foreign key is not unique most of the time.
 - Referenced relation may also be called as the master table or primary table.
 - Referencing relation may also be called as the foreign table.
+# 6. Partial Key-
+ 
+- Partial key is a key using which all the records of the table can not be identified uniquely.
+- However, a bunch of related tuples can be selected from the table using the partial key.
+
 ## 7. Composite Key-
 
 - A primary key comprising of multiple attributes and not just a single attribute is called as a composite key.
