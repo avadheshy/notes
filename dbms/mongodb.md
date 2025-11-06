@@ -1,3 +1,8 @@
+update
+lookup unwind
+what is ordered/unordered insert
+bulk & many in detail
+
 # Mongodb fundamentals
 1. what is mongodb and what are its main features ?
 2. How does mongodb differ from relational databases ?
@@ -3614,26 +3619,564 @@ db.createView(
 - Real-time query capabilities
 - Integration with analytics tools
 
+# MongoDB Interview Questions and Answers
+
 ### 70. Can MongoDB handle real-time data analytics workload?
 
-**Yes**, MongoDB is well-suited for real-time analytics:
+Yes, MongoDB can handle real-time data analytics workloads effectively through:
+- **Aggregation Pipeline**: Processes data in real-time with stages like $match, $group, $sort
+- **Change Streams**: Allows applications to access real-time data changes
+- **Indexing**: Speeds up query performance for analytics
+- **In-Memory Storage Engine**: Provides high-speed data access
+- **Atlas Analytics Nodes**: Dedicated nodes for analytical workloads without impacting operational performance
 
-**Key Features**:
+### 71. How do you stream large quantities of data into and out of MongoDB?
 
-1. **Change Streams**:
+**Streaming Data Into MongoDB:**
+- Use bulk write operations (insertMany, bulkWrite)
+- Implement batch processing with proper batch sizes
+- Use MongoDB connectors (Kafka Connector, Spark Connector)
+- Implement change data capture (CDC) tools
+- Use mongoimport for file-based imports
+
+**Streaming Data Out:**
+- Use Change Streams to capture real-time changes
+- Implement cursor-based iteration for large result sets
+- Use aggregation pipeline with $out or $merge
+- Export using mongoexport
+- Integrate with streaming platforms like Kafka or Apache Flink
+
+### 72. How does MongoDB handle locking and concurrency?
+
+MongoDB uses document-level locking:
+- **WiredTiger Storage Engine**: Implements optimistic concurrency control with document-level locks
+- **Read/Write Locks**: Multiple readers can access simultaneously, but writes lock at document level
+- **Intent Locks**: Used at database and collection levels to indicate intended operations
+- **Lock Yielding**: Long-running operations yield locks periodically
+- **MVCC (Multi-Version Concurrency Control)**: Provides snapshot isolation for reads
+
+### 73. What is the relationship between BSON and MongoDB?
+
+BSON (Binary JSON) is MongoDB's native data format:
+- **Binary Encoding**: More efficient than JSON for storage and transmission
+- **Extended Data Types**: Supports types not in JSON (Date, ObjectId, Binary, Decimal128)
+- **Traversable**: Can be scanned efficiently without full parsing
+- **Size-Prefixed**: Each element has size information for quick skipping
+- MongoDB stores all documents as BSON internally
+
+### 74. Explain the concept of cursor in MongoDB?
+
+A cursor is a pointer to the result set of a query:
+- **Batch Processing**: Returns documents in batches (default 101 documents in first batch)
+- **Iteration**: Allows iterating through large result sets without loading all data
+- **Timeout**: Cursors timeout after 10 minutes of inactivity (can be disabled with noCursorTimeout)
+- **Methods**: hasNext(), next(), forEach()
+- **Memory Efficient**: Doesn't load entire result set into memory
+
 ```javascript
-// Watch for changes in real-time
-const changeStream = db.collection('orders').watch();
+const cursor = db.collection.find({});
+while(cursor.hasNext()) {
+    const doc = cursor.next();
+    // process document
+}
+```
 
+### 75. How does MongoDB manage memory?
+
+MongoDB memory management includes:
+- **WiredTiger Cache**: Default 50% of RAM minus 1GB, or 256MB minimum
+- **Operating System Cache**: File system cache for frequently accessed data
+- **Connection Memory**: Each connection uses memory (~1MB per connection)
+- **Index Memory**: Indexes should fit in RAM for optimal performance
+- **Memory-Mapped Files**: MMAPv1 engine uses memory-mapped files
+- **Automatic Management**: WiredTiger automatically manages cache eviction
+
+### 76. What are the best practices for securing a MongoDB instance?
+
+**Security Best Practices:**
+- Enable authentication and authorization
+- Use Role-Based Access Control (RBAC)
+- Enable encryption at rest and in transit (TLS/SSL)
+- Run MongoDB with a dedicated user account
+- Bind to specific IP addresses, not 0.0.0.0
+- Enable auditing for compliance
+- Regular security updates and patches
+- Use firewall rules to restrict access
+- Implement network segmentation
+- Disable unused MongoDB features
+- Regular backup and disaster recovery testing
+
+### 77. How do you scale a MongoDB deployment?
+
+**Vertical Scaling:**
+- Increase CPU, RAM, or storage capacity
+- Limited by hardware constraints
+
+**Horizontal Scaling (Sharding):**
+- Distribute data across multiple servers
+- Choose appropriate shard key
+- Add shards as data grows
+- Use zone sharding for geo-distribution
+
+**Read Scaling:**
+- Add replica set members
+- Route read operations to secondaries
+- Use read preferences appropriately
+
+### 78. What is Ops Manager in MongoDB?
+
+Ops Manager is MongoDB's enterprise management platform:
+- **Monitoring**: Real-time performance metrics and alerts
+- **Backup**: Automated continuous backup and point-in-time recovery
+- **Automation**: Automates deployment, upgrades, and configuration
+- **Query Optimization**: Identifies slow queries and suggests indexes
+- **On-Premise Solution**: Self-hosted alternative to Atlas
+- **Integration**: Works with existing infrastructure
+
+### 79. How do you troubleshoot a slow running query in MongoDB?
+
+**Troubleshooting Steps:**
+1. Use `explain()` to analyze query execution
+2. Check if proper indexes exist
+3. Review query plan for collection scans (COLLSCAN)
+4. Enable profiler to identify slow queries
+5. Check server resource utilization (CPU, memory, disk I/O)
+6. Analyze query patterns and optimize schema
+7. Review index usage with `db.collection.stats()`
+8. Check for lock contention
+9. Optimize aggregation pipeline stages
+10. Consider sharding for large collections
+
+```javascript
+db.collection.find({field: value}).explain("executionStats")
+```
+
+### 80. What is the cause of MongoDB error E11000 duplicate key error?
+
+This error occurs when:
+- Attempting to insert a document with a duplicate `_id`
+- Violating unique index constraints
+- Bulk operations containing duplicate keys
+
+**Solutions:**
+- Ensure unique values for indexed fields
+- Use `upsert: true` for update operations
+- Handle duplicates in application logic
+- Use `ordered: false` in bulk operations to continue after errors
+
+### 81. How do you handle a scenario where MongoDB service doesn't start?
+
+**Troubleshooting Steps:**
+1. Check MongoDB log files (`/var/log/mongodb/mongod.log`)
+2. Verify port availability (27017 not in use)
+3. Check disk space availability
+4. Verify data directory permissions
+5. Review configuration file for errors
+6. Check if lock file exists and remove if stale (`mongod.lock`)
+7. Repair database if corrupted: `mongod --repair`
+8. Verify network configuration and firewall rules
+9. Check system resource limits (ulimit)
+10. Review recent changes or updates
+
+### 82. What are some MongoDB cloud hosted solutions?
+
+**Popular Cloud Solutions:**
+- **MongoDB Atlas**: Official MongoDB cloud platform (AWS, Azure, GCP)
+- **AWS DocumentDB**: MongoDB-compatible service
+- **Azure Cosmos DB**: Multi-model database with MongoDB API
+- **Google Cloud Platform**: MongoDB on Compute Engine/Kubernetes
+- **IBM Cloud Databases for MongoDB**
+- **DigitalOcean Managed MongoDB**
+- **ScaleGrid**: Multi-cloud MongoDB hosting
+
+### 83. How does MongoDB Atlas enhance MongoDB capability?
+
+Atlas provides:
+- **Automated Operations**: Automatic backups, updates, and scaling
+- **Global Clusters**: Multi-region deployments with low latency
+- **Serverless**: Pay-per-use pricing model
+- **Full-Text Search**: Integrated search capabilities
+- **Data Lake**: Query data from Atlas and S3
+- **Charts**: Built-in data visualization
+- **Triggers**: Database event-driven functions
+- **App Services**: Backend-as-a-Service functionality
+- **Performance Advisor**: Automated optimization suggestions
+- **Security Features**: Encryption, network isolation, compliance
+
+### 84. Describe the use of Atlas in MongoDB?
+
+MongoDB Atlas is a fully managed cloud database service:
+- **Database Deployment**: Deploy clusters in minutes
+- **Monitoring**: Real-time performance metrics and alerts
+- **Backup and Recovery**: Continuous backups with point-in-time recovery
+- **Security**: Built-in encryption, VPC peering, IP whitelisting
+- **Scalability**: Automatic or manual scaling
+- **Multi-Cloud**: Deploy across AWS, Azure, and GCP
+- **Developer Tools**: Integration with IDEs and CI/CD pipelines
+- **Analytics**: Built-in analytics nodes for reporting
+
+### 85. Explain the use of Robo 3T?
+
+Robo 3T (formerly Robomongo) is a MongoDB GUI client:
+- **Shell-Centric**: Embedded MongoDB shell
+- **Cross-Platform**: Works on Windows, macOS, Linux
+- **Connection Management**: Manage multiple MongoDB connections
+- **Query Building**: Visual query builder
+- **JSON View**: View documents in tree or text mode
+- **Auto-Completion**: IntelliSense for MongoDB commands
+- **Free and Open Source**: Community edition available
+- **Lightweight**: Minimal resource footprint
+
+### 86. Can you work with MongoDB with command line? If yes, how?
+
+Yes, using the MongoDB Shell (mongosh):
+
+```bash
+# Connect to MongoDB
+mongosh "mongodb://localhost:27017"
+
+# Use a database
+use myDatabase
+
+# Insert document
+db.users.insertOne({name: "John", age: 30})
+
+# Query documents
+db.users.find({age: {$gt: 25}})
+
+# Update document
+db.users.updateOne({name: "John"}, {$set: {age: 31}})
+
+# Delete document
+db.users.deleteOne({name: "John"})
+
+# Create index
+db.users.createIndex({email: 1}, {unique: true})
+
+# Show collections
+show collections
+
+# Show databases
+show dbs
+```
+
+### 87. What factors to consider when deploying a containerized MongoDB environment?
+
+**Key Considerations:**
+- **Persistent Storage**: Use volumes for data persistence
+- **Resource Limits**: Set appropriate CPU and memory limits
+- **Networking**: Configure proper port mapping and service discovery
+- **Security**: Use secrets for credentials, enable authentication
+- **Backup Strategy**: Implement backup solutions for containers
+- **Orchestration**: Use Kubernetes StatefulSets for replica sets
+- **Monitoring**: Implement container-aware monitoring
+- **Health Checks**: Configure liveness and readiness probes
+- **Data Migration**: Plan for data portability
+- **Performance**: Consider storage driver performance impact
+
+### 88. How does MongoDB work with microservice architecture?
+
+MongoDB fits well with microservices:
+- **Database per Service**: Each microservice can have its own MongoDB database
+- **Schema Flexibility**: Supports independent schema evolution
+- **Horizontal Scaling**: Sharding supports service-specific scaling
+- **API Integration**: Easy integration via drivers and REST APIs
+- **Change Streams**: Enable event-driven architecture
+- **Aggregation**: Supports service-specific data processing
+- **Replication**: Provides high availability per service
+- **Document Model**: Aligns with microservice data ownership
+
+### 89. What are change streams in MongoDB?
+
+Change streams allow applications to access real-time data changes:
+- **Real-Time Updates**: Subscribe to insert, update, delete, replace operations
+- **Resumable**: Can resume from a specific point after disconnection
+- **Cluster-Wide**: Can watch entire cluster, database, or collection
+- **Filtering**: Use aggregation pipeline to filter events
+- **Ordered**: Changes delivered in order they occurred
+
+```javascript
+const changeStream = db.collection.watch();
 changeStream.on('change', (change) => {
-  if (change.operationType === 'insert') {
-    // Process new order in real-time
-    updateDashboard(change.fullDocument);
-  }
+    console.log('Change detected:', change);
 });
 ```
 
-2. **Aggregation Pipeline**:
+**Use Cases:**
+- Real-time notifications
+- Data synchronization
+- Audit logging
+- Cache invalidation
+
+### 90. What are the major features added in latest MongoDB releases?
+
+**Recent Major Features (MongoDB 5.x - 7.x):**
+- **Time Series Collections**: Optimized for time-stamped data
+- **Queryable Encryption**: Field-level encryption with querying
+- **Clustered Collections**: Store data ordered by _id
+- **Native Date Arithmetic**: $dateAdd, $dateSubtract operators
+- **Window Functions**: $setWindowFields for analytics
+- **Versioned API**: Stable API for applications
+- **Atlas Search**: Integrated full-text search
+- **Aggregation Improvements**: New operators and optimizations
+- **Enhanced Sharding**: Improved balancer and chunk operations
+- **Multi-Document ACID Transactions**: Enhanced transaction support
+
+### 91. How does MongoDB handle version upgrades in production environment?
+
+**Upgrade Process:**
+1. **Review Release Notes**: Check compatibility and breaking changes
+2. **Test in Staging**: Thoroughly test in non-production environment
+3. **Backup Data**: Complete backup before upgrade
+4. **Rolling Upgrade**: Upgrade replica set members one at a time
+   - Upgrade secondaries first
+   - Step down primary and upgrade last
+5. **Feature Compatibility Version**: Set after all nodes upgraded
+6. **Monitor Performance**: Watch for issues post-upgrade
+7. **Downgrade Plan**: Have rollback strategy ready
+
 ```javascript
-// Real-time metrics
-db.
+// Check version
+db.version()
+
+// Set feature compatibility
+db.adminCommand({setFeatureCompatibilityVersion: "6.0"})
+```
+
+### 92. In what scenarios is MongoDB favorable over MySQL?
+
+**MongoDB is Better For:**
+- **Flexible Schema**: Rapid development with changing requirements
+- **Hierarchical Data**: Nested/embedded documents
+- **Horizontal Scaling**: Sharding for massive datasets
+- **Real-Time Analytics**: Aggregation pipeline
+- **Content Management**: Document-centric applications
+- **IoT Applications**: High write throughput
+- **Catalog Management**: Product catalogs with varying attributes
+- **JSON/BSON Data**: Native JSON support
+
+**MySQL is Better For:**
+- Complex multi-table joins
+- Strong ACID requirements across tables
+- Mature ecosystem and tooling
+- Structured, relational data
+
+### 93. What are some common patterns of data access in MongoDB applications?
+
+**Common Patterns:**
+- **Embedding**: Store related data in single document
+- **Referencing**: Store references to documents in other collections
+- **Bucket Pattern**: Group documents into buckets (time series)
+- **Outlier Pattern**: Handle exceptional cases separately
+- **Computed Pattern**: Pre-calculate and store aggregated values
+- **Subset Pattern**: Store frequently accessed data in main document
+- **Extended Reference Pattern**: Duplicate frequently accessed fields
+- **Approximation Pattern**: Use approximations for large counts
+- **Tree/Graph Pattern**: Model hierarchical relationships
+- **Polymorphic Pattern**: Store documents with different schemas in one collection
+
+### 94. How can you prevent slow queries in MongoDB?
+
+**Prevention Strategies:**
+1. **Create Appropriate Indexes**: Index frequently queried fields
+2. **Use Covered Queries**: Return only indexed fields
+3. **Limit Result Sets**: Use limit() and projection
+4. **Optimize Aggregation**: Place $match early in pipeline
+5. **Avoid Large Documents**: Keep documents reasonably sized
+6. **Use Profiler**: Identify and optimize slow queries
+7. **Regular Index Maintenance**: Remove unused indexes
+8. **Schema Design**: Embed frequently accessed data
+9. **Connection Pooling**: Reduce connection overhead
+10. **Monitor Working Set**: Ensure indexes fit in RAM
+
+### 95. Explain the role of profiler in MongoDB?
+
+The database profiler collects query execution data:
+- **Profiling Levels**:
+  - 0: Profiler off
+  - 1: Log slow operations (threshold-based)
+  - 2: Log all operations
+
+```javascript
+// Enable profiler for slow queries (>100ms)
+db.setProfilingLevel(1, 100)
+
+// View profiled queries
+db.system.profile.find().sort({ts: -1}).limit(5)
+
+// Disable profiler
+db.setProfilingLevel(0)
+```
+
+**Usage:**
+- Identify slow queries
+- Analyze query patterns
+- Optimize index strategy
+- Debug performance issues
+
+### 96. How are B-tree indexes implemented in MongoDB?
+
+MongoDB uses B-tree indexes:
+- **Balanced Tree Structure**: All leaf nodes at same level
+- **Sorted Order**: Keys stored in sorted order
+- **Efficient Searches**: O(log n) search time
+- **Range Queries**: Efficient range scans
+- **Multiple Indexes**: Compound and multi-key indexes supported
+- **WiredTiger**: Uses B+ tree variant
+- **Index Entries**: Point to document locations
+- **Prefix Compression**: Reduces index size
+
+### 97. How do you handle complex transactions in MongoDB?
+
+MongoDB supports multi-document ACID transactions:
+
+```javascript
+const session = db.getMongo().startSession();
+session.startTransaction();
+
+try {
+    const accountsCol = session.getDatabase('bank').accounts;
+    
+    // Debit from account A
+    accountsCol.updateOne(
+        {account: "A"},
+        {$inc: {balance: -100}},
+        {session}
+    );
+    
+    // Credit to account B
+    accountsCol.updateOne(
+        {account: "B"},
+        {$inc: {balance: 100}},
+        {session}
+    );
+    
+    session.commitTransaction();
+} catch (error) {
+    session.abortTransaction();
+} finally {
+    session.endSession();
+}
+```
+
+**Best Practices:**
+- Keep transactions short
+- Use appropriate write concerns
+- Handle transaction errors properly
+- Prefer document model to minimize transactions
+
+### 98. Explain the MongoDB MapReduce operation?
+
+MapReduce processes large datasets (deprecated in favor of aggregation):
+
+```javascript
+db.collection.mapReduce(
+    // Map function
+    function() {
+        emit(this.category, this.price);
+    },
+    // Reduce function
+    function(key, values) {
+        return Array.sum(values);
+    },
+    {
+        out: "result_collection",
+        query: {status: "active"}
+    }
+)
+```
+
+**Components:**
+- **Map**: Emits key-value pairs
+- **Reduce**: Aggregates values for each key
+- **Finalize**: Optional final processing
+
+**Note**: Aggregation pipeline is now preferred for better performance.
+
+### 99. Can you perform text search in MongoDB?
+
+Yes, using text indexes:
+
+```javascript
+// Create text index
+db.articles.createIndex({title: "text", content: "text"})
+
+// Search
+db.articles.find({$text: {$search: "mongodb database"}})
+
+// Search with score
+db.articles.find(
+    {$text: {$search: "mongodb"}},
+    {score: {$meta: "textScore"}}
+).sort({score: {$meta: "textScore"}})
+
+// Exact phrase search
+db.articles.find({$text: {$search: "\"exact phrase\""}})
+
+// Exclude words
+db.articles.find({$text: {$search: "mongodb -sql"}})
+```
+
+**Features:**
+- Language-specific stemming
+- Case-insensitive search
+- Diacritic-insensitive
+- Stop word filtering
+- Text score ranking
+
+### 100. How can you integrate MongoDB with 3rd party applications?
+
+**Integration Methods:**
+1. **Native Drivers**: Official drivers for various languages
+2. **REST APIs**: Create REST endpoints using frameworks
+3. **GraphQL**: Use tools like Apollo Server
+4. **ETL Tools**: Talend, Apache NiFi, Pentaho
+5. **BI Tools**: Tableau, Power BI, Looker
+6. **Messaging Systems**: Kafka Connect, RabbitMQ
+7. **ODM/ORM**: Mongoose, Spring Data MongoDB
+8. **Webhooks**: MongoDB Realm triggers
+9. **Change Streams**: Real-time data synchronization
+10. **Atlas Data API**: HTTP-based data access
+
+### 101. Describe how to synchronize data between MongoDB and MySQL?
+
+**Synchronization Approaches:**
+
+**1. Change Data Capture (CDC):**
+- Use MongoDB Change Streams
+- Capture changes and write to MySQL
+- Tools: Debezium, Maxwell
+
+**2. ETL Tools:**
+- Apache NiFi
+- Talend
+- Pentaho Data Integration
+
+**3. Custom Sync Scripts:**
+```javascript
+// MongoDB Change Stream
+const changeStream = db.collection.watch();
+changeStream.on('change', async (change) => {
+    if (change.operationType === 'insert') {
+        // Insert into MySQL
+        await mysqlConnection.query(
+            'INSERT INTO table VALUES (?)', 
+            [change.fullDocument]
+        );
+    }
+});
+```
+
+**4. Third-Party Services:**
+- Fivetran
+- Stitch Data
+- Airbyte
+
+**5. Considerations:**
+- Schema mapping
+- Data type conversion
+- Conflict resolution
+- Performance impact
+- Monitoring and error handling
+
+---
