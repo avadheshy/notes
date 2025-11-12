@@ -73,3 +73,67 @@ async def read_item(skip: int = 0, limit: int = 10):
 the query parameters are:skip: with a value of 0, limit: with a value of 10
 ```
 - You can declare multiple path parameters and query parameters at the same time, FastAPI knows which is which. And you don't have to declare them in any specific order. They will be detected by name:
+
+# Request Body
+- To send data, you should use one of: POST (the more common), PUT, DELETE or PATCH.
+- Model made with pydantic is called schema
+- You can declare body, path and query parameters, all at the same time.
+# Annotated 
+Annotated can be used to add metadata to your parameters.
+# Query Parameters and String Validations¶
+
+```
+async def read_items(q: Annotated[str | None, Query(max_length=50)] = None):
+async def read_items(q: Annotated[str | None, Query(min_length=3, max_length=50, pattern="^fixedquery$")] = None,):
+# We are going to enforce that even though q is optional, whenever it is provided, its length doesn't exceed 50 characters.
+
+q: str | None = None # q: Annotated[str | None] = None
+# both are same
+```
+This is how you would use Query() as the default value of your function parameter, setting the parameter max_length to 50:
+```
+async def read_items(q: str | None = Query(default=None, max_length=50)):
+```
+Using Annotated is recommended instead of the default value in function parameters.
+## Generic validations and metadata:
+
+```
+alias # alternate name for the parameter in the URL
+title # displayed in the OpenAPI docs
+description # # longer doc
+deprecated #  # marks it as deprecated in docs
+```
+## Validations specific for strings:
+```
+min_length 
+max_length
+pattern #regex
+```
+## Custom validations using 
+```
+AfterValidator
+```
+# Path Parameters and Numeric Validations¶
+A path parameter is always required as it has to be part of the path. Even if you declared it with None or set a default value, it would not affect anything, it would still be always required.
+```
+@app.get("/items/{item_id}")
+async def read_items(*,item_id: Annotated[int, Path(title="The ID of the item to get", ge=0, le=1000)],q: str,size: Annotated[float, Query(gt=0, lt=10.5)],):
+```
+
+# Query Parameter Models¶
+If you have a group of query parameters that are related, you can create a Pydantic model to declare them.
+
+```
+class FilterParams(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    limit: int = Field(100, gt=0, le=100)
+    offset: int = Field(0, ge=0)
+    order_by: Literal["created_at", "updated_at"] = "created_at"
+    tags: list[str] = []
+
+
+@app.get("/items/")
+async def read_items(filter_query: Annotated[FilterParams, Query()]):
+```
+In some special use cases (probably not very common), you might want to restrict the query parameters that you want to receive.

@@ -2,6 +2,8 @@ update
 lookup unwind
 what is ordered/unordered insert
 bulk & many in detail
+gridfs
+
 
 # Mongodb fundamentals
 1. what is mongodb and what are its main features ?
@@ -130,6 +132,102 @@ bulk & many in detail
 # mongodb Integrations
 99.   How can you integrate mongodb with 3rd party applications ?
 100.   Describe how to synchronize data between mongodb and mysql ?
+     
+#  Architecture & Internals
+101. What is the role of mongod, mongos, and config servers in a MongoDB cluster?
+
+102. How does MongoDB manage journaling and checkpoints internally?
+
+103. How does MongoDB write data to disk in WiredTiger?
+
+104. What are write-ahead logs (WAL) in MongoDB?
+
+105. Explain the difference between storage compression and index compression in WiredTiger.
+
+# Performance Tuning
+
+106. How would you identify and fix a performance bottleneck in MongoDB?
+
+107. How do you decide which fields to index?
+
+108. How do you detect index scans vs collection scans?
+
+109. What are the performance implications of $lookup?
+
+110. What are “hot” documents and how does MongoDB handle them?
+
+#  Data Modeling (Real-world Scenarios)
+
+111. How would you model user posts and comments (1:N relation)?
+
+112. When would you use $lookup vs embedding?
+113. How do you handle large arrays in MongoDB?
+114. What are bucket pattern and subset pattern in schema design?
+115. How do you design schema for time-series data in MongoDB?
+
+#  Transactions & Concurrency
+
+116. How are multi-document transactions implemented in MongoDB?
+117. What are the limitations of MongoDB transactions?
+118. How does MongoDB maintain ACID properties in a replica set?
+119. How does optimistic concurrency control work in MongoDB?
+120. How does snapshot isolation work in MongoDB?
+
+# Aggregation Framework Deep Dive
+
+121. Explain $facet and $bucket stages with examples.
+122. What’s the difference between $group and $accumulator operators?
+123. How can $merge be used to write aggregation results into another collection?
+124. What is $graphLookup and when would you use it?
+125. How can you optimize an aggregation pipeline?
+
+#  Replica Set and Sharding
+
+126. How do you force a MongoDB replica set failover?
+127. What is the difference between primaryPreferred and secondaryPreferred read preferences?
+128. How do you rebalance chunks in a sharded cluster?
+129. What is a chunk migration and how does it affect performance?
+130. How do you handle shard key selection and what are the best practices?
+
+#  Backup, Restore & Monitoring
+
+131. What’s the difference between mongodump and oplog-based backups?
+132. How do you restore a specific collection from a dump?
+133. How do you monitor replication lag?
+134. What metrics do you track for MongoDB health?
+135. How do you integrate MongoDB with Prometheus / Grafana for monitoring?
+
+# Security & Compliance
+
+136. What are MongoDB’s authentication mechanisms (SCRAM, x.509, LDAP, Kerberos)?
+137. What are field-level and queryable encryption features in MongoDB 7.0+?
+138. How do you implement IP whitelisting for MongoDB?
+139. What is audit logging and how do you enable it?
+140. What are MongoDB’s compliance certifications (HIPAA, GDPR, etc.)?
+
+# Deployment & Cloud
+
+141. What’s the difference between MongoDB Atlas, Ops Manager, and Enterprise Advanced?
+142. How does auto-scaling work in Atlas?
+143. How do you set up continuous backups in Atlas?
+144. What is Atlas Data Federation?
+145. How does MongoDB Atlas Search differ from regular text indexes?
+
+# Tools & Ecosystem
+
+146. What is Compass and how does it differ from Robo 3T?
+147. What is MongoMirror used for?
+148. How do you use mongostat and mongotop for performance monitoring?
+149. What’s the use of mongoexport and mongoimport commands?
+150. How do you automate MongoDB deployments using Terraform or Ansible?
+
+# Bonus — Real Interview Scenarios
+
+151. Describe a situation where you optimized a slow query.
+152. How would you migrate a 500GB MongoDB database to a new cluster with minimal downtime?
+153. How would you design MongoDB for an ecommerce site (products, users, orders)?
+154. How would you store and query logs or IoT data efficiently?
+155. What’s your strategy for schema versioning and backward compatibility?
 # MongoDB Interview Questions & Answers
 
 ## MongoDB Fundamentals
@@ -360,6 +458,54 @@ db.collection.replaceOne(
 ```
 
 **Update Operators**: `$set`, `$unset`, `$inc`, `$push`, `$pull`, `$addToSet`
+# 🧩 MongoDB Update Operations — Complete Guide
+
+MongoDB's **update operations** allow you to modify documents flexibly — from updating individual fields to performing mathematical calculations, manipulating arrays, or even transforming entire documents.
+
+---
+
+## 1️⃣ Field Update Operators
+Used to set, unset, rename, or modify field values.
+
+| Operator | Description | Example |
+|-----------|--------------|----------|
+| `$set` | Sets the value of a field | `{ $set: { age: 25 } }` |
+| `$unset` | Removes a field from a document | `{ $unset: { age: "" } }` |
+| `$rename` | Renames a field | `{ $rename: { "oldName": "newName" } }` |
+| `$inc` | Increments a field value by a specified amount | `{ $inc: { views: 1 } }` |
+| `$mul` | Multiplies the value of a field by a number | `{ $mul: { price: 1.1 } }` |
+| `$min` | Updates a field only if the specified value is less than the current value | `{ $min: { score: 80 } }` |
+| `$max` | Updates a field only if the specified value is greater than the current value | `{ $max: { score: 90 } }` |
+| `$currentDate` | Sets a field to the current date/time | `{ $currentDate: { updatedAt: true } }` |
+
+---
+
+## 2️⃣ Array Update Operators
+Used to add, remove, or modify elements in array fields.
+
+| Operator | Description | Example |
+|-----------|--------------|----------|
+| `$push` | Adds an element to an array | `{ $push: { tags: "mongodb" } }` |
+| `$addToSet` | Adds element to an array only if it doesn’t already exist | `{ $addToSet: { tags: "database" } }` |
+| `$pop` | Removes the first (`-1`) or last (`1`) element of an array | `{ $pop: { tags: 1 } }` |
+| `$pull` | Removes elements matching a condition | `{ $pull: { tags: "old" } }` |
+| `$pullAll` | Removes all specified values from an array | `{ $pullAll: { tags: ["old", "temp"] } }` |
+| `$each` | Used with `$push` or `$addToSet` to add multiple values | `{ $push: { tags: { $each: ["nodejs", "python"] } } }` |
+| `$position` | Sets the position for inserting elements | `{ $push: { tags: { $each: ["new"], $position: 0 } } }` |
+| `$slice` | Limits the size of an array after push | `{ $push: { logs: { $each: [newLog], $slice: -10 } } }` |
+
+---
+
+## 3️⃣ Array Filters (Advanced Updates)
+Update specific elements inside arrays using **array filters**.
+
+```javascript
+db.students.updateOne(
+  { _id: 1 },
+  { $set: { "grades.$[elem].score": 95 } },
+  { arrayFilters: [ { "elem.subject": "math" } ] }
+);
+
 
 ### 15. What are MongoDB commands to delete documents?
 
@@ -403,6 +549,7 @@ db.orders.aggregate([
 This performs a left outer join. MongoDB also supports:
 - Multiple joins using multiple $lookup stages
 - $unwind to flatten joined arrays
+- If a document has an array field, $unwind splits that document into multiple documents, one per array element.
 - Correlated subqueries with pipeline in $lookup
 
 ### 17. How can you limit the number of documents returned by a MongoDB query?
@@ -4178,5 +4325,5918 @@ changeStream.on('change', async (change) => {
 - Conflict resolution
 - Performance impact
 - Monitoring and error handling
+
+---
+// Find Alice's network up to 2 degrees
+db.users.aggregate([
+  {$match: {_id: "alice"}},
+  {$graphLookup: {
+    from: "users",
+    startWith: "$friends",
+    connectFromField: "friends",
+    connectToField: "_id",
+    as: "network",
+    maxDepth: 2,
+    depthField: "connectionDegree"
+  }},
+  {$project: {
+    name: 1,
+    directFriends: "$friends",
+    extendedNetwork: "$network"
+  }}
+])
+
+// Result: Alice's friends + friends of friends (up to 2 levels)
+```
+
+---
+
+**Example 3: Category Tree Navigation**
+```javascript
+// categories collection
+{_id: 1, name: "Electronics", parent: null}
+{_id: 2, name: "Computers", parent: 1}
+{_id: 3, name: "Laptops", parent: 2}
+{_id: 4, name: "Desktops", parent: 2}
+{_id: 5, name: "Gaming Laptops", parent: 3}
+
+// Find all subcategories under "Electronics"
+db.categories.aggregate([
+  {$match: {name: "Electronics"}},
+  {$graphLookup: {
+    from: "categories",
+    startWith: "$_id",
+    connectFromField: "_id",
+    connectToField: "parent",
+    as: "subcategories",
+    depthField: "depth"
+  }},
+  {$unwind: "$subcategories"},
+  {$sort: {"subcategories.depth": 1}},
+  {$group: {
+    _id: "$_id",
+    name: {$first: "$name"},
+    tree: {$push: {
+      name: "$subcategories.name",
+      depth: "$subcategories.depth"
+    }}
+  }}
+])
+```
+
+---
+
+**Example 4: Bill of Materials (BOM)**
+```javascript
+// parts collection
+{_id: "car", name: "Car", components: ["engine", "chassis"]}
+{_id: "engine", name: "Engine", components: ["pistons", "crankshaft"]}
+{_id: "chassis", name: "Chassis", components: ["frame", "suspension"]}
+{_id: "pistons", name: "Pistons", components: []}
+
+// Find all parts needed to build a car
+db.parts.aggregate([
+  {$match: {_id: "car"}},
+  {$graphLookup: {
+    from: "parts",
+    startWith: "$components",
+    connectFromField: "components",
+    connectToField: "_id",
+    as: "allParts",
+    depthField: "level"
+  }},
+  {$project: {
+    name: 1,
+    bomList: {
+      $map: {
+        input: "$allParts",
+        as: "part",
+        in: {
+          name: "$part.name",
+          level: "$part.level"
+        }
+      }
+    }
+  }}
+])
+```
+
+---
+
+**Example 5: With restrictSearchWithMatch**
+```javascript
+// Find only active employees in reporting chain
+db.employees.aggregate([
+  {$match: {_id: 1}},
+  {$graphLookup: {
+    from: "employees",
+    startWith: "$_id",
+    connectFromField: "_id",
+    connectToField: "reportsTo",
+    as: "activeReports",
+    restrictSearchWithMatch: {
+      status: "active",
+      department: "Engineering"
+    }
+  }}
+])
+
+// Only traverses employees matching the restriction
+```
+
+---
+
+**Example 6: Circular Reference Detection**
+```javascript
+// Detect circular references in categories
+db.categories.aggregate([
+  {$graphLookup: {
+    from: "categories",
+    startWith: "$parent",
+    connectFromField: "parent",
+    connectToField: "_id",
+    as: "ancestors"
+  }},
+  {$project: {
+    name: 1,
+    hasCircularRef: {
+      $in: ["$_id", "$ancestors._id"]  // Check if own ID in ancestors
+    }
+  }},
+  {$match: {hasCircularRef: true}}
+])
+```
+
+---
+
+**Example 7: Shortest Path (with maxDepth)**
+```javascript
+// Find connections within 3 hops
+db.users.aggregate([
+  {$match: {_id: "user1"}},
+  {$graphLookup: {
+    from: "users",
+    startWith: "$connections",
+    connectFromField: "connections",
+    connectToField: "_id",
+    as: "reachable",
+    maxDepth: 3,
+    depthField: "hops"
+  }},
+  {$match: {
+    "reachable._id": "user2"  // Check if user2 is reachable
+  }},
+  {$project: {
+    connection: {
+      $filter: {
+        input: "$reachable",
+        cond: {$eq: ["$this._id", "user2"]}
+      }
+    }
+  }}
+])
+```
+
+---
+
+**Performance Considerations:**
+
+**1. Index Requirements:**
+```javascript
+// CRITICAL: Index on connectToField
+db.employees.createIndex({reportsTo: 1})
+
+// Without index, $graphLookup does collection scan at each level
+```
+
+**2. Memory Usage:**
+```javascript
+// Large graphs consume memory
+// Use maxDepth to limit recursion
+{$graphLookup: {
+  // ...
+  maxDepth: 5  // Prevent unlimited traversal
+}}
+```
+
+**3. Query Optimization:**
+```javascript
+// Use restrictSearchWithMatch to reduce search space
+{$graphLookup: {
+  from: "employees",
+  startWith: "$_id",
+  connectFromField: "_id",
+  connectToField: "reportsTo",
+  as: "reports",
+  restrictSearchWithMatch: {
+    status: "active",     // Only active employees
+    hireDate: {$gte: ISODate("2020-01-01")}
+  }
+}}
+```
+
+**4. Avoid Circular Traversal:**
+```javascript
+// MongoDB detects and prevents infinite loops
+// But still incurs performance cost
+// Design schema to avoid circles when possible
+```
+
+---
+
+**Comparison with $lookup:**
+
+| Feature | $graphLookup | $lookup |
+|---------|--------------|---------|
+| Recursion | ✓ | ✗ |
+| Single join | ✗ | ✓ (faster) |
+| Depth tracking | ✓ | ✗ |
+| Max depth limit | ✓ | N/A |
+| Performance | Slower | Faster |
+| Use Case | Trees/Graphs | Flat relations |
+
+---
+
+**Best Practices:**
+
+1. **Always Index connectToField**
+2. **Use maxDepth** to prevent runaway queries
+3. **Use restrictSearchWithMatch** to filter early
+4. **Consider Alternative Designs:**
+   - Flatten hierarchy with path arrays
+   - Materialized paths
+   - Nested sets
+5. **Monitor Query Performance:**
+```javascript
+db.collection.aggregate([...], {explain: true})
+```
+
+---
+
+### 125. How can you optimize an aggregation pipeline?
+
+**1. Use $match Early (Filter First)**
+
+```javascript
+// BAD: $match after heavy operations
+db.orders.aggregate([
+  {$lookup: {
+    from: "customers",
+    localField: "customerId",
+    foreignField: "_id",
+    as: "customer"
+  }},
+  {$unwind: # MongoDB Advanced Interview Questions & Answers
+
+## Architecture & Internals
+
+### 101. What is the role of mongod, mongos, and config servers in a MongoDB cluster?
+
+**mongod** is the primary daemon process for MongoDB that handles data requests, manages data access, and performs background management operations. In a replica set, multiple mongod instances run on different servers.
+
+**mongos** acts as a query router in sharded clusters. It processes queries from applications, determines which shards contain the relevant data, and aggregates results from multiple shards. It's the interface between client applications and the sharded cluster.
+
+**Config servers** store metadata and configuration settings for sharded clusters. They maintain the mapping of chunks to shards, cluster topology, and authentication configuration. MongoDB uses a replica set of config servers (CSRS - Config Server Replica Set) for high availability.
+
+---
+
+### 102. How does MongoDB manage journaling and checkpoints internally?
+
+**Journaling** is a write-ahead logging mechanism that ensures data durability. MongoDB writes all data modifications to the journal before applying them to data files. The journal is a sequential log file stored in the `journal/` directory.
+
+**Write flow:**
+1. Write operation received
+2. Write to journal (group commits every 100ms by default)
+3. Write to in-memory WiredTiger cache
+4. Background checkpoint writes to disk
+
+**Checkpoints** are snapshots of data at a consistent state. WiredTiger creates checkpoints every 60 seconds by default or when 2GB of journal data is written. During checkpoint:
+- All dirty pages are flushed to disk
+- Journal files can be purged
+- Provides recovery point
+
+After a clean checkpoint, older journal files are removed.
+
+---
+
+### 103. How does MongoDB write data to disk in WiredTiger?
+
+WiredTiger uses a **multi-version concurrency control (MVCC)** architecture:
+
+1. **Write to Cache**: Data is first written to WiredTiger's internal cache (50% of RAM minus 1GB by default)
+2. **Write to Journal**: Simultaneously logged to journal for durability
+3. **Background Eviction**: When cache pressure increases, least-recently-used pages are evicted
+4. **Checkpoint Process**: Every 60 seconds, dirty pages are flushed to disk in a consistent snapshot
+5. **Compression**: Data is compressed before writing to disk (snappy by default)
+
+WiredTiger writes are **copy-on-write**, meaning it never overwrites existing data - it writes new versions and later reclaims space.
+
+---
+
+### 104. What are write-ahead logs (WAL) in MongoDB?
+
+**Write-Ahead Logs** (journal in MongoDB terminology) ensure durability by recording all write operations before they're applied to the main data files.
+
+**Key characteristics:**
+- Operations logged sequentially for fast writes
+- Group commits batch multiple operations
+- Enables crash recovery by replaying journal
+- Can be disabled for better performance (at risk of data loss)
+- Journal files are binary encoded for efficiency
+
+**Recovery process:**
+1. After crash, MongoDB replays journal from last checkpoint
+2. Applies all logged operations
+3. Restores database to consistent state
+
+---
+
+### 105. Explain the difference between storage compression and index compression in WiredTiger.
+
+**Storage Compression** (Collection Level):
+- Compresses document data on disk
+- Default: Snappy (balanced speed/compression)
+- Options: Snappy, zlib, zstd, or none
+- Configured per collection: `{storageEngine: {wiredTiger: {configString: "block_compressor=zstd"}}}`
+- Reduces disk I/O and storage costs
+- Documents decompressed when read into cache
+
+**Index Compression** (Index Level):
+- Compresses index data separately
+- Default: Prefix compression
+- Reduces index size by storing common prefixes once
+- Can use block compression (zlib, zstd)
+- Trades CPU for disk space
+- Particularly effective for indexes with repeated prefixes
+
+**Key difference**: Storage compression affects documents, index compression affects index structures. Both can be configured independently based on workload characteristics.
+
+---
+
+## Performance Tuning
+
+### 106. How would you identify and fix a performance bottleneck in MongoDB?
+
+**Identification Process:**
+
+1. **Enable Profiling**:
+```javascript
+db.setProfilingLevel(1, {slowms: 100}) // Log queries >100ms
+db.system.profile.find().sort({ts: -1}).limit(5)
+```
+
+2. **Check Current Operations**:
+```javascript
+db.currentOp({active: true, secs_running: {$gte: 3}})
+```
+
+3. **Analyze Slow Queries**:
+```javascript
+db.system.profile.find({millis: {$gt: 100}}).sort({millis: -1})
+```
+
+4. **Use explain()**:
+```javascript
+db.collection.find({...}).explain("executionStats")
+```
+
+**Common Bottlenecks & Fixes:**
+
+- **Missing Indexes**: Add appropriate indexes
+- **Collection Scans**: Create covering indexes
+- **High Memory Usage**: Increase RAM or optimize queries
+- **Lock Contention**: Redesign schema or use sharding
+- **Network Latency**: Use connection pooling, deploy closer to app
+- **Disk I/O**: Use SSDs, enable compression, add RAM
+
+**Monitoring Tools:**
+- mongostat, mongotop
+- MongoDB Atlas Performance Advisor
+- Database Profiler
+
+---
+
+### 107. How do you decide which fields to index?
+
+**Key Considerations:**
+
+1. **Query Patterns**: Index fields used in:
+   - WHERE clauses (find, update, delete)
+   - Sort operations
+   - Join conditions ($lookup)
+
+2. **Selectivity**: Prioritize high-cardinality fields
+   - Good: userEmail, userId, orderId
+   - Poor: gender, status (few distinct values)
+
+3. **ESR Rule** (Equality, Sort, Range):
+```javascript
+// Query: Find active users, sort by createdAt, filter by age range
+db.users.createIndex({
+    status: 1,      // Equality first
+    createdAt: -1,  // Sort second
+    age: 1          // Range last
+})
+```
+
+4. **Write vs Read Ratio**:
+   - Heavy reads: More indexes acceptable
+   - Heavy writes: Minimize indexes (each index slows writes)
+
+5. **Compound Index Efficiency**:
+   - Left-to-right prefix rule
+   - Index {a: 1, b: 1} supports queries on {a} and {a, b}, not just {b}
+
+**Anti-patterns:**
+- Don't index low-cardinality fields alone
+- Avoid indexing fields that change frequently
+- Don't create redundant indexes
+
+---
+
+### 108. How do you detect index scans vs collection scans?
+
+**Using explain():**
+
+```javascript
+db.collection.find({status: "active"}).explain("executionStats")
+```
+
+**Index Scan Indicators:**
+```javascript
+{
+  "executionStats": {
+    "executionStages": {
+      "stage": "IXSCAN",           // Index scan
+      "indexName": "status_1",
+      "keysExamined": 100,
+      "docsExamined": 100          // Efficient if equal
+    }
+  }
+}
+```
+
+**Collection Scan Indicators:**
+```javascript
+{
+  "executionStats": {
+    "executionStages": {
+      "stage": "COLLSCAN",         // Collection scan - BAD!
+      "docsExamined": 1000000      // Scanned entire collection
+    },
+    "totalDocsExamined": 1000000,
+    "nReturned": 10                // Only returned 10 - very inefficient
+  }
+}
+```
+
+**Key Metrics:**
+- **COLLSCAN**: Full collection scan (slow)
+- **IXSCAN**: Index scan (fast)
+- **docsExamined/nReturned ratio**: Should be close to 1
+- **executionTimeMillis**: Total execution time
+
+**Quick Check:**
+```javascript
+// If this shows COLLSCAN, you need an index
+db.collection.find({field: value}).explain("executionStats").executionStats.executionStages.stage
+```
+
+---
+
+### 109. What are the performance implications of $lookup?
+
+**Performance Challenges:**
+
+1. **Left Join Operation**: $lookup performs left outer join, which is expensive
+2. **No Index on Foreign Field**: If foreign collection lacks index on join field, causes COLLSCAN
+3. **Memory Intensive**: Joins happen in memory, can hit 100MB aggregation limit
+4. **Network Overhead**: In sharded clusters, may require cross-shard communication
+
+**Example Impact:**
+```javascript
+// Without index on orders.userId - VERY SLOW
+db.users.aggregate([
+  {$lookup: {
+    from: "orders",
+    localField: "_id",
+    foreignField: "userId",  // If no index here, scans all orders for EACH user
+    as: "userOrders"
+  }}
+])
+```
+
+**Optimization Strategies:**
+
+1. **Index Foreign Key**:
+```javascript
+db.orders.createIndex({userId: 1})
+```
+
+2. **Limit Results Before $lookup**:
+```javascript
+db.users.aggregate([
+  {$match: {status: "active"}},  // Reduce users first
+  {$lookup: {...}}
+])
+```
+
+3. **Use $project to Reduce Data**:
+```javascript
+{$project: {_id: 1, name: 1}}  // Fetch only needed fields
+```
+
+4. **Consider Embedding** instead of $lookup for frequently accessed data
+
+5. **Pagination**:
+```javascript
+{$skip: 0}, {$limit: 20}  // Don't lookup entire dataset
+```
+
+**When to Avoid:**
+- High-frequency queries
+- Large collections without proper indexes
+- Real-time applications requiring <100ms response
+
+---
+
+### 110. What are "hot" documents and how does MongoDB handle them?
+
+**Hot Documents** are documents accessed/modified extremely frequently, causing:
+- Write contention
+- Lock conflicts
+- Performance degradation
+- Uneven load distribution in sharded clusters
+
+**Common Examples:**
+- Like counters on viral posts
+- Real-time inventory counts
+- Session documents
+- Global configuration documents
+
+**MongoDB's Handling:**
+
+1. **Document-Level Locking**: WiredTiger uses document-level concurrency, but hot documents still bottleneck
+
+2. **In-Memory Cache**: Frequently accessed docs stay in WiredTiger cache
+
+3. **Write Conflicts**: Multiple concurrent updates cause retries
+
+**Mitigation Strategies:**
+
+1. **Sharding** (distribute hot doc across shards):
+```javascript
+// Bad: single counter
+{_id: "post123", likes: 50000}
+
+// Good: distributed counters
+{_id: "post123:shard1", likes: 10000}
+{_id: "post123:shard2", likes: 15000}
+```
+
+2. **Bucketing Pattern**:
+```javascript
+// Group counters into time buckets
+{
+  _id: "post123:2025-11-08:hour14",
+  likes: 1500,
+  bucket: ISODate("2025-11-08T14:00:00Z")
+}
+```
+
+3. **Approximation**:
+```javascript
+// Update every N operations instead of every time
+if (Math.random() < 0.1) {  // 10% sampling
+  db.posts.updateOne({_id: "post123"}, {$inc: {likes: 10}})
+}
+```
+
+4. **Client-Side Aggregation**: Aggregate in application, periodic batch updates
+
+5. **Separate Collection**: Move hot fields to dedicated collection
+
+---
+
+## Data Modeling (Real-world Scenarios)
+
+### 111. How would you model user posts and comments (1:N relation)?
+
+**Three Approaches:**
+
+**1. Embedding (Recommended for Moderate Comments)**
+```javascript
+// User Posts Collection
+{
+  _id: ObjectId("..."),
+  userId: ObjectId("user123"),
+  title: "My First Post",
+  content: "Post content here",
+  createdAt: ISODate("2025-11-08"),
+  comments: [
+    {
+      commentId: ObjectId("comment1"),
+      userId: ObjectId("user456"),
+      text: "Great post!",
+      createdAt: ISODate("2025-11-08T10:30:00Z")
+    },
+    {
+      commentId: ObjectId("comment2"),
+      userId: ObjectId("user789"),
+      text: "Thanks for sharing",
+      createdAt: ISODate("2025-11-08T11:00:00Z")
+    }
+  ],
+  commentCount: 2
+}
+```
+
+**Pros**: Single query, atomicity, good performance for <100 comments
+**Cons**: 16MB document limit, difficult to paginate comments
+
+**2. Referencing (For High-Volume Comments)**
+```javascript
+// Posts Collection
+{
+  _id: ObjectId("post123"),
+  userId: ObjectId("user123"),
+  title: "Viral Post",
+  content: "Content here",
+  commentCount: 15000
+}
+
+// Comments Collection (separate)
+{
+  _id: ObjectId("comment1"),
+  postId: ObjectId("post123"),  // Reference to post
+  userId: ObjectId("user456"),
+  text: "Great post!",
+  createdAt: ISODate("2025-11-08T10:30:00Z")
+}
+
+// Index for efficient queries
+db.comments.createIndex({postId: 1, createdAt: -1})
+```
+
+**Pros**: Unbounded comments, easy pagination, no 16MB limit
+**Cons**: Multiple queries, no atomic updates
+
+**3. Hybrid (Best of Both)**
+```javascript
+// Posts with recent comments embedded
+{
+  _id: ObjectId("post123"),
+  userId: ObjectId("user123"),
+  title: "My Post",
+  content: "Content",
+  commentCount: 500,
+  recentComments: [  // Only last 5-10 comments embedded
+    {commentId: ObjectId("..."), text: "Latest", createdAt: ISODate("...")}
+  ],
+  hasMoreComments: true
+}
+
+// Full comments in separate collection for pagination
+```
+
+**Recommendation**: Start with embedding, migrate to hybrid/referencing when comments > 100 per post.
+
+---
+
+### 112. When would you use $lookup vs embedding?
+
+**Use Embedding When:**
+
+1. **One-to-Few Relationship**: Parent has limited children (<100)
+2. **Data Accessed Together**: User profile with addresses
+3. **No Independent Queries**: Children only queried with parent
+4. **Bounded Growth**: Array won't exceed 16MB
+5. **Atomic Updates Required**: Updates must be transactional
+
+**Example:**
+```javascript
+// User with addresses - perfect for embedding
+{
+  _id: ObjectId("user123"),
+  name: "John Doe",
+  addresses: [
+    {type: "home", street: "123 Main St", city: "NYC"},
+    {type: "work", street: "456 Office Blvd", city: "NYC"}
+  ]
+}
+```
+
+**Use $lookup When:**
+
+1. **One-to-Many/Many-to-Many**: Unbounded relationships
+2. **Independent Access**: Children queried separately
+3. **Large Child Documents**: Would cause document bloat
+4. **Frequent Updates**: Children updated independently
+5. **Data Duplication Issues**: Same child belongs to multiple parents
+
+**Example:**
+```javascript
+// Users and Orders - use $lookup
+// Users Collection
+{_id: ObjectId("user123"), name: "John"}
+
+// Orders Collection
+{_id: ObjectId("order1"), userId: ObjectId("user123"), total: 99.99}
+
+// Query with $lookup
+db.users.aggregate([
+  {$match: {_id: ObjectId("user123")}},
+  {$lookup: {
+    from: "orders",
+    localField: "_id",
+    foreignField: "userId",
+    as: "orders"
+  }}
+])
+```
+
+**Performance Comparison:**
+
+| Aspect | Embedding | $lookup |
+|--------|-----------|---------|
+| Read Speed | Fast (1 query) | Slower (join) |
+| Write Speed | Fast (1 write) | Fast (separate docs) |
+| Scalability | Limited by 16MB | Unlimited |
+| Atomicity | Yes | No (requires transactions) |
+| Flexibility | Low | High |
+
+**Hybrid Approach:**
+Embed recent/popular items, reference the rest:
+```javascript
+{
+  _id: ObjectId("post123"),
+  recentComments: [...],  // Last 10 embedded
+  totalComments: 5000     // Rest in separate collection
+}
+```
+
+---
+
+### 113. How do you handle large arrays in MongoDB?
+
+**Problem**: Arrays growing unbounded can:
+- Hit 16MB document limit
+- Cause performance issues (index overhead, memory)
+- Make updates inefficient
+
+**Solutions:**
+
+**1. Pagination/Slicing** (Keep only recent items):
+```javascript
+// Keep only last 100 comments
+db.posts.updateOne(
+  {_id: "post123"},
+  {
+    $push: {
+      comments: {
+        $each: [newComment],
+        $position: 0,      // Add to beginning
+        $slice: 100        // Keep only first 100
+      }
+    }
+  }
+)
+```
+
+**2. Bucketing Pattern** (Split into time-based buckets):
+```javascript
+// Instead of single document with huge array
+{
+  _id: "messages:user123:2025-11",
+  userId: "user123",
+  month: "2025-11",
+  messages: [
+    {text: "Hi", timestamp: ISODate("2025-11-01")},
+    {text: "Hello", timestamp: ISODate("2025-11-02")}
+  ],
+  count: 2
+}
+
+// New bucket each month
+{
+  _id: "messages:user123:2025-12",
+  month: "2025-12",
+  messages: [...],
+  count: 45
+}
+```
+
+**3. Separate Collection** (Reference instead of embed):
+```javascript
+// Parent
+{_id: "order123", totalItems: 5000}
+
+// Children in separate collection
+{_id: "item1", orderId: "order123", name: "Product A"}
+{_id: "item2", orderId: "order123", name: "Product B"}
+
+// Query
+db.orderItems.find({orderId: "order123"}).limit(20)
+```
+
+**4. Subset Pattern** (Embed most accessed, reference rest):
+```javascript
+{
+  _id: "product123",
+  topReviews: [...],      // 10 highest-rated embedded
+  totalReviews: 50000,
+  allReviewsRef: true     // Flag indicating more in separate collection
+}
+```
+
+**5. Outlier Pattern** (Special handling for outliers):
+```javascript
+// Normal document
+{_id: "user123", friends: ["user2", "user3"], friendCount: 2}
+
+// Outlier (celebrity with millions of friends)
+{
+  _id: "celebrity789",
+  friends: [],            // Empty array
+  friendCount: 5000000,
+  friendsOverflow: true   // Friends stored in separate collection
+}
+```
+
+**6. Approximation** (Don't store every item):
+```javascript
+// Instead of tracking every viewer
+{
+  _id: "video123",
+  sampleViewers: [...],   // Sample of 1000 viewers
+  totalViews: 10000000    // Just counter
+}
+```
+
+**Best Practice**: Design schema to prevent unbounded arrays from the start. If array might grow indefinitely, use separate collection.
+
+---
+
+### 114. What are bucket pattern and subset pattern in schema design?
+
+**Bucket Pattern**
+
+Groups related data into time-based or quantity-based buckets to avoid unbounded document growth.
+
+**Use Cases:**
+- Time-series data (IoT sensors, logs, metrics)
+- Event streams
+- High-frequency data points
+
+**Example - IoT Temperature Sensors:**
+```javascript
+// Bad: Single document per sensor (unbounded)
+{
+  _id: "sensor123",
+  readings: [
+    {temp: 22.5, timestamp: ISODate("2025-11-08T10:00:00Z")},
+    {temp: 22.6, timestamp: ISODate("2025-11-08T10:01:00Z")},
+    // ... millions of readings
+  ]
+}
+
+// Good: Bucketing by hour
+{
+  _id: "sensor123:2025-11-08:10",
+  sensorId: "sensor123",
+  bucket: ISODate("2025-11-08T10:00:00Z"),
+  readings: [
+    {temp: 22.5, minute: 0},
+    {temp: 22.6, minute: 1},
+    // ... max 60 readings per hour bucket
+  ],
+  count: 60,
+  avgTemp: 22.8,
+  minTemp: 22.3,
+  maxTemp: 23.1
+}
+
+// Query specific hour
+db.sensors.findOne({"_id": "sensor123:2025-11-08:10"})
+
+// Query range
+db.sensors.find({
+  sensorId: "sensor123",
+  bucket: {
+    $gte: ISODate("2025-11-08T10:00:00Z"),
+    $lt: ISODate("2025-11-08T12:00:00Z")
+  }
+})
+```
+
+**Benefits:**
+- Predictable document size
+- Easy to archive/delete old buckets
+- Efficient range queries
+- Pre-aggregated statistics
+
+---
+
+**Subset Pattern**
+
+Embeds frequently accessed subset of data while keeping full dataset in separate collection.
+
+**Use Cases:**
+- Product reviews (show top reviews, link to all)
+- Social media posts (recent comments embedded)
+- User activity logs (recent activities)
+
+**Example - E-commerce Reviews:**
+```javascript
+// Products Collection
+{
+  _id: "product123",
+  name: "Laptop",
+  price: 999,
+  
+  // Subset: Top 3 reviews embedded
+  featuredReviews: [
+    {
+      reviewId: ObjectId("rev1"),
+      rating: 5,
+      text: "Amazing product!",
+      helpful: 245,
+      userId: "user456"
+    },
+    {
+      reviewId: ObjectId("rev2"),
+      rating: 5,
+      text: "Best laptop ever",
+      helpful: 189,
+      userId: "user789"
+    },
+    {
+      reviewId: ObjectId("rev3"),
+      rating: 4,
+      text: "Great value",
+      helpful: 156,
+      userId: "user321"
+    }
+  ],
+  
+  // Metadata
+  reviewStats: {
+    total: 15847,
+    avgRating: 4.3,
+    distribution: {5: 8000, 4: 5000, 3: 2000, 2: 500, 1: 347}
+  }
+}
+
+// Reviews Collection (complete data)
+{
+  _id: ObjectId("rev1"),
+  productId: "product123",
+  userId: "user456",
+  rating: 5,
+  text: "Amazing product!",
+  helpful: 245,
+  createdAt: ISODate("2025-10-15")
+}
+
+// Full review queries
+db.reviews.find({productId: "product123"})
+  .sort({helpful: -1})
+  .skip(20)
+  .limit(10)
+```
+
+**Benefits:**
+- Fast initial page load (embedded subset)
+- No 16MB limit (full data separate)
+- Easy pagination
+- Reduced $lookup operations
+
+**Maintenance:**
+```javascript
+// Periodic job to update featured reviews
+db.products.updateOne(
+  {_id: "product123"},
+  {$set: {
+    featuredReviews: db.reviews.find({productId: "product123"})
+      .sort({helpful: -1})
+      .limit(3)
+      .toArray()
+  }}
+)
+```
+
+---
+
+### 115. How do you design schema for time-series data in MongoDB?
+
+MongoDB has built-in **Time Series Collections** (MongoDB 5.0+) optimized for this use case.
+
+**1. Native Time Series Collections (Recommended):**
+
+```javascript
+// Create time series collection
+db.createCollection("sensorData", {
+  timeseries: {
+    timeField: "timestamp",
+    metaField: "metadata",
+    granularity: "seconds"  // seconds, minutes, or hours
+  }
+})
+
+// Insert data
+db.sensorData.insertMany([
+  {
+    timestamp: ISODate("2025-11-08T10:00:00Z"),
+    metadata: {sensorId: "sensor123", location: "warehouse-A"},
+    temperature: 22.5,
+    humidity: 45
+  },
+  {
+    timestamp: ISODate("2025-11-08T10:01:00Z"),
+    metadata: {sensorId: "sensor123", location: "warehouse-A"},
+    temperature: 22.6,
+    humidity: 46
+  }
+])
+
+// Efficient aggregations
+db.sensorData.aggregate([
+  {$match: {
+    timestamp: {$gte: ISODate("2025-11-08T00:00:00Z")},
+    "metadata.sensorId": "sensor123"
+  }},
+  {$group: {
+    _id: {$dateTrunc: {date: "$timestamp", unit: "hour"}},
+    avgTemp: {$avg: "$temperature"},
+    maxTemp: {$max: "$temperature"},
+    count: {$sum: 1}
+  }}
+])
+```
+
+**Benefits:**
+- Automatic bucketing and compression (90% storage reduction)
+- Optimized queries for time ranges
+- Efficient aggregations
+- Automatic index on timeField
+
+**2. Manual Bucketing Pattern (Pre-5.0 or custom needs):**
+
+```javascript
+// Bucket per hour
+{
+  _id: ObjectId("..."),
+  sensorId: "sensor123",
+  bucket: ISODate("2025-11-08T10:00:00Z"),
+  measurements: [
+    {time: 0, temp: 22.5, humidity: 45},   // 10:00:00
+    {time: 60, temp: 22.6, humidity: 46},  // 10:01:00
+    {time: 120, temp: 22.7, humidity: 46}  // 10:02:00
+  ],
+  count: 3,
+  stats: {
+    avgTemp: 22.6,
+    minTemp: 22.5,
+    maxTemp: 22.7
+  }
+}
+
+// Indexes
+db.sensorData.createIndex({sensorId: 1, bucket: 1})
+```
+
+**3. Schema Design Patterns:**
+
+**IoT Sensors:**
+```javascript
+{
+  _id: "sensor123:2025-11-08:10",
+  sensorId: "sensor123",
+  deviceType: "temperature",
+  location: {type: "Point", coordinates: [40.7128, -74.0060]},
+  bucket: ISODate("2025-11-08T10:00:00Z"),
+  readings: [{timestamp, value, quality}],
+  aggregates: {count, sum, avg, min, max, stdDev}
+}
+```
+
+**Application Logs:**
+```javascript
+{
+  _id: ObjectId("..."),
+  appId: "app123",
+  bucket: ISODate("2025-11-08T10:00:00Z"),
+  logs: [
+    {offset: 0, level: "ERROR", message: "Failed to connect", userId: "user456"},
+    {offset: 30, level: "INFO", message: "Request completed", userId: "user789"}
+  ]
+}
+```
+
+**Financial Ticks:**
+```javascript
+{
+  _id: "AAPL:2025-11-08:10",
+  symbol: "AAPL",
+  bucket: ISODate("2025-11-08T10:00:00Z"),
+  ticks: [
+    {time: 0, price: 150.25, volume: 1000},
+    {time: 1, price: 150.26, volume: 500}
+  ],
+  ohlc: {open: 150.25, high: 150.30, low: 150.20, close: 150.26}
+}
+```
+
+**4. Query Optimization:**
+
+```javascript
+// Index strategy
+db.sensorData.createIndex({
+  "metadata.sensorId": 1,
+  timestamp: 1
+})
+
+// Efficient range query
+db.sensorData.find({
+  "metadata.sensorId": "sensor123",
+  timestamp: {
+    $gte: ISODate("2025-11-08T00:00:00Z"),
+    $lt: ISODate("2025-11-09T00:00:00Z")
+  }
+}).sort({timestamp: -1}).limit(100)
+
+// Downsampling aggregation
+db.sensorData.aggregate([
+  {$match: {timestamp: {$gte: ISODate("2025-11-01")}}},
+  {$group: {
+    _id: {
+      $dateTrunc: {date: "$timestamp", unit: "day"}
+    },
+    avgTemp: {$avg: "$temperature"},
+    count: {$sum: 1}
+  }},
+  {$sort: {_id: 1}}
+])
+```
+
+**5. Data Retention Strategy:**
+
+```javascript
+// TTL index for automatic deletion
+db.sensorData.createIndex(
+  {timestamp: 1},
+  {expireAfterSeconds: 2592000}  // 30 days
+)
+
+// Or manual archival
+db.sensorData.deleteMany({
+  timestamp: {$lt: ISODate("2025-10-08")}
+})
+```
+
+---
+
+## Transactions & Concurrency
+
+### 116. How are multi-document transactions implemented in MongoDB?
+
+MongoDB implements **ACID transactions** across multiple documents, collections, and databases using a two-phase commit protocol with snapshot isolation.
+
+**Architecture:**
+
+**1. Transaction Lifecycle:**
+```javascript
+const session = db.getMongo().startSession()
+session.startTransaction({
+  readConcern: {level: "snapshot"},
+  writeConcern: {w: "majority"},
+  readPreference: "primary"
+})
+
+try {
+  const accounts = session.getDatabase("bank").accounts
+  
+  // Debit account A
+  accounts.updateOne(
+    {_id: "accountA"},
+    {$inc: {balance: -100}},
+    {session}
+  )
+  
+  // Credit account B
+  accounts.updateOne(
+    {_id: "accountB"},
+    {$inc: {balance: 100}},
+    {session}
+  )
+  
+  // Commit transaction
+  session.commitTransaction()
+} catch (error) {
+  session.abortTransaction()
+  throw error
+} finally {
+  session.endSession()
+}
+```
+
+**2. Implementation Details:**
+
+**Transaction Coordinator:**
+- Each transaction gets unique transaction ID (txnNumber)
+- Session tracks transaction state
+- Coordinator manages prepare, commit, abort phases
+
+**Write Staging:**
+- Writes are staged in memory during transaction
+- Not visible to other sessions until commit
+- Uses versioned storage (MVCC)
+
+**Two-Phase Commit:**
+```
+Phase 1: Prepare
+- Validate all operations
+- Acquire necessary locks
+- Write to oplog with "prepare" entry
+
+Phase 2: Commit/Abort
+- If all nodes prepared successfully → commit
+- Oplog entry marks transaction committed
+- Release locks
+- Make changes visible
+```
+
+**3. Snapshot Isolation:**
+
+```javascript
+// Transaction sees consistent snapshot from start time
+session.startTransaction()
+
+// Read sees data as of transaction start
+db.products.findOne({_id: "product123"}, {session})
+// Returns: {_id: "product123", stock: 100}
+
+// Even if another transaction updates stock to 50,
+// this transaction still sees 100
+
+db.products.updateOne(
+  {_id: "product123", stock: {$gte: 10}},
+  {$inc: {stock: -10}},
+  {session}
+)
+
+session.commitTransaction()
+```
+
+**4. Conflict Resolution:**
+
+MongoDB uses **first-write-wins** for conflicts:
+
+```javascript
+// Transaction T1
+session1.startTransaction()
+db.accounts.updateOne({_id: "acc1"}, {$inc: {balance: 100}}, {session: session1})
+
+// Transaction T2 (concurrent)
+session2.startTransaction()
+db.accounts.updateOne({_id: "acc1"}, {$inc: {balance: 50}}, {session: session2})
+
+// T1 commits first → succeeds
+session1.commitTransaction()
+
+// T2 tries to commit → WriteConflict error, must retry
+session2.commitTransaction() // Throws error
+```
+
+**5. Transaction Limitations:**
+
+- 60-second default timeout
+- 16MB oplog entry size limit per transaction
+- Cannot read/write to capped collections, system collections
+- Performance impact on high-concurrency workloads
+- Replica sets: all operations on primary
+- Sharded clusters: additional overhead
+
+**6. Replication:**
+
+```javascript
+// Transaction replicated as single oplog entry
+{
+  op: "c",
+  ns: "admin.$cmd",
+  o: {
+    applyOps: [
+      {op: "u", ns: "bank.accounts", o: {$inc: {balance: -100}}},
+      {op: "u", ns: "bank.accounts", o: {$inc: {balance: 100}}}
+    ]
+  },
+  txnNumber: 1,
+  stmtId: 0,
+  lsid: {id: UUID("...")},
+  prevOpTime: {...}
+}
+```
+
+---
+
+### 117. What are the limitations of MongoDB transactions?
+
+**1. Performance Limitations:**
+
+**Overhead:**
+- Transactions are slower than single-document operations
+- WiredTiger maintains transaction state in memory
+- Snapshot isolation requires version tracking
+- Lock acquisition overhead
+
+**Concurrency:**
+- Write conflicts force retries
+- Can cause contention on hot documents
+- Reduced throughput under high contention
+
+**2. Size Limitations:**
+
+```javascript
+// 16MB oplog entry limit
+// Transaction with too many operations fails
+session.startTransaction()
+for (let i = 0; i < 100000; i++) {
+  db.collection.insertOne({data: "..."}, {session}) // May exceed 16MB
+}
+session.commitTransaction() // ERROR: Transaction too large
+```
+
+**Workaround:** Batch into smaller transactions
+
+**3. Time Limitations:**
+
+```javascript
+// Default 60-second timeout
+session.startTransaction({
+  maxTimeMS: 60000  // Cannot exceed this
+})
+// If transaction runs > 60s, automatically aborted
+```
+
+**4. Collection Type Restrictions:**
+
+**Cannot Use With:**
+- Capped collections
+- System collections (system.*)
+- config, admin, local databases in sharded clusters
+
+```javascript
+session.startTransaction()
+db.cappedCollection.insertOne({...}, {session}) // ERROR
+```
+
+**5. Sharding Limitations:**
+
+**Cross-Shard Transactions:**
+- Higher latency
+- More coordinator overhead
+- Network failures can cause aborts
+- Requires MongoDB 4.2+
+
+**Orphaned Documents:**
+- Can see orphaned documents during chunk migration
+- Requires careful handling
+
+**6. DDL Operations:**
+
+```javascript
+// Cannot perform DDL in transactions
+session.startTransaction()
+db.createCollection("newCollection", {session}) // ERROR
+db.collection.createIndex({field: 1}, {session}) // ERROR
+```
+
+**7. Read/Write Concern Restrictions:**
+
+```javascript
+// Must use compatible read/write concerns
+session.startTransaction({
+  readConcern: {level: "snapshot"},     // Required
+  writeConcern: {w: "majority"}         // Required for durability
+})
+
+// Invalid combinations cause errors
+session.startTransaction({
+  readConcern: {level: "local"},  // ERROR: must be snapshot
+  writeConcern: {w: 1}            // ERROR: should be majority
+})
+```
+
+**8. Retryability:**
+
+```javascript
+// Must implement retry logic
+function runTransactionWithRetry(txnFunc, session) {
+  while (true) {
+    try {
+      txnFunc(session)
+      session.commitTransaction()
+      break
+    } catch (error) {
+      if (error.hasErrorLabel("TransientTransactionError")) {
+        // Retry entire transaction
+        continue
+      } else if (error.hasErrorLabel("UnknownTransactionCommitResult")) {
+        // Retry commit
+        session.commitTransaction()
+      } else {
+        throw error
+      }
+    }
+  }
+}
+```
+
+**9. Memory Pressure:**
+
+- Transactions held in memory until commit
+- Large transactions can cause memory issues
+- Can trigger cache pressure and evictions
+
+**10. No Isolation for DDL:**
+
+```javascript
+// Other sessions can see schema changes immediately
+// Even if transaction uncommitted
+session.startTransaction()
+db.newCollection.insertOne({...}, {session})
+// Other sessions can now see newCollection exists
+```
+
+**Best Practices:**
+- Keep transactions short (< 1 second ideal)
+- Minimize operations per transaction
+- Use single-document atomicity when possible
+- Implement proper retry logic
+- Monitor transaction metrics
+- Avoid transactions for high-frequency operations
+
+---
+
+### 118. How does MongoDB maintain ACID properties in a replica set?
+
+**Atomicity:**
+
+**Single Document:**
+```javascript
+// Always atomic without transactions
+db.accounts.updateOne(
+  {_id: "acc1"},
+  {
+    $inc: {balance: 100},
+    $push: {transactions: {amount: 100, date: new Date()}}
+  }
+)
+// Both operations succeed or fail together
+```
+
+**Multi-Document:**
+```javascript
+// Requires explicit transaction
+session.startTransaction()
+db.accounts.updateOne({_id: "acc1"}, {$inc: {balance: -100}}, {session})
+db.accounts.updateOne({_id: "acc2"}, {$inc: {balance: 100}}, {session})
+session.commitTransaction() // Both or neither
+```
+
+**Implementation:**
+- WiredTiger transaction log ensures atomicity
+- Operations grouped in oplog entry
+- Rollback if any operation fails
+
+---
+
+**Consistency:**
+
+**Write Concern Enforcement:**
+```javascript
+// Ensure consistency across replica set
+db.collection.insertOne(
+  {data: "important"},
+  {writeConcern: {w: "majority", j: true}}
+)
+// Confirmed by majority before acknowledged
+```
+
+**Schema Validation:**
+```javascript
+db.createCollection("users", {
+  validator: {
+    $jsonSchema: {
+      required: ["email", "age"],
+      properties: {
+        email: {type: "string"},
+        age: {type: "number", minimum: 0}
+      }
+    }
+  }
+})
+// Enforces consistency of data structure
+```
+
+**Consistency Model:**
+- **Eventual Consistency**: Default for secondary reads
+- **Strong Consistency**: readConcern "majority" + writeConcern "majority"
+
+```javascript
+db.collection.find({}).readConcern("majority")
+// Reads only data acknowledged by majority
+```
+
+---
+
+**Isolation:**
+
+**Document-Level Locking (WiredTiger):**
+```javascript
+// Concurrent reads - no blocking
+session1: db.accounts.find({_id: "acc1"})
+session2: db.accounts.find({_id: "acc1"}) // No conflict
+
+// Concurrent writes - last write wins
+session1: db.accounts.updateOne({_id: "acc1"}, {$inc: {balance: 10}})
+session2: db.accounts.updateOne({_id: "acc1"}, {$inc: {balance: 20}})
+// Both succeed, final state depends on order
+```
+
+**Snapshot Isolation (Transactions):**
+```javascript
+// Transaction sees consistent snapshot
+session.startTransaction({readConcern: {level: "snapshot"}})
+
+// All reads in transaction see data as of transaction start
+db.accounts.find({}, {session})
+
+// External changes not visible until commit
+session.commitTransaction()
+```
+
+**Read Isolation Levels:**
+```javascript
+// Local: reads latest data (may not be durable)
+db.collection.find().readConcern("local")
+
+// Majority: reads only majority-committed data
+db.collection.find().readConcern("majority")
+
+// Linearizable: reads with real-time guarantees
+db.collection.find().readConcern("linearizable")
+```
+
+---
+
+**Durability:**
+
+**Journal (Write-Ahead Log):**
+```javascript
+// Ensure durability with journal
+db.collection.insertOne(
+  {data: "critical"},
+  {writeConcern: {w: 1, j: true}} // j:true = wait for journal
+)
+```
+
+**Journal Process:**
+1. Write to journal (on-disk log)
+2. Group commit every 100ms
+3. Flush to data files later
+4. Crash recovery replays journal
+
+**Replication for Durability:**
+```javascript
+// Durability across multiple servers
+db.collection.insertOne(
+  {data: "important"},
+  {writeConcern: {w: "majority"}} // Replicated to majority
+)
+```
+
+**Write Concern Levels:**
+```javascript
+// No acknowledgment (fire and forget)
+{w: 0}
+
+// Acknowledged by primary only
+{w: 1, j: false}
+
+// Primary + journaled
+{w: 1, j: true}
+
+// Majority of replica set
+{w: "majority"}
+
+// Custom: specific number of nodes
+{w: 3}
+```
+
+---
+
+**Replica Set Guarantees:**
+
+**Primary Election:**
+```javascript
+// Ensures only one primary writes
+// Prevents split-brain scenarios
+// Election uses Raft-like protocol
+
+// Priority settings
+rs.reconfig({
+  members: [
+    {_id: 0, host: "server1:27017", priority: 2}, // Preferred primary
+    {_id: 1, host: "server2:27017", priority: 1},
+    {_id: 2, host: "server3:27017", priority: 1}
+  ]
+})
+```
+
+**Oplog Replication:**
+```javascript
+// Oplog entry structure
+{
+  ts: Timestamp(1699430400, 1),
+  t: 1,
+  h: NumberLong("123456789"),
+  v: 2,
+  op: "u",  // operation: i=insert, u=update, d=delete
+  ns: "db.collection",
+  o: {$set: {balance: 100}},
+  o2: {_id: "acc1"}
+}
+
+// Secondaries continuously tail oplog
+// Apply operations in same order as primary
+```
+
+**Rollback Prevention:**
+```javascript
+// Write concern prevents rollbacks
+db.collection.insertOne(
+  {data: "critical"},
+  {writeConcern: {w: "majority", j: true, wtimeout: 5000}}
+)
+// Waits for majority acknowledgment
+// If timeout, throws error (doesn't rollback)
+```
+
+**Failure Scenarios:**
+
+**Primary Crash:**
+1. Primary crashes
+2. Replica set detects heartbeat failure
+3. Election triggered
+4. New primary elected
+5. Clients reconnect to new primary
+
+**Network Partition:**
+```javascript
+// Minority partition cannot elect primary
+// Majority partition continues operating
+// Prevents split-brain
+
+// 3-node set splits 1-2:
+// 1 node: becomes secondary (no writes)
+// 2 nodes: elect new primary (continues)
+```
+
+**Rollback Handling:**
+```javascript
+// If primary crashes with uncommitted writes
+// Rolled back when rejoins as secondary
+// Written to rollback files in dbPath/rollback
+
+// View rollback files
+ls /data/db/rollback/
+
+// Manually resolve if needed
+```
+
+**Causal Consistency:**
+```javascript
+// Session-based causal consistency
+const session = client.startSession({causalConsistency: true})
+
+// Write on primary
+db.collection.insertOne({_id: 1}, {session})
+
+// Read from secondary sees write
+db.collection.findOne({_id: 1}, {
+  session,
+  readPreference: "secondary"
+}) // Returns document (causally consistent)
+```
+
+---
+
+### 119. How does optimistic concurrency control work in MongoDB?
+
+**Optimistic Concurrency Control (OCC)** assumes conflicts are rare and validates at commit time rather than locking preemptively.
+
+**1. Version-Based OCC:**
+
+```javascript
+// Document with version field
+{
+  _id: "product123",
+  name: "Laptop",
+  stock: 100,
+  version: 1
+}
+
+// Update with version check
+const product = db.products.findOne({_id: "product123"})
+const currentVersion = product.version
+
+const result = db.products.updateOne(
+  {
+    _id: "product123",
+    version: currentVersion  // Check version hasn't changed
+  },
+  {
+    $inc: {stock: -10},
+    $set: {version: currentVersion + 1}  // Increment version
+  }
+)
+
+if (result.matchedCount === 0) {
+  // Conflict detected - version changed
+  // Retry with fresh data
+  throw new ConflictError("Document was modified by another operation")
+}
+```
+
+**Application-Level Retry:**
+```javascript
+async function updateWithRetry(productId, quantity, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Read current state
+      const product = await db.products.findOne({_id: productId})
+      
+      if (product.stock < quantity) {
+        throw new Error("Insufficient stock")
+      }
+      
+      // Attempt update with version check
+      const result = await db.products.updateOne(
+        {_id: productId, version: product.version},
+        {
+          $inc: {stock: -quantity},
+          $set: {
+            version: product.version + 1,
+            lastModified: new Date()
+          }
+        }
+      )
+      
+      if (result.matchedCount === 1) {
+        return {success: true, newVersion: product.version + 1}
+      }
+      
+      // Conflict - retry
+      console.log(`Conflict detected, retry ${attempt + 1}`)
+      await sleep(Math.random() * 100) // Exponential backoff
+      
+    } catch (error) {
+      if (attempt === maxRetries - 1) throw error
+    }
+  }
+  
+  throw new Error("Max retries exceeded")
+}
+```
+
+**2. Timestamp-Based OCC:**
+
+```javascript
+{
+  _id: "order123",
+  status: "pending",
+  total: 99.99,
+  lastModified: ISODate("2025-11-08T10:30:00Z")
+}
+
+// Update with timestamp check
+const order = db.orders.findOne({_id: "order123"})
+
+db.orders.updateOne(
+  {
+    _id: "order123",
+    lastModified: order.lastModified  // Check timestamp
+  },
+  {
+    $set: {
+      status: "processing",
+      lastModified: new Date()
+    }
+  }
+)
+```
+
+**3. MongoDB's Internal OCC (WiredTiger):**
+
+MongoDB uses OCC internally with **MVCC (Multi-Version Concurrency Control)**:
+
+```javascript
+// Transaction T1
+session1.startTransaction()
+const doc = db.collection.findOne({_id: 1}, {session: session1})
+db.collection.updateOne({_id: 1}, {$set: {value: doc.value + 10}}, {session: session1})
+
+// Transaction T2 (concurrent)
+session2.startTransaction()
+db.collection.updateOne({_id: 1}, {$set: {value: 50}}, {session: session2})
+session2.commitTransaction() // Commits first
+
+// T1 tries to commit
+session1.commitTransaction() // WriteConflict error
+// Must abort and retry
+```
+
+**Internal Process:**
+1. Each transaction reads snapshot at start time
+2. Changes staged in memory (not visible to others)
+3. At commit, check if read data was modified
+4. If conflict → abort with WriteConflict
+5. If no conflict → commit changes
+
+**4. Conditional Updates (Implicit OCC):**
+
+```javascript
+// Check condition during update
+db.inventory.updateOne(
+  {
+    _id: "item123",
+    quantity: {$gte: 10}  // Implicit version check
+  },
+  {
+    $inc: {quantity: -10}
+  }
+)
+
+// If quantity changed before update, matchedCount = 0
+// No explicit version field needed
+```
+
+**5. Compare-and-Swap Pattern:**
+
+```javascript
+function compareAndSwap(docId, expectedValue, newValue) {
+  const result = db.collection.updateOne(
+    {
+      _id: docId,
+      value: expectedValue  // Expected state
+    },
+    {
+      $set: {value: newValue}
+    }
+  )
+  
+  return result.matchedCount === 1 // True if succeeded
+}
+
+// Usage
+while (!compareAndSwap("counter1", currentValue, currentValue + 1)) {
+  currentValue = db.collection.findOne({_id: "counter1"}).value
+  // Retry with updated value
+}
+```
+
+**6. Advantages:**
+
+- **High Concurrency**: No locks held during read phase
+- **Better Performance**: No blocking on reads
+- **Deadlock-Free**: No lock acquisition order issues
+- **Scalable**: Works well with distributed systems
+
+**7. Disadvantages:**
+
+- **Retry Overhead**: High contention causes many retries
+- **Wasted Work**: Failed transactions must be redone
+- **Application Complexity**: Must implement retry logic
+- **Starvation**: Unlucky transactions may retry indefinitely
+
+**8. When to Use:**
+
+**Use OCC When:**
+- Conflicts are rare
+- Read-heavy workload
+- Short transactions
+- Distributed environment
+
+**Avoid OCC When:**
+- High contention on same documents
+- Long-running transactions
+- Write-heavy workloads
+- Pessimistic locking preferred (use MongoDB transactions with explicit locking patterns)
+
+---
+
+### 120. How does snapshot isolation work in MongoDB?
+
+**Snapshot Isolation** provides each transaction a consistent view of the database as of a specific point in time (the snapshot).
+
+**1. Core Concept:**
+
+```javascript
+// Transaction starts and captures snapshot
+session.startTransaction({
+  readConcern: {level: "snapshot"}
+})
+
+// Time: T0 (transaction start)
+const account = db.accounts.findOne({_id: "acc1"}, {session})
+// Reads: {_id: "acc1", balance: 100}
+
+// Time: T1 (another transaction commits)
+// External update: balance → 200
+
+// Time: T2 (still in transaction)
+const accountAgain = db.accounts.findOne({_id: "acc1"}, {session})
+// Still reads: {_id: "acc1", balance: 100} (snapshot unchanged)
+
+session.commitTransaction()
+```
+
+**2. MVCC Implementation:**
+
+**Multi-Version Storage:**
+```javascript
+// WiredTiger maintains multiple versions of each document
+
+// Version 1 (timestamp: 1000)
+{_id: "acc1", balance: 100}
+
+// Version 2 (timestamp: 2000)
+{_id: "acc1", balance: 200}
+
+// Version 3 (timestamp: 3000)
+{_id: "acc1", balance: 250}
+
+// Transaction with snapshot at timestamp 1500:
+// Reads version 1 (balance: 100)
+
+// Transaction with snapshot at timestamp 2500:
+// Reads version 2 (balance: 200)
+```
+
+**3. Snapshot Timestamp:**
+
+```javascript
+session.startTransaction({
+  readConcern: {level: "snapshot"}
+})
+
+// MongoDB internally assigns snapshot timestamp
+// All reads in transaction use this timestamp
+
+// Logical clock: guarantees ordering
+snapshot_timestamp = cluster_time_at_transaction_start
+
+// All reads see data ≤ snapshot_timestamp
+```
+
+**4. Read Consistency Guarantees:**
+
+**Repeatable Reads:**
+```javascript
+session.startTransaction({readConcern: {level: "snapshot"}})
+
+// First read
+const doc1 = db.collection.findOne({_id: 1}, {session})
+// Returns: {_id: 1, value: 10}
+
+// Another transaction updates and commits
+// db.collection.updateOne({_id: 1}, {$set: {value: 20}})
+
+// Second read in same transaction
+const doc2 = db.collection.findOne({_id: 1}, {session})
+// Still returns: {_id: 1, value: 10} (same as first read)
+
+session.commitTransaction()
+```
+
+**No Phantom Reads:**
+```javascript
+session.startTransaction({readConcern: {level: "snapshot"}})
+
+// First query
+const count1 = db.products.countDocuments({status: "active"}, {session})
+// Returns: 100
+
+// Another transaction inserts new active product
+// db.products.insertOne({status: "active", name: "New Product"})
+
+// Second query in same transaction
+const count2 = db.products.countDocuments({status: "active"}, {session})
+// Still returns: 100 (no phantom reads)
+
+session.commitTransaction()
+```
+
+**5. Write Conflict Detection:**
+
+```javascript
+// Transaction T1
+session1.startTransaction({readConcern: {level: "snapshot"}})
+const doc = db.accounts.findOne({_id: "acc1"}, {session: session1})
+// Snapshot timestamp: 1000, reads balance: 100
+
+// Transaction T2 (concurrent)
+session2.startTransaction({readConcern: {level: "snapshot"}})
+db.accounts.updateOne(
+  {_id: "acc1"},
+  {$set: {balance: 200}},
+  {session: session2}
+)
+session2.commitTransaction() // Commits at timestamp: 2000
+
+// T1 tries to update
+db.accounts.updateOne(
+  {_id: "acc1"},
+  {$set: {balance: 150}}, // Based on stale read (balance: 100)
+  {session: session1}
+)
+
+session1.commitTransaction()
+// ERROR: WriteConflict
+// Document modified between read (timestamp 1000) and write attempt
+```
+
+**6. Snapshot Isolation Anomalies:**
+
+**Write Skew (Possible):**
+```javascript
+// Two doctors on-call, at least 1 required
+
+// Transaction T1 (Dr. Alice requests time off)
+session1.startTransaction({readConcern: {level: "snapshot"}})
+const onCall = db.doctors.countDocuments({status: "on-call"}, {session: session1})
+// Reads: 2 doctors on-call
+
+if (onCall > 1) {
+  db.doctors.updateOne(
+    {name: "Alice"},
+    {$set: {status: "off-call"}},
+    {session: session1}
+  )
+}
+session1.commitTransaction()
+
+// Transaction T2 (Dr. Bob requests time off, concurrent)
+session2.startTransaction({readConcern: {level: "snapshot"}})
+const onCall2 = db.doctors.countDocuments({status: "on-call"}, {session: session2})
+// Also reads: 2 doctors on-call (snapshot before T1 committed)
+
+if (onCall2 > 1) {
+  db.doctors.updateOne(
+    {name: "Bob"},
+    {$set: {status: "off-call"}},
+    {session: session2}
+  )
+}
+session2.commitTransaction()
+
+// Result: 0 doctors on-call! (write skew anomaly)
+```
+
+**Prevention:**
+```javascript
+// Use explicit locking or serializable isolation
+db.doctors.updateOne(
+  {
+    name: "Alice",
+    // Check constraint in update
+    $expr: {$gt: [{$size: "$colleagues_on_call"}, 1]}
+  },
+  {$set: {status: "off-call"}},
+  {session}
+)
+```
+
+**7. Performance Characteristics:**
+
+**Benefits:**
+- No read locks
+- High read concurrency
+- Predictable read performance
+- No blocking between readers and writers
+
+**Costs:**
+- Version storage overhead
+- Write conflict retries
+- Garbage collection of old versions
+- Higher memory usage
+
+**8. Snapshot Cleanup:**
+
+```javascript
+// WiredTiger periodically removes old versions
+
+// Version GC policy:
+// - Keep versions needed by active transactions
+// - Keep versions within checkpoint interval
+// - Remove older versions
+
+// Oldest active transaction determines oldest required version
+oldest_required = min(all_active_transaction_snapshots)
+```
+
+**9. Configuration:**
+
+```javascript
+// Transaction with snapshot isolation
+session.startTransaction({
+  readConcern: {level: "snapshot"},
+  writeConcern: {w: "majority"},
+  maxTimeMS: 60000  // Snapshot valid for max 60s
+})
+
+// Read preference
+session.startTransaction({
+  readConcern: {level: "snapshot"},
+  readPreference: "primary"  // Must read from primary
+})
+```
+
+**10. Monitoring:**
+
+```javascript
+// Check active transactions
+db.serverStatus().transactions
+
+// View transaction metrics
+{
+  currentActive: 5,
+  currentInactive: 0,
+  currentOpen: 5,
+  totalAborted: 120,
+  totalCommitted: 9880,
+  totalStarted: 10000
+}
+
+// Find long-running transactions
+db.currentOp({
+  active: true,
+  secs_running: {$gte: 30},
+  $or: [
+    {op: "command", "command.commitTransaction": 1},
+    {op: "command", "command.abortTransaction": 1}
+  ]
+})
+```
+
+---
+
+## Aggregation Framework Deep Dive
+
+### 121. Explain $facet and $bucket stages with examples.
+
+**$facet Stage:**
+
+**$facet** allows running multiple aggregation pipelines in parallel on the same input documents and returns results in a single document.
+
+**Use Cases:**
+- Multiple analytics on same dataset
+- Dashboard queries with different metrics
+- Pagination with total count
+
+**Example 1: E-commerce Analytics**
+```javascript
+db.products.aggregate([
+  {$match: {category: "electronics"}},
+  {$facet: {
+    // Facet 1: Price statistics
+    "priceStats": [
+      {$group: {
+        _id: null,
+        avgPrice: {$avg: "$price"},
+        minPrice: {$min: "$price"},
+        maxPrice: {$max: "$price"},
+        totalProducts: {$sum: 1}
+      }}
+    ],
+    
+    // Facet 2: Top 5 brands by product count
+    "topBrands": [
+      {$group: {
+        _id: "$brand",
+        count: {$sum: 1}
+      }},
+      {$sort: {count: -1}},
+      {$limit: 5}
+    ],
+    
+    // Facet 3: Price range distribution
+    "priceRanges": [
+      {$bucket: {
+        groupBy: "$price",
+        boundaries: [0, 100, 500, 1000, 5000],
+        default: "5000+",
+        output: {
+          count: {$sum: 1},
+          products: {$push: "$name"}
+        }
+      }}
+    ],
+    
+    // Facet 4: Recent products
+    "recentProducts": [
+      {$sort: {createdAt: -1}},
+      {$limit: 10},
+      {$project: {name: 1, price: 1, brand: 1}}
+    ]
+  }}
+])
+
+// Result:
+{
+  "priceStats": [{
+    _id: null,
+    avgPrice: 749.99,
+    minPrice: 29.99,
+    maxPrice: 4999.99,
+    totalProducts: 1250
+  }],
+  "topBrands": [
+    {_id: "Samsung", count: 320},
+    {_id: "Apple", count: 280},
+    {_id: "Sony", count: 210}
+  ],
+  "priceRanges": [
+    {_id: 0, count: 150, products: [...]},
+    {_id: 100, count: 450, products: [...]},
+    {_id: 500, count: 380, products: [...]}
+  ],
+  "recentProducts": [...]
+}
+```
+
+**Example 2: Pagination with Total Count**
+```javascript
+db.orders.aggregate([
+  {$match: {status: "shipped"}},
+  {$facet: {
+    "metadata": [
+      {$count: "total"},
+      {$addFields: {
+        page: 1,
+        pageSize: 20
+      }}
+    ],
+    "data": [
+      {$skip: 0},
+      {$limit: 20},
+      {$sort: {orderDate: -1}}
+    ]
+  }}
+])
+
+// Result:
+{
+  "metadata": [{total: 5420, page: 1, pageSize: 20}],
+  "data": [/* 20 orders */]
+}
+```
+
+---
+
+**$bucket Stage:**
+
+**$bucket** categorizes documents into groups (buckets) based on a specified expression and boundaries.
+
+**Syntax:**
+```javascript
+{$bucket: {
+  groupBy: <expression>,
+  boundaries: [<value1>, <value2>, ...],
+  default: <literal>,  // Optional: for values outside boundaries
+  output: {           // Optional: output specifications
+    <output1>: {<accumulator>},
+    <output2>: {<accumulator>}
+  }
+}}
+```
+
+**Example 1: Age Distribution**
+```javascript
+db.users.aggregate([
+  {$bucket: {
+    groupBy: "$age",
+    boundaries: [0, 18, 25, 35, 50, 65, 100],
+    default: "Other",
+    output: {
+      count: {$sum: 1},
+      users: {$push: "$name"},
+      avgAge: {$avg: "$age"}
+    }
+  }}
+])
+
+// Result:
+[
+  {_id: 0, count: 45, users: ["Alice", "Bob",...], avgAge: 12.5},
+  {_id: 18, count: 230, users: [...], avgAge: 21.3},
+  {_id: 25, count: 450, users: [...], avgAge: 29.8},
+  {_id: 35, count: 320, users: [...], avgAge: 42.1},
+  {_id: 50, count: 180, users: [...], avgAge: 57.2},
+  {_id: 65, count: 75, users: [...], avgAge: 71.5}
+]
+```
+
+**Example 2: Revenue Buckets**
+```javascript
+db.orders.aggregate([
+  {$bucket: {
+    groupBy: "$totalAmount",
+    boundaries: [0, 50, 200, 1000, 10000],
+    default: "Huge",
+    output: {
+      count: {$sum: 1},
+      totalRevenue: {$sum: "$totalAmount"},
+      avgOrder: {$avg: "$totalAmount"},
+      orders: {$push: {orderId: "$_id", amount: "$totalAmount"}}
+    }
+  }}
+])
+
+// Result:
+[
+  {
+    _id: 0,           // $0-$50
+    count: 1200,
+    totalRevenue: 36000,
+    avgOrder: 30,
+    orders: [...]
+  },
+  {
+    _id: 50,          // $50-$200
+    count: 800,
+    totalRevenue: 96000,
+    avgOrder: 120,
+    orders: [...]
+  },
+  {
+    _id: 200,         // $200-$1000
+    count: 300,
+    totalRevenue: 180000,
+    avgOrder: 600,
+    orders: [...]
+  }
+]
+```
+
+**$bucketAuto** (Automatic Boundaries):**
+
+```javascript
+// MongoDB automatically determines boundaries
+db.products.aggregate([
+  {$bucketAuto: {
+    groupBy: "$price",
+    buckets: 5,  // Create 5 equal-sized buckets
+    output: {
+      count: {$sum: 1},
+      avgPrice: {$avg: "$price"},
+      products: {$push: "$name"}
+    }
+  }}
+])
+
+// MongoDB calculates boundaries to distribute documents evenly
+```
+
+**Example 3: Time-based Bucketing**
+```javascript
+db.logs.aggregate([
+  {$bucket: {
+    groupBy: {$hour: "$timestamp"},
+    boundaries: [0, 6, 12, 18, 24],
+    output: {
+      count: {$sum: 1},
+      errors: {
+        $sum: {$cond: [{$eq: ["$level", "ERROR"]}, 1, 0]}
+      }
+    }
+  }}
+])
+
+// Result: Logs grouped by time of day
+[
+  {_id: 0, count: 450, errors: 12},    // 12 AM - 6 AM
+  {_id: 6, count: 1200, errors: 45},   // 6 AM - 12 PM
+  {_id: 12, count: 2100, errors: 78},  // 12 PM - 6 PM
+  {_id: 18, count: 890, errors: 23}    // 6 PM - 12 AM
+]
+```
+
+**Combining $facet and $bucket:**
+```javascript
+db.sales.aggregate([
+  {$facet: {
+    "byRegion": [
+      {$group: {
+        _id: "$region",
+        totalSales: {$sum: "$amount"}
+      }}
+    ],
+    "byAmount": [
+      {$bucket: {
+        groupBy: "$amount",
+        boundaries: [0, 100, 500, 1000, 5000],
+        default: "VIP",
+        output: {
+          count: {$sum: 1},
+          revenue: {$sum: "$amount"}
+        }
+      }}
+    ],
+    "byQuarter": [
+      {$bucket: {
+        groupBy: {$month: "$date"},
+        boundaries: [1, 4, 7, 10, 13],
+        output: {
+          sales: {$sum: "$amount"},
+          transactions: {$sum: 1}
+        }
+      }}
+    ]
+  }}
+])
+```
+
+---
+
+### 122. What's the difference between $group and $accumulator operators?
+
+**$group Stage:**
+
+**$group** is a pipeline stage that groups documents by a specified identifier and applies accumulator expressions.
+
+**Syntax:**
+```javascript
+{$group: {
+  _id: <expression>,  // Group key
+  <field1>: {<accumulator1>: <expression>},
+  <field2>: {<accumulator2>: <expression>}
+}}
+```
+
+**Example:**
+```javascript
+db.orders.aggregate([
+  {$group: {
+    _id: "$customerId",
+    totalSpent: {$sum: "$amount"},
+    orderCount: {$sum: 1},
+    avgOrderValue: {$avg: "$amount"},
+    orders: {$push: {orderId: "$_id", amount: "$amount"}}
+  }}
+])
+```
+
+---
+
+**$accumulator Operator:**
+
+**$accumulator** is a custom accumulator operator that allows you to define custom aggregation logic using JavaScript functions (MongoDB 4.4+).
+
+**Syntax:**
+```javascript
+{$accumulator: {
+  init: <code>,                    // Initialize state
+  accumulate: <code>,              // Process each document
+  accumulateArgs: [<arg1>, ...],  // Arguments to accumulate
+  merge: <code>,                   // Merge states (sharding)
+  finalize: <code>,               // Final transformation
+  lang: "js"
+}}
+```
+
+**Key Differences:**
+
+| Aspect | $group | $accumulator |
+|--------|--------|--------------|
+| Type | Pipeline stage | Accumulator operator |
+| Built-in | Yes | Custom logic |
+| Performance | Optimized (C++) | Slower (JavaScript) |
+| Flexibility | Limited to built-in operators | Fully customizable |
+| Use Case | Standard aggregations | Complex custom logic |
+
+---
+
+**Built-in Accumulator Operators (used with $group):**
+
+```javascript
+// Standard accumulators
+{
+  $sum: <expression>,
+  $avg: <expression>,
+  $max: <expression>,
+  $min: <expression>,
+  $first: <expression>,
+  $last: <expression>,
+  $push: <expression>,
+  $addToSet: <expression>,
+  $stdDevPop: <expression>,
+  $stdDevSamp: <expression>
+}
+
+// Example
+db.sales.aggregate([
+  {$group: {
+    _id: "$product",
+    totalRevenue: {$sum: "$amount"},
+    avgPrice: {$avg: "$amount"},
+    maxSale: {$max: "$amount"},
+    uniqueCustomers: {$addToSet: "$customerId"}
+  }}
+])
+```
+
+---
+
+**Custom $accumulator Examples:**
+
+**Example 1: Weighted Average**
+```javascript
+db.reviews.aggregate([
+  {$group: {
+    _id: "$productId",
+    weightedRating: {
+      $accumulator: {
+        init: function() {
+          return {sum: 0, weightSum: 0}
+        },
+        accumulate: function(state, rating, helpful) {
+          return {
+            sum: state.sum + (rating * helpful),
+            weightSum: state.weightSum + helpful
+          }
+        },
+        accumulateArgs: ["$rating", "$helpfulVotes"],
+        merge: function(state1, state2) {
+          return {
+            sum: state1.sum + state2.sum,
+            weightSum: state1.weightSum + state2.weightSum
+          }
+        },
+        finalize: function(state) {
+          return state.weightSum > 0 
+            ? state.sum / state.weightSum 
+            : 0
+        },
+        lang: "js"
+      }
+    }
+  }}
+])
+```
+
+**Example 2: Running Percentile Calculation**
+```javascript
+db.testScores.aggregate([
+  {$group: {
+    _id: "$class",
+    p95Score: {
+      $accumulator: {
+        init: function() {
+          return []
+        },
+        accumulate: function(scores, score) {
+          scores.push(score)
+          return scores
+        },
+        accumulateArgs: ["$score"],
+        merge: function(scores1, scores2) {
+          return scores1.concat(scores2)
+        },
+        finalize: function(scores) {
+          scores.sort((a, b) => a - b)
+          const index = Math.ceil(scores.length * 0.95) - 1
+          return scores[index]
+        },
+        lang: "js"
+      }
+    }
+  }}
+])
+```
+
+**Example 3: Custom String Aggregation**
+```javascript
+db.comments.aggregate([
+  {$group: {
+    _id: "$postId",
+    topWords: {
+      $accumulator: {
+        init: function() {
+          return {}
+        },
+        accumulate: function(wordCounts, text) {
+          const words = text.toLowerCase().split(/\s+/)
+          words.forEach(word => {
+            if (word.length > 3) {
+              wordCounts[word] = (wordCounts[word] || 0) + 1
+            }
+          })
+          return wordCounts
+        },
+        accumulateArgs: ["$text"],
+        merge: function(counts1, counts2) {
+          Object.keys(counts2).forEach(word => {
+            counts1[word] = (counts1[word] || 0) + counts2[word]
+          })
+          return counts1
+        },
+        finalize: function(wordCounts) {
+          return Object.entries(wordCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([word, count]) => ({word, count}))
+        },
+        lang: "js"
+      }
+    }
+  }}
+])
+```
+
+**Example 4: Complex Business Logic**
+```javascript
+// Calculate customer tier based on custom rules
+db.orders.aggregate([
+  {$group: {
+    _id: "$customerId",
+    tier: {
+      $accumulator: {
+        init: function() {
+          return {
+            totalSpent: 0,
+            orderCount: 0,
+            returnsCount: 0,
+            avgOrderValue: 0
+          }
+        },
+        accumulate: function(state, amount, isReturn) {
+          state.orderCount++
+          if (isReturn) {
+            state.returnsCount++
+          } else {
+            state.totalSpent += amount
+          }
+          state.avgOrderValue = state.totalSpent / (state.orderCount - state.returnsCount)
+          return state
+        },
+        accumulateArgs: ["$amount", "$isReturn"],
+        merge: function(state1, state2) {
+          return {
+            totalSpent: state1.totalSpent + state2.totalSpent,
+            orderCount: state1.orderCount + state2.orderCount,
+            returnsCount: state1.returnsCount + state2.returnsCount,
+            avgOrderValue: (state1.totalSpent + state2.totalSpent) / 
+                          (state1.orderCount + state2.orderCount - 
+                           state1.returnsCount - state2.returnsCount)
+          }
+        },
+        finalize: function(state) {
+          const returnRate = state.returnsCount / state.orderCount
+          
+          if (state.totalSpent > 10000 && returnRate < 0.05) {
+            return "platinum"
+          } else if (state.totalSpent > 5000 && returnRate < 0.1) {
+            return "gold"
+          } else if (state.totalSpent > 1000) {
+            return "silver"
+          } else {
+            return "bronze"
+          }
+        },
+        lang: "js"
+      }
+    }
+  }}
+])
+```
+
+**Performance Considerations:**
+
+1. **$group with built-ins**: Always prefer when possible (10-100x faster)
+2. **$accumulator**: Use only for logic that can't be expressed with built-in operators
+3. **Memory**: JavaScript accumulators use more memory
+4. **Optimization**: Built-in operators are pushed down to storage engine
+
+**When to Use Each:**
+
+**Use $group + built-in accumulators:**
+- Standard aggregations (sum, avg, count)
+- Simple array operations
+- Performance-critical queries
+- Production workloads
+
+**Use $accumulator:**
+- Complex custom business logic
+- Algorithms not supported by built-ins
+- Prototyping complex calculations
+- When built-ins can't express the logic
+
+---
+
+### 123. How can $merge be used to write aggregation results into another collection?
+
+**$merge** (MongoDB 4.2+) writes aggregation pipeline results to a collection, with options for handling existing documents.
+
+**Basic Syntax:**
+```javascript
+{$merge: {
+  into: <target_collection>,
+  on: <identifier_field>,          // Optional
+  whenMatched: <action>,            // Optional
+  whenNotMatched: <action>          // Optional
+}}
+```
+
+**Actions:**
+
+**whenMatched:**
+- `replace` (default): Replace entire document
+- `keepExisting`: Keep existing document, discard new
+- `merge`: Merge new fields into existing
+- `fail`: Fail if document exists
+- `pipeline`: Custom update pipeline
+
+**whenNotMatched:**
+- `insert` (default): Insert new document
+- `discard`: Discard new document
+- `fail`: Fail if document doesn't exist
+
+---
+
+**Example 1: Simple Merge (Replace)**
+```javascript
+// Aggregate daily sales and merge into summary collection
+db.orders.aggregate([
+  {$match: {
+    orderDate: {
+      $gte: ISODate("2025-11-08T00:00:00Z"),
+      $lt: ISODate("2025-11-09T00:00:00Z")
+    }
+  }},
+  {$group: {
+    _id: {
+      product: "$productId",
+      date: {$dateToString: {format: "%Y-%m-%d", date: "$orderDate"}}
+    },
+    totalSales: {$sum: "$amount"},
+    quantity: {$sum: "$quantity"},
+    orderCount: {$sum: 1}
+  }},
+  {$merge: {
+    into: "dailySalesSummary",
+    on: "_id",
+    whenMatched: "replace",
+    whenNotMatched: "insert"
+  }}
+])
+
+// Result in dailySalesSummary:
+{
+  _id: {product: "prod123", date: "2025-11-08"},
+  totalSales: 5420.50,
+  quantity: 124,
+  orderCount: 45
+}
+```
+
+---
+
+**Example 2: Incremental Updates (Merge)**
+```javascript
+// Update customer stats incrementally
+db.orders.aggregate([
+  {$match: {status: "completed"}},
+  {$group: {
+    _id: "$customerId",
+    newOrders: {$sum: 1},
+    newRevenue: {$sum: "$amount"}
+  }},
+  {$merge: {
+    into: "customerStats",
+    on: "_id",
+    whenMatched: "merge",  // Merge new fields, keep existing
+    whenNotMatched: "insert"
+  }}
+])
+
+// Before:
+{_id: "cust123", totalOrders: 10, totalRevenue: 1000}
+
+// After merge:
+{
+  _id: "cust123",
+  totalOrders: 10,           // Existing field kept
+  totalRevenue: 1000,        // Existing field kept
+  newOrders: 5,              // New field added
+  newRevenue: 450            // New field added
+}
+```
+
+---
+
+**Example 3: Custom Pipeline (Complex Logic)**
+```javascript
+// Update product inventory with custom logic
+db.orderItems.aggregate([
+  {$group: {
+    _id: "$productId",
+    soldQuantity: {$sum: "$quantity"}
+  }},
+  {$merge: {
+    into: "products",
+    on: "_id",
+    whenMatched: [
+      {$set: {
+        stock: {$subtract: ["$stock", "$new.soldQuantity"]},
+        lastSold: new Date(),
+        totalSold: {$add: ["$totalSold", "$new.soldQuantity"]},
+        status: {
+          $cond: {
+            if: {$lte: [{$subtract: ["$stock", "$new.soldQuantity"]}, 10]},
+            then: "low_stock",
+            else: "in_stock"
+          }
+        }
+      }}
+    ],
+    whenNotMatched: "discard"
+  }}
+])
+
+// $new refers to aggregation result
+// $ refers to existing document fields
+```
+
+---
+
+**Example 4: Materialized View Pattern**
+```javascript
+// Create/update materialized view for dashboard
+db.transactions.aggregate([
+  {$match: {timestamp: {$gte: ISODate("2025-11-01")}}},
+  {$facet: {
+    byCategory: [
+      {$group: {
+        _id: "$category",
+        count: {$sum: 1},
+        total: {$sum: "$amount"}
+      }}
+    ],
+    byDay: [
+      {$group: {
+        _id: {$dateToString: {format: "%Y-%m-%d", date: "$timestamp"}},
+        transactions: {$sum: 1},
+        revenue: {$sum: "$amount"}
+      }},
+      {$sort: {_id: 1}}
+    ],
+    overall: [
+      {$group: {
+        _id: null,
+        totalTransactions: {$sum: 1},
+        totalRevenue: {$sum: "$amount"},
+        avgTransaction: {$avg: "$amount"}
+      }}
+    ]
+  }},
+  {$project: {
+    _id: "november_2025_summary",
+    timestamp: new Date(),
+    byCategory: 1,
+    byDay: 1,
+    overall: {$arrayElemAt: ["$overall", 0]}
+  }},
+  {$merge: {
+    into: "dashboardCache",
+    on: "_id",
+    whenMatched: "replace",
+    whenNotMatched: "insert"
+  }}
+])
+
+// Schedule this to run periodically
+// Fast dashboard queries from dashboardCache
+```
+
+---
+
+**Example 5: Time-Series Rollup**
+```javascript
+// Rollup hourly metrics to daily
+db.hourlyMetrics.aggregate([
+  {$match: {
+    timestamp: {
+      $gte: ISODate("2025-11-08T00:00:00Z"),
+      $lt: ISODate("2025-11-09T00:00:00Z")
+    }
+  }},
+  {$group: {
+    _id: {
+      sensor: "$sensorId",
+      date: {$dateToString: {format: "%Y-%m-%d", date: "$timestamp"}}
+    },
+    avgTemp: {$avg: "$temperature"},
+    minTemp: {$min: "$temperature"},
+    maxTemp: {$max: "$temperature"},
+    readings: {$sum: "$count"}
+  }},
+  {$merge: {
+    into: "dailyMetrics",
+    on: "_id",
+    whenMatched: "replace",
+    whenNotMatched: "insert"
+  }}
+])
+```
+
+---
+
+**Example 6: Upsert with Timestamp**
+```javascript
+// Track last update time
+db.events.aggregate([
+  {$group: {
+    _id: "$userId",
+    lastEvent: {$max: "$timestamp"},
+    eventCount: {$sum: 1}
+  }},
+  {$merge: {
+    into: "userActivity",
+    on: "_id",
+    whenMatched: [
+      {$set: {
+        lastEvent: "$new.lastEvent",
+        eventCount: {$add: ["$eventCount", "$new.eventCount"]},
+        updatedAt: new Date()
+      }}
+    ],
+    whenNotMatched: "insert"
+  }}
+])
+```
+
+---
+
+**Example 7: Different Database/Collection**
+```javascript
+// Merge to different database
+db.transactions.aggregate([
+  {$group: {
+    _id: "$storeId",
+    dailyRevenue: {$sum: "$amount"}
+  }},
+  {$merge: {
+    into: {
+      db: "analytics",
+      coll: "storeMetrics"
+    },
+    on: "_id",
+    whenMatched: "replace",
+    whenNotMatched: "insert"
+  }}
+])
+```
+
+---
+
+**Example 8: Conditional Merge**
+```javascript
+// Only merge if certain conditions met
+db.orders.aggregate([
+  {$match: {status: "completed"}},
+  {$group: {
+    _id: "$customerId",
+    lifetimeValue: {$sum: "$amount"}
+  }},
+  {$match: {lifetimeValue: {$gte: 1000}}},  // Only high-value customers
+  {$merge: {
+    into: "vipCustomers",
+    on: "_id",
+    whenMatched: [
+      {$set: {
+        lifetimeValue: "$new.lifetimeValue",
+        tier: {
+          $switch: {
+            branches: [
+              {case: {$gte: ["$new.lifetimeValue", 10000]}, then: "platinum"},
+              {case: {$gte: ["$new.lifetimeValue", 5000]}, then: "gold"}
+            ],
+            default: "silver"
+          }
+        },
+        updatedAt: new Date()
+      }}
+    ],
+    whenNotMatched: "insert"
+  }}
+])
+```
+
+---
+
+**Advantages over $out:**
+
+| Feature | $merge | $out |
+|---------|--------|------|
+| Update existing docs | ✓ | ✗ (replaces entire collection) |
+| Custom update logic | ✓ | ✗ |
+| On-demand refresh | ✓ | ✗ |
+| Preserve indexes | ✓ | ✗ |
+| Atomic | Per-document | Collection-level |
+| Sharded output | ✓ | Limited |
+
+---
+
+**Best Practices:**
+
+1. **Use Indexes**: Ensure target collection has index on merge key
+```javascript
+db.targetCollection.createIndex({_id: 1})
+```
+
+2. **Error Handling**: Wrap in try-catch for production
+```javascript
+try {
+  db.collection.aggregate([...pipeline, {$merge: {...}}])
+} catch (e) {
+  if (e.code === 11000) {
+    // Handle duplicate key error
+  }
+}
+```
+
+3. **Monitor Performance**: Check merge operation duration
+```javascript
+db.currentOp({
+  "command.aggregate": {$exists: true},
+  "command.pipeline.$merge": {$exists: true}
+})
+```
+
+4. **Schedule for Off-Peak**: Run heavy merges during low-traffic periods
+
+5. **Test with Small Datasets**: Verify logic before production
+
+---
+# MongoDB Advanced Topics Guide
+
+## Aggregation Pipeline Advanced
+
+### 124. What is $graphLookup and when would you use it?
+
+**$graphLookup** performs a recursive search on a collection to traverse graph or tree structures.
+
+**Syntax:**
+```javascript
+{
+  $graphLookup: {
+    from: "collection",
+    startWith: "$fieldName",
+    connectFromField: "fieldName",
+    connectToField: "fieldName",
+    as: "outputArray",
+    maxDepth: number,
+    depthField: "depthFieldName",
+    restrictSearchWithMatch: { query }
+  }
+}
+```
+
+**Use Cases:**
+- **Organizational hierarchies** - Find all employees reporting to a manager (direct and indirect)
+- **Social networks** - Find friends of friends
+- **Category trees** - Navigate product categories
+- **Recommendation systems** - Find connected items
+
+**Example - Employee Hierarchy:**
+```javascript
+db.employees.aggregate([
+  {
+    $graphLookup: {
+      from: "employees",
+      startWith: "$_id",
+      connectFromField: "_id",
+      connectToField: "managerId",
+      as: "subordinates",
+      maxDepth: 3,
+      depthField: "level"
+    }
+  }
+])
+```
+
+**Example - Social Network:**
+```javascript
+db.users.aggregate([
+  { $match: { username: "alice" } },
+  {
+    $graphLookup: {
+      from: "users",
+      startWith: "$friends",
+      connectFromField: "friends",
+      connectToField: "_id",
+      as: "network",
+      maxDepth: 2,
+      restrictSearchWithMatch: { active: true }
+    }
+  }
+])
+```
+
+---
+
+### 125. How can you optimize an aggregation pipeline?
+
+**Key Optimization Strategies:**
+
+#### 1. **Stage Ordering**
+```javascript
+// 2. Use Collection Normally
+const db = client.db('myapp')
+await db.collection('patients').insertOne({
+  name: 'Jane Doe',
+  ssn: '987-65-4321',  // Encrypted, queryable
+  age: 45,  // Encrypted, range queryable
+  medicalRecord: 'Sensitive data...'  // Encrypted, not queryable
+})
+
+// 3. Query Encrypted Fields
+const patient = await db.collection('patients').findOne({
+  ssn: '987-65-4321'  // Equality query on encrypted field
+})
+
+const seniors = await db.collection('patients').find({
+  age: { $gte: 65 }  // Range query on encrypted field
+}).toArray()
+```
+
+**Queryable Encryption vs CSFLE:**
+
+| Feature | CSFLE | Queryable Encryption |
+|---------|-------|---------------------|
+| **Equality Queries** | ✅ (Deterministic) | ✅ (More secure) |
+| **Range Queries** | ❌ | ✅ |
+| **Frequency Analysis Protection** | ❌ | ✅ |
+| **MongoDB Version** | 4.2+ | 7.0+ |
+| **Performance** | Faster | Slightly slower |
+| **Security** | Good | Better |
+
+**Use Cases:**
+- **Healthcare** - Patient records, PHI data
+- **Finance** - Credit cards, bank accounts, SSNs
+- **PII Protection** - Email, phone, addresses
+- **Compliance** - GDPR, HIPAA, PCI-DSS
+
+**Best Practices:**
+- Use queryable encryption for fields needing search
+- Use random encryption for maximum security (no queries needed)
+- Rotate data encryption keys regularly
+- Store master keys in proper KMS (AWS, Azure, GCP)
+- Implement key rotation policies
+- Monitor encryption performance impact
+
+---
+
+### 138. How do you implement IP whitelisting for MongoDB?
+
+**IP Whitelisting restricts access to specific IP addresses or ranges**
+
+#### **1. MongoDB Atlas (Cloud)**
+
+**Via UI:**
+1. Navigate to Network Access
+2. Add IP Address
+3. Enter IP or CIDR range (e.g., 192.168.1.0/24)
+4. Add description (optional)
+5. Confirm
+
+**Via Atlas CLI:**
+```bash
+# Add single IP
+atlas accessLists create 203.0.113.45 --projectId PROJECT_ID
+
+# Add CIDR block
+atlas accessLists create 192.168.1.0/24 --projectId PROJECT_ID
+
+# Add temporary access (auto-expires)
+atlas accessLists create 198.51.100.10 --projectId PROJECT_ID --deleteAfter "2025-12-31T23:59:59Z"
+
+# List current whitelist
+atlas accessLists list --projectId PROJECT_ID
+
+# Delete entry
+atlas accessLists delete 203.0.113.45 --projectId PROJECT_ID
+```
+
+**Via Atlas API:**
+```bash
+curl --user "PUBLIC_KEY:PRIVATE_KEY" \
+  --digest \
+  --header "Content-Type: application/json" \
+  --request POST \
+  "https://cloud.mongodb.com/api/atlas/v1.0/groups/PROJECT_ID/accessList" \
+  --data '{
+    "ipAddress": "203.0.113.45",
+    "comment": "Production API server"
+  }'
+```
+
+---
+
+#### **2. Self-Hosted MongoDB**
+
+**Method 1: bindIp Configuration**
+```yaml
+# mongod.conf
+net:
+  port: 27017
+  bindIp: 127.0.0.1,192.168.1.10  # Comma-separated IPs
+  # bindIpAll: true  # Listen on all interfaces (dangerous!)
+```
+
+**Method 2: Firewall Rules (Recommended)**
+
+**Linux (iptables):**
+```bash
+# Allow specific IP
+iptables -A INPUT -p tcp --dport 27017 -s 203.0.113.45 -j ACCEPT
+
+# Allow CIDR range
+iptables -A INPUT -p tcp --dport 27017 -s 192.168.1.0/24 -j ACCEPT
+
+# Block all others
+iptables -A INPUT -p tcp --dport 27017 -j DROP
+
+# Save rules
+iptables-save > /etc/iptables/rules.v4
+```
+
+**Linux (ufw):**
+```bash
+# Enable firewall
+ufw enable
+
+# Allow specific IP
+ufw allow from 203.0.113.45 to any port 27017
+
+# Allow subnet
+ufw allow from 192.168.1.0/24 to any port 27017
+
+# Check status
+ufw status numbered
+
+# Delete rule
+ufw delete 3
+```
+
+**Linux (firewalld):**
+```bash
+# Create rich rule
+firewall-cmd --permanent --add-rich-rule='
+  rule family="ipv4"
+  source address="203.0.113.45"
+  port protocol="tcp" port="27017" accept'
+
+# Add zone for MongoDB
+firewall-cmd --permanent --new-zone=mongodb
+firewall-cmd --permanent --zone=mongodb --add-source=192.168.1.0/24
+firewall-cmd --permanent --zone=mongodb --add-port=27017/tcp
+
+# Reload
+firewall-cmd --reload
+```
+
+**Windows Firewall:**
+```powershell
+# Allow specific IP
+New-NetFirewallRule -DisplayName "MongoDB from 203.0.113.45" `
+  -Direction Inbound `
+  -Protocol TCP `
+  -LocalPort 27017 `
+  -RemoteAddress 203.0.113.45 `
+  -Action Allow
+
+# Allow subnet
+New-NetFirewallRule -DisplayName "MongoDB from local network" `
+  -Direction Inbound `
+  -Protocol TCP `
+  -LocalPort 27017 `
+  -RemoteAddress 192.168.1.0/24 `
+  -Action Allow
+```
+
+---
+
+#### **3. Cloud Provider Security Groups**
+
+**AWS Security Groups:**
+```bash
+# Via AWS CLI
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-12345678 \
+  --protocol tcp \
+  --port 27017 \
+  --cidr 203.0.113.45/32
+
+# Or via Terraform
+resource "aws_security_group_rule" "mongodb" {
+  type              = "ingress"
+  from_port         = 27017
+  to_port           = 27017
+  protocol          = "tcp"
+  cidr_blocks       = ["203.0.113.45/32", "192.168.1.0/24"]
+  security_group_id = aws_security_group.mongodb.id
+}
+```
+
+**Azure Network Security Groups:**
+```bash
+# Via Azure CLI
+az network nsg rule create \
+  --resource-group myResourceGroup \
+  --nsg-name myNSG \
+  --name Allow-MongoDB \
+  --priority 100 \
+  --source-address-prefixes 203.0.113.45 \
+  --destination-port-ranges 27017 \
+  --protocol Tcp \
+  --access Allow
+```
+
+**GCP Firewall Rules:**
+```bash
+# Via gcloud
+gcloud compute firewall-rules create allow-mongodb \
+  --allow tcp:27017 \
+  --source-ranges 203.0.113.45/32,192.168.1.0/24 \
+  --target-tags mongodb-server
+```
+
+---
+
+#### **4. Application-Level IP Filtering**
+
+**Node.js Middleware:**
+```javascript
+const allowedIPs = ['203.0.113.45', '192.168.1.10']
+
+function ipWhitelist(req, res, next) {
+  const clientIP = req.ip || req.connection.remoteAddress
+  
+  if (!allowedIPs.includes(clientIP)) {
+    return res.status(403).json({ error: 'Access denied' })
+  }
+  
+  next()
+}
+
+app.use('/api', ipWhitelist, apiRoutes)
+```
+
+---
+
+#### **5. VPN/Bastion Host Approach**
+
+**Production Best Practice:**
+```
+Client → VPN → Bastion Host → MongoDB
+
+# Only allow MongoDB access from bastion host
+iptables -A INPUT -p tcp --dport 27017 -s BASTION_IP -j ACCEPT
+iptables -A INPUT -p tcp --dport 27017 -j DROP
+```
+
+---
+
+#### **Best Practices**
+
+**Multi-Layer Security:**
+```yaml
+1. Cloud Security Groups (AWS/Azure/GCP)
+2. OS Firewall (iptables/firewalld)
+3. MongoDB bindIp configuration
+4. VPN for remote access
+5. Authentication (SCRAM, x.509, LDAP)
+6. TLS/SSL encryption
+```
+
+**Dynamic IP Management:**
+```python
+# Script to update Atlas whitelist with current IP
+import requests
+import json
+
+def update_atlas_whitelist():
+    current_ip = requests.get('https://api.ipify.org').text
+    
+    # Add to Atlas
+    response = requests.post(
+        f'https://cloud.mongodb.com/api/atlas/v1.0/groups/{PROJECT_ID}/accessList',
+        auth=(PUBLIC_KEY, PRIVATE_KEY),
+        json={
+            'ipAddress': current_ip,
+            'comment': 'Auto-updated',
+            'deleteAfterDate': '2025-12-31T23:59:59Z'  # Auto-expire
+        }
+    )
+    
+    print(f'Added {current_ip} to whitelist')
+
+# Run on schedule
+update_atlas_whitelist()
+```
+
+**Documentation:**
+```markdown
+# IP Whitelist Documentation
+
+## Production IPs
+- API Server 1: 203.0.113.45
+- API Server 2: 203.0.113.46
+- Office Network: 192.168.1.0/24
+
+## Emergency Access
+- VPN: 10.0.0.0/8
+- Bastion: 198.51.100.10
+
+## Review Schedule
+- Monthly review of all IPs
+- Remove unused entries
+- Update documentation
+```
+
+---
+
+### 139. What is audit logging and how do you enable it?
+
+**Audit Logging** tracks database activities for security, compliance, and troubleshooting.
+
+**MongoDB Enterprise Feature** (not available in Community Edition)
+
+#### **Enable Audit Logging**
+
+**Configuration File:**
+```yaml
+# mongod.conf
+auditLog:
+  destination: file
+  format: JSON
+  path: /var/log/mongodb/audit.json
+  filter: '{}'  # Log everything (can be filtered)
+```
+
+**Command Line:**
+```bash
+mongod --auditDestination file \
+  --auditFormat JSON \
+  --auditPath /var/log/mongodb/audit.json \
+  --auditFilter '{}'
+```
+
+**Start MongoDB with Auditing:**
+```bash
+sudo systemctl restart mongod
+```
+
+---
+
+#### **Audit Log Destinations**
+
+**1. File (JSON or BSON):**
+```yaml
+auditLog:
+  destination: file
+  format: JSON  # or BSON
+  path: /var/log/mongodb/audit.json
+```
+
+**2. Syslog:**
+```yaml
+auditLog:
+  destination: syslog
+  format: JSON
+```
+
+**3. Console:**
+```yaml
+auditLog:
+  destination: console
+  format: JSON
+```
+
+---
+
+#### **Audit Filters**
+
+**Log All Operations:**
+```yaml
+auditLog:
+  filter: '{}'
+```
+
+**Log Specific Actions:**
+```javascript
+// Authentication events only
+{
+  atype: { $in: ['authenticate', 'logout'] }
+}
+
+// DDL operations (createCollection, dropCollection, etc.)
+{
+  atype: { $in: ['createCollection', 'dropCollection', 'createIndex', 'dropIndex'] }
+}
+
+// User management
+{
+  atype: { $in: ['createUser', 'dropUser', 'updateUser', 'grantRolesToUser', 'revokeRolesFromUser'] }
+}
+
+// Read/write operations on specific collection
+{
+  atype: { $in: ['insert', 'update', 'delete', 'find'] },
+  'param.ns': 'mydb.sensitive_collection'
+}
+
+// Failed authentication attempts
+{
+  atype: 'authenticate',
+  result: 5  // Authorization failed
+}
+
+// Administrative commands
+{
+  atype: 'authCheck',
+  'param.command': { $in: ['shutdown', 'serverStatus', 'replSetReconfig'] }
+}
+```
+
+**Apply Filter:**
+```yaml
+# mongod.conf
+auditLog:
+  destination: file
+  format: JSON
+  path: /var/log/mongodb/audit.json
+  filter: '{ "atype": { "$in": ["authenticate", "createUser", "dropUser"] } }'
+```
+
+---
+
+#### **Audit Log Format**
+
+**Sample Audit Entry:**
+```json
+{
+  "atype": "authenticate",
+  "ts": { "$date": "2025-11-12T10:30:00.000Z" },
+  "local": { "ip": "127.0.0.1", "port": 27017 },
+  "remote": { "ip": "192.168.1.100", "port": 52345 },
+  "users": [{ "user": "app_user", "db": "admin" }],
+  "roles": [{ "role": "readWrite", "db": "myapp" }],
+  "param": {
+    "user": "app_user",
+    "db": "admin",
+    "mechanism": "SCRAM-SHA-256"
+  },
+  "result": 0
+}
+```
+
+**Field Descriptions:**
+- `atype`: Action type (authenticate, insert, update, delete, etc.)
+- `ts`: Timestamp
+- `local`: MongoDB server IP/port
+- `remote`: Client IP/port
+- `users`: Authenticated user
+- `roles`: User roles
+- `param`: Action-specific parameters
+- `result`: Result code (0 = success, non-zero = failure)
+
+---
+
+#### **Common Audit Scenarios**
+
+**1. Track Failed Logins:**
+```yaml
+auditLog:
+  filter: '{ "atype": "authenticate", "result": { "$ne": 0 } }'
+```
+
+**2. Monitor Sensitive Collections:**
+```yaml
+auditLog:
+  filter: '{
+    "atype": { "$in": ["insert", "update", "delete", "find"] },
+    "$or": [
+      { "param.ns": "myapp.users" },
+      { "param.ns": "myapp.payments" },
+      { "param.ns": "myapp.transactions" }
+    ]
+  }'
+```
+
+**3. Track Administrative Actions:**
+```yaml
+auditLog:
+  filter: '{
+    "$or": [
+      { "atype": { "$in": ["createUser", "dropUser", "updateUser"] } },
+      { "atype": "authCheck", "param.command": "shutdown" },
+      { "atype": "authCheck", "param.command": "replSetReconfig" }
+    ]
+  }'
+```
+
+**4. Compliance Logging (HIPAA, PCI-DSS):**
+```yaml
+# Log all data access
+auditLog:
+  filter: '{
+    "$or": [
+      { "atype": { "$in": ["insert", "update", "delete", "find", "findAndModify"] } },
+      { "atype": { "$in": ["createUser", "dropUser", "grantRolesToUser"] } },
+      { "atype": "authenticate" }
+    ]
+  }'
+```
+
+---
+
+#### **Analyze Audit Logs**
+
+**Using mongosh:**
+```javascript
+// Read audit log (if in MongoDB collection)
+use audit
+db.log.find({ atype: 'authenticate', result: { $ne: 0 } })
+
+// Failed login attempts by user
+db.log.aggregate([
+  { $match: { atype: 'authenticate', result: { $ne: 0 } } },
+  { $group: { _id: '$users.user', count: { $sum: 1 } } },
+  { $sort: { count: -1 } }
+])
+```
+
+**Using jq (for JSON files):**
+```bash
+# Failed authentications
+cat /var/log/mongodb/audit.json | jq 'select(.atype == "authenticate" and .result != 0)'
+
+# Most active users
+cat /var/log/mongodb/audit.json | jq -r '.users[0].user' | sort | uniq -c | sort -rn
+
+# Operations on specific collection
+cat /var/log/mongodb/audit.json | jq 'select(.param.ns == "myapp.users")'
+```
+
+**Using ELK Stack:**
+```yaml
+# Filebeat configuration
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/mongodb/audit.json
+    json.keys_under_root: true
+    json.add_error_key: true
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  index: "mongodb-audit-%{+yyyy.MM.dd}"
+```
+
+---
+
+#### **Rotate Audit Logs**
+
+**Logrotate Configuration:**
+```bash
+# /etc/logrotate.d/mongodb-audit
+/var/log/mongodb/audit.json {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 mongodb mongodb
+    postrotate
+        /usr/bin/killall -SIGUSR1 mongod
+    endscript
+}
+```
+
+**Manual Rotation:**
+```bash
+# Rotate log file
+mv /var/log/mongodb/audit.json /var/log/mongodb/audit.json.$(date +%Y%m%d)
+
+# Signal MongoDB to reopen log file
+kill -SIGUSR1 $(pidof mongod)
+```
+
+---
+
+#### **Best Practices**
+
+**Performance Considerations:**
+- Audit logging adds I/O overhead
+- Use filters to reduce log volume
+- Use BSON format for better performance than JSON
+- Monitor disk space for audit logs
+- Rotate logs regularly
+
+**Security:**
+- Restrict access to audit log files
+  ```bash
+  chmod 600 /var/log/mongodb/audit.json
+  chown mongodb:mongodb /var/log/mongodb/audit.json
+  ```
+- Store logs on separate disk partition
+- Forward logs to central SIEM system
+- Encrypt audit logs at rest
+
+**Compliance:**
+- Define retention policy (90 days, 1 year, 7 years)
+- Implement tamper-proof logging
+- Regular audit log reviews
+- Document audit procedures
+- Test log integrity
+
+---
+
+### 140. What are MongoDB's compliance certifications (HIPAA, GDPR, etc.)?
+
+MongoDB Atlas and Enterprise have various compliance certifications:
+
+#### **1. HIPAA (Health Insurance Portability and Accountability Act)**
+
+**Status:** ✅ MongoDB Atlas Enterprise is HIPAA-eligible
+
+**Requirements:**
+- Sign Business Associate Agreement (BAA) with MongoDB
+- Use MongoDB Atlas M10+ clusters (not shared)
+- Enable encryption at rest
+- Enable encryption in transit (TLS)
+- Implement audit logging
+- Use field-level encryption for PHI
+
+**Setup:**
+```javascript
+// Sign BAA through Atlas
+// Atlas Settings → Privacy & Compliance → HIPAA
+
+// Configure encryption
+// Cluster → Configuration → Encryption at Rest: Enabled
+// Connection: Require TLS
+
+// Enable audit logging (Enterprise)
+auditLog:
+  destination: file
+  format: JSON
+  filter: '{ "atype": { "$in": ["authenticate", "insert", "update", "delete"] } }'
+
+// Use CSFLE for PHI
+const encryptedFieldsMap = {
+  'healthcare.patients': {
+    fields: [
+      { path: 'ssn', bsonType: 'string', queries: { queryType: 'equality' } },
+      { path: 'medicalRecord', bsonType: 'string' }
+    ]
+  }
+}
+```
+
+---
+
+#### **2. GDPR (General Data Protection Regulation)**
+
+**Status:** ✅ MongoDB compliant
+
+**Key Features:**
+- **Right to Access:** Query user data
+- **Right to Erasure:** Delete user data
+- **Data Portability:** Export data in standard format
+- **Pseudonymization:** Field-level encryption
+- **Audit Trails:** Audit logging
+
+**Implementation:**
+```javascript
+// Right to Access - Export user data
+const userData = await db.collection('users').findOne({ email: 'user@example.com' })
+
+// Right to Erasure - Delete user data
+await db.collection('users').deleteOne({ email: 'user@example.com' })
+await db.collection('orders').deleteMany({ userEmail: 'user@example.com' })
+await db.collection('logs').deleteMany({ userId: ObjectId('...') })
+
+// Data Portability - Export to JSON
+mongodump --db=myapp --query='{"email":"user@example.com"}' --out=/exports
+
+// Pseudonymization - Encrypt PII
+const encryptedEmail = await encryption.encrypt(email, {
+  algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic',
+  keyId: dataKey
+})
+
+// Data residency - Use Atlas regions
+// EU customers: Deploy in EU regions only (Frankfurt, Ireland, London)
+```
+
+**GDPR Compliance Checklist:**
+- ✅ Data residency (deploy in appropriate regions)
+- ✅ Encryption at rest and in transit
+- ✅ Field-level encryption for sensitive data
+- ✅ Audit logging for data access
+- ✅ Data retention policies
+- ✅ Implement user data export/deletion APIs
+- ✅ Privacy policy and consent management
+
+---
+
+#### **3. SOC 2 Type II**
+
+**Status:** ✅ MongoDB Atlas certified
+
+**Controls:**
+- Security
+- Availability
+- Processing Integrity
+- Confidentiality
+- Privacy
+
+**Audit Report:** Available through Atlas (Contact MongoDB sales)
+
+---
+
+#### **4. ISO 27001**
+
+**Status:** ✅ MongoDB Atlas certified
+
+**Information Security Management System (ISMS)**
+- Risk assessment
+- Security policies
+- Access controls
+- Incident management
+- Business continuity
+
+---
+
+#### **5. PCI DSS (Payment Card Industry Data Security Standard)**
+
+**Status:** ✅ MongoDB Atlas can be used in PCI DSS environments
+
+**Requirements:**
+- Strong access control (authentication, authorization)
+- Encryption of cardholder data
+- Regular security testing
+- Maintain audit trails
+- Network segmentation
+
+**Implementation:**
+```javascript
+// Never store full credit card numbers unencrypted
+// Use tokenization or encryption
+
+// Encrypt credit card data
+const encryptedCard = await encryption.encrypt(creditCardNumber, {
+  algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_512-Random',  // Non-deterministic
+  keyId: dataKey
+})
+
+await db.collection('payments').insertOne({
+  userId: ObjectId('...'),
+  cardLast4: '1234',  // Only store last 4 digits in plaintext
+  cardToken: 'tok_...', // Payment processor token
+  encryptedCard: encryptedCard  // Fully encrypted full number (if needed)
+})
+
+// Network isolation
+// Use VPC peering or private endpoints
+// Firewall rules to restrict access
+```
+
+---
+
+#### **6. FedRAMP (Federal Risk and Authorization Management Program)**
+
+**Status:** ✅ MongoDB Atlas for Government (FedRAMP Authorized)
+
+**Levels:**
+- Low Impact
+- Moderate Impact
+- High Impact
+
+**Requirements:**
+- US-based data centers only
+- Enhanced security controls
+- Continuous monitoring
+- Incident response procedures
+
+---
+
+#### **7. CSA STAR (Cloud Security Alliance Security, Trust & Assurance Registry)**
+
+**Status:** ✅ MongoDB Atlas Level 2 certified
+
+---
+
+#### **Compliance Summary Table**
+
+| Certification | Atlas Support | Enterprise Support | Key Requirements |
+|--------------|---------------|-------------------|------------------|
+| **HIPAA** | ✅ (with BAA) | ✅ | Encryption, audit logging, BAA |
+| **GDPR** | ✅ | ✅ | Data residency, encryption, right to erasure |
+| **SOC 2 Type II** | ✅ | ✅ | Security controls, availability |
+| **ISO 27001** | ✅ | ✅ | ISMS, risk management |
+| **PCI DSS** | ✅ | ✅ | Cardholder data encryption, access control |
+| **FedRAMP** | ✅ (Gov) | ✅ | US data centers, enhanced security |
+| **CSA STAR** | ✅ | ✅ | Cloud security controls |
+
+---
+
+#### **Atlas Compliance Features**
+
+**Network Security:**
+- VPC Peering
+- Private Endpoints (AWS PrivateLink, Azure Private Link)
+- IP Whitelisting
+- Dedicated clusters (M10+)
+
+**Encryption:**
+- Encryption at rest (AES-256)
+- Encryption in transit (TLS 1.2+)
+- Customer-managed keys (AWS KMS, Azure Key Vault, GCP KMS)
+- Field-level encryption
+
+**Access Control:**
+- RBAC (Role-Based Access Control)
+- LDAP integration
+- x.509 certificate authentication
+- Auditing and logging
+
+**Backup & DR:**
+- Continuous backups with point-in-time recovery
+- Cross-region snapshots
+- Automated backup encryption
+
+**Monitoring:**
+- Real-time performance monitoring
+- Security alerts
+- Audit logs
+
+---
+
+#### **Compliance Best Practices**
+
+**1. Data Classification:**
+```javascript
+// Tag collections by sensitivity
+db.createCollection('users', {
+  validator: {
+    $jsonSchema: {
+      bsonType: 'object',
+      properties: {
+        classification: { enum: ['public', 'internal', 'confidential', 'restricted'] }
+      }
+    }
+  }
+})
+```
+
+**2. Regular Audits:**
+```bash
+# Schedule regular access reviews
+# Review user permissions quarterly
+# Audit encryption key rotation
+# Test backup/restore procedures
+```
+
+**3. Documentation:**
+```markdown
+# Compliance Documentation
+
+## Data Flow Diagrams
+- Where data is stored
+- How data moves through systems
+- Encryption points
+
+## Access Control Matrix
+- Who has access to what data
+- Role definitions
+- Access review schedule
+
+## Incident Response Plan
+- Data breach procedures
+- Notification requirements
+- Contact information
+```
+
+**4. Testing:**
+```bash
+# Penetration testing
+# Vulnerability scanning
+# Disaster recovery drills
+# Compliance audits
+```
+
+---
+
+## Deployment & Cloud
+
+### 141. What's the difference between MongoDB Atlas, Ops Manager, and Enterprise Advanced?
+
+#### **MongoDB Atlas (DBaaS - Database as a Service)**
+
+**Fully managed cloud database**
+
+**Key Features:**
+- Automated provisioning and deployment
+- Auto-scaling (storage and compute)
+- Automated backups with PITR
+- Built-in monitoring and alerting
+- Global clusters (multi-region)
+- Serverless instances (preview)
+- Atlas Search (full-text search)
+- Atlas Data Federation
+- One-click upgrades
+
+**Deployment:**
+```bash
+# Via Atlas CLI
+atlas clusters create myCluster \
+  --provider AWS \
+  --region US_EAST_1 \
+  --tier M10 \
+  --members 3 \
+  --projectId PROJECT_ID
+
+# Via Terraform
+resource "mongodbatlas_cluster" "cluster" {
+  project_id = var.project_id
+  name       = "production-cluster"
+  
+  provider_name               = "AWS"
+  provider_region_name        = "US_EAST_1"
+  provider_instance_size_name = "M10"
+  
+  replication_specs {
+    num_shards = 1
+    regions_config {
+      region_name     = "US_EAST_1"
+      electable_nodes = 3
+      priority        = 7
+    }
+  }
+}
+```
+
+**Pricing Model:**
+- Pay-as-you-go
+- Tiered pricing (M0/M2/M5 free tier, M10+) BAD - Filter after expensive operations
+db.orders.aggregate([
+  { $lookup: { ... } },  // Expensive
+  { $unwind: "$items" },
+  { $match: { status: "completed" } }  // Should be first
+])
+
+// GOOD - Filter early
+db.orders.aggregate([
+  { $match: { status: "completed" } },  // Reduce documents early
+  { $lookup: { ... } },
+  { $unwind: "$items" }
+])
+```
+
+#### 2. **Use Indexes**
+```javascript
+// Ensure $match stages can use indexes
+db.orders.createIndex({ status: 1, createdAt: -1 })
+
+db.orders.aggregate([
+  { $match: { status: "completed", createdAt: { $gte: startDate } } },
+  // ... rest of pipeline
+])
+```
+
+#### 3. **Projection Early**
+```javascript
+// BAD - Carry unnecessary fields
+db.users.aggregate([
+  { $lookup: { ... } },
+  { $project: { name: 1, email: 1 } }
+])
+
+// GOOD - Project early to reduce memory
+db.users.aggregate([
+  { $project: { name: 1, email: 1, friendIds: 1 } },
+  { $lookup: { ... } }
+])
+```
+
+#### 4. **Limit Results**
+```javascript
+// Add $limit early when possible
+db.products.aggregate([
+  { $match: { category: "electronics" } },
+  { $sort: { price: -1 } },
+  { $limit: 10 },  // Reduces documents in pipeline
+  { $lookup: { ... } }
+])
+```
+
+#### 5. **Use $facet for Multiple Aggregations**
+```javascript
+// Instead of running multiple pipelines
+db.orders.aggregate([
+  {
+    $facet: {
+      totalRevenue: [
+        { $group: { _id: null, total: { $sum: "$amount" } } }
+      ],
+      topProducts: [
+        { $unwind: "$items" },
+        { $group: { _id: "$items.productId", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 }
+      ]
+    }
+  }
+])
+```
+
+#### 6. **Avoid $lookup When Possible**
+```javascript
+// Consider denormalization for frequently accessed data
+// Instead of:
+db.orders.aggregate([
+  { $lookup: { from: "customers", ... } }
+])
+
+// Embed customer data in orders if read-heavy
+{
+  _id: ObjectId("..."),
+  customerId: ObjectId("..."),
+  customerName: "John Doe",  // Denormalized
+  customerEmail: "john@example.com",  // Denormalized
+  items: [...]
+}
+```
+
+#### 7. **Use allowDiskUse for Large Datasets**
+```javascript
+db.orders.aggregate(
+  [ /* pipeline */ ],
+  { allowDiskUse: true }  // For pipelines exceeding 100MB memory
+)
+```
+
+#### 8. **Optimize $unwind**
+```javascript
+// Use preserveNullAndEmptyArrays only when needed
+{ $unwind: { path: "$items", preserveNullAndEmptyArrays: false } }
+```
+
+#### 9. **Use $indexStats to Monitor**
+```javascript
+db.collection.aggregate([
+  { $indexStats: {} }
+])
+```
+
+---
+
+## Replica Set and Sharding
+
+### 126. How do you force a MongoDB replica set failover?
+
+**Methods to Force Failover:**
+
+#### Method 1: Step Down Primary
+```javascript
+// Connect to primary
+rs.stepDown(60)  // Step down for 60 seconds
+
+// With options
+rs.stepDown(120, 60)  // stepDownSecs, secondaryCatchUpPeriodSecs
+```
+
+#### Method 2: Using Priority
+```javascript
+// Set primary priority to 0 (temporarily)
+cfg = rs.conf()
+cfg.members[0].priority = 0  // Assuming member 0 is primary
+rs.reconfig(cfg)
+
+// Restore priority later
+cfg.members[0].priority = 1
+rs.reconfig(cfg)
+```
+
+#### Method 3: Shut Down Primary
+```javascript
+// On primary server
+db.adminCommand({ shutdown: 1 })
+// or
+mongod --shutdown
+```
+
+#### Method 4: Freeze Secondary (Prevent from becoming primary)
+```javascript
+// Connect to secondary
+rs.freeze(120)  // Freeze for 120 seconds
+```
+
+**Verification:**
+```javascript
+rs.status()
+rs.isMaster()
+```
+
+**Best Practices:**
+- Perform during maintenance windows
+- Ensure secondaries are caught up (replication lag < 10 seconds)
+- Monitor application connections
+- Use stepDown for controlled failover
+- Document the procedure in runbooks
+
+---
+
+### 127. What is the difference between primaryPreferred and secondaryPreferred read preferences?
+
+**Read Preference Modes:**
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| **primary** | Always read from primary | Strong consistency required |
+| **primaryPreferred** | Primary first, fallback to secondary | Default for most apps |
+| **secondary** | Always read from secondary | Analytics, reports |
+| **secondaryPreferred** | Secondary first, fallback to primary | Reduce primary load |
+| **nearest** | Lowest network latency | Geo-distributed apps |
+
+#### **primaryPreferred**
+```javascript
+db.collection.find().readPref("primaryPreferred")
+
+// With tags
+db.collection.find().readPref("primaryPreferred", [
+  { datacenter: "east" },
+  { datacenter: "west" }
+])
+```
+
+**Behavior:**
+1. Reads from primary when available
+2. Falls back to secondary if primary unavailable
+3. Ensures you read from primary during normal operations
+4. Provides availability during failover
+
+**Use When:**
+- You want strong consistency by default
+- Occasional stale reads during failover are acceptable
+- Primary is available most of the time
+
+#### **secondaryPreferred**
+```javascript
+db.collection.find().readPref("secondaryPreferred")
+
+// With max staleness
+db.collection.find().readPref("secondaryPreferred", null, {
+  maxStalenessSeconds: 90
+})
+```
+
+**Behavior:**
+1. Reads from secondary when available
+2. Falls back to primary if no secondary available
+3. Distributes read load to secondaries
+4. May return stale data
+
+**Use When:**
+- You want to reduce load on primary
+- Stale reads are acceptable
+- Running analytics or reporting queries
+- Have multiple secondaries for load distribution
+
+**Connection String Examples:**
+```javascript
+// primaryPreferred
+mongodb://host1,host2,host3/?readPreference=primaryPreferred
+
+// secondaryPreferred with tags
+mongodb://host1,host2,host3/?readPreference=secondaryPreferred&readPreferenceTags=datacenter:east&readPreferenceTags=
+```
+
+**Code Examples:**
+```javascript
+// Node.js Driver
+const client = new MongoClient(uri, {
+  readPreference: 'secondaryPreferred',
+  readPreferenceTags: [{ region: 'us-east' }]
+})
+
+// Python Driver
+client = MongoClient(
+    uri,
+    read_preference=ReadPreference.SECONDARY_PREFERRED,
+    readPreferenceTags=[{'region': 'us-east'}]
+)
+```
+
+---
+
+### 128. How do you rebalance chunks in a sharded cluster?
+
+**Automatic Balancing:**
+
+MongoDB's balancer runs automatically and distributes chunks evenly across shards.
+
+#### Check Balancer Status
+```javascript
+sh.getBalancerState()  // Returns true if enabled
+sh.isBalancerRunning()  // Returns true if currently running
+db.adminCommand({ balancerStatus: 1 })
+```
+
+#### Enable/Disable Balancer
+```javascript
+// Enable
+sh.startBalancer()
+
+// Disable
+sh.stopBalancer()
+
+// Disable temporarily during maintenance window
+sh.stopBalancer()
+// Perform maintenance
+sh.startBalancer()
+```
+
+#### Schedule Balancer Window
+```javascript
+// Only run balancer during off-peak hours
+db.settings.updateOne(
+  { _id: "balancer" },
+  {
+    $set: {
+      activeWindow: {
+        start: "23:00",  // 11 PM
+        stop: "06:00"    // 6 AM
+      }
+    }
+  },
+  { upsert: true }
+)
+
+// Remove window restriction
+db.settings.updateOne(
+  { _id: "balancer" },
+  { $unset: { activeWindow: "" } }
+)
+```
+
+#### Manual Chunk Operations
+
+**Move Specific Chunk:**
+```javascript
+sh.moveChunk(
+  "mydb.mycollection",
+  { userId: 1000 },  // Chunk containing this value
+  "shard0001"        // Destination shard
+)
+```
+
+**Split Chunk:**
+```javascript
+sh.splitAt("mydb.mycollection", { userId: 5000 })
+
+// Or split at middle
+sh.splitFind("mydb.mycollection", { userId: 3000 })
+```
+
+#### Monitor Chunk Distribution
+```javascript
+// View chunk distribution
+db.getSiblingDB("config").chunks.aggregate([
+  { $group: { _id: "$shard", count: { $sum: 1 } } },
+  { $sort: { count: -1 } }
+])
+
+// View specific collection chunks
+sh.status()
+
+// More detailed
+use config
+db.chunks.find({ ns: "mydb.mycollection" }).count()
+```
+
+#### Set Chunk Size
+```javascript
+// Default is 64MB, can be 1-1024 MB
+use config
+db.settings.updateOne(
+  { _id: "chunksize" },
+  { $set: { value: 128 } },  // 128 MB
+  { upsert: true }
+)
+```
+
+**Best Practices:**
+- Monitor balancer during peak hours
+- Use maintenance windows for large rebalancing
+- Adjust chunk size based on data patterns
+- Monitor migration impact on performance
+- Keep chunks balanced to avoid hotspots
+
+---
+
+### 129. What is a chunk migration and how does it affect performance?
+
+**Chunk Migration Process:**
+
+A chunk migration moves data from one shard to another to maintain balanced distribution.
+
+#### Migration Steps
+
+1. **Start Migration**
+   - Balancer identifies unbalanced shards
+   - Initiates migration from donor to recipient shard
+
+2. **Initial Clone**
+   - Copy chunk data to recipient shard
+   - Donor continues serving reads/writes
+
+3. **Sync Changes**
+   - Apply changes made during clone
+   - Uses oplog to capture modifications
+
+4. **Commit**
+   - Update config servers with new chunk location
+   - Route queries to new shard
+
+5. **Delete Source**
+   - Clean up data on donor shard
+   - Range deleter runs in background
+
+#### Performance Impact
+
+**Network Impact:**
+```javascript
+// Monitor migration progress
+db.currentOp({
+  $or: [
+    { op: "command", "command.moveChunk": { $exists: true } },
+    { op: "command", "command._recvChunkStart": { $exists: true } }
+  ]
+})
+```
+
+**CPU and I/O:**
+- Increased disk I/O on both shards
+- Network bandwidth consumption
+- Additional CPU for copying and syncing
+
+**Write Performance:**
+- Writes to migrating chunk tracked in session
+- Slight latency increase during transfer
+- Critical section blocks writes briefly (typically <1 second)
+
+**Read Performance:**
+- Reads continue normally during migration
+- Some overhead from change tracking
+
+#### Monitoring Migration
+```javascript
+// Check active migrations
+db.currentOp().inprog.filter(op => 
+  op.desc && op.desc.includes("migration")
+)
+
+// Migration stats
+db.serverStatus().sharding
+
+// Changelog
+use config
+db.changelog.find({ what: "moveChunk.start" }).sort({ time: -1 }).limit(10)
+```
+
+#### Tuning Migration Performance
+
+**Throttle Migrations:**
+```javascript
+// Limit concurrent migrations (default: 1)
+db.adminCommand({
+  setParameter: 1,
+  maxNumActiveTransferMods: 2
+})
+
+// Adjust migration chunk size
+db.settings.updateOne(
+  { _id: "chunksize" },
+  { $set: { value: 32 } },  // Smaller chunks = faster migrations
+  { upsert: true }
+)
+```
+
+**Migration Window:**
+```javascript
+// Only allow migrations during off-peak
+db.settings.updateOne(
+  { _id: "balancer" },
+  {
+    $set: {
+      activeWindow: { start: "01:00", stop: "05:00" }
+    }
+  },
+  { upsert: true }
+)
+```
+
+**Best Practices:**
+- Schedule migrations during low traffic periods
+- Monitor replication lag during migrations
+- Use smaller chunk sizes for faster migrations
+- Ensure adequate network bandwidth between shards
+- Monitor disk space on recipient shard
+- Test migrations in staging environment first
+
+---
+
+### 130. How do you handle shard key selection and what are the best practices?
+
+**Shard Key Characteristics:**
+
+Good shard keys have three properties: **Cardinality, Frequency, Rate of Change**
+
+#### 1. **High Cardinality**
+```javascript
+// GOOD - High cardinality
+{ userId: ObjectId("...") }  // Millions of unique values
+
+// BAD - Low cardinality
+{ status: "active" }  // Only 2-3 values
+{ country: "US" }     // Limited values
+```
+
+#### 2. **Low Frequency**
+```javascript
+// GOOD - Even distribution
+{ email: "user@example.com" }  // Unique per user
+
+// BAD - Skewed distribution
+{ category: "electronics" }  // 80% of docs in one category
+```
+
+#### 3. **Non-Monotonic (Avoid constantly increasing)
+```javascript
+// BAD - Monotonically increasing (hot shard)
+{ _id: ObjectId("...") }  // Always writes to last chunk
+{ timestamp: ISODate("...") }  // Always writes to newest chunk
+
+// GOOD - Random distribution
+{ userId: ObjectId("..."), timestamp: ISODate("...") }  // Compound key
+{ hashedId: "hashed" }  // Hashed shard key
+```
+
+#### Shard Key Strategies
+
+**1. Hashed Shard Key**
+```javascript
+// Even distribution but no range queries
+db.collection.createIndex({ userId: "hashed" })
+sh.shardCollection("mydb.users", { userId: "hashed" })
+
+// Use when: Need even distribution, no range queries needed
+```
+
+**2. Ranged Shard Key**
+```javascript
+// Good for range queries but risk of hot spots
+sh.shardCollection("mydb.orders", { customerId: 1, orderDate: 1 })
+
+// Use when: Range queries important, can manage distribution
+```
+
+**3. Compound Shard Key**
+```javascript
+// Balance distribution and query patterns
+sh.shardCollection("mydb.events", { 
+  userId: 1,      // High cardinality
+  timestamp: 1    // Time-based queries
+})
+
+// Use when: Multiple access patterns, need targeted routing
+```
+
+**4. Zoned Sharding (Tag-Aware)**
+```javascript
+// Pin data to specific shards by region/type
+sh.addShardTag("shard0000", "US")
+sh.addShardTag("shard0001", "EU")
+
+sh.addTagRange(
+  "mydb.users",
+  { country: "US", userId: MinKey },
+  { country: "US", userId: MaxKey },
+  "US"
+)
+
+// Use when: Geographic requirements, compliance needs
+```
+
+#### Examples by Use Case
+
+**Time-Series Data (IoT, Logs):**
+```javascript
+// Compound key: device + time
+sh.shardCollection("iot.readings", {
+  deviceId: 1,
+  timestamp: 1
+})
+
+// Or hashed device with time
+sh.shardCollection("iot.readings", {
+  deviceId: "hashed",
+  timestamp: 1
+})
+```
+
+**E-commerce:**
+```javascript
+// Orders: customer + order ID
+sh.shardCollection("shop.orders", {
+  customerId: 1,
+  _id: 1
+})
+
+// Products: hashed product ID
+sh.shardCollection("shop.products", {
+  _id: "hashed"
+})
+```
+
+**Social Network:**
+```javascript
+// User posts: hashed user + timestamp
+sh.shardCollection("social.posts", {
+  userId: "hashed",
+  createdAt: 1
+})
+
+// Messages: conversation + timestamp
+sh.shardCollection("social.messages", {
+  conversationId: 1,
+  timestamp: 1
+})
+```
+
+**Multi-Tenant SaaS:**
+```javascript
+// Tenant isolation
+sh.shardCollection("app.data", {
+  tenantId: 1,
+  _id: 1
+})
+
+// With zones for premium tenants
+sh.addShardTag("shard0000", "premium")
+sh.addTagRange(
+  "app.data",
+  { tenantId: "premium_tenant_1", _id: MinKey },
+  { tenantId: "premium_tenant_1", _id: MaxKey },
+  "premium"
+)
+```
+
+#### Evaluation Checklist
+
+**Before choosing shard key:**
+- ✅ Cardinality: Does it have enough unique values?
+- ✅ Frequency: Are values evenly distributed?
+- ✅ Monotonicity: Avoid always-increasing keys
+- ✅ Query patterns: Does it align with common queries?
+- ✅ Write patterns: Distributes writes evenly?
+- ✅ Read patterns: Enables targeted reads?
+- ✅ Future growth: Scales with data volume?
+
+**Testing:**
+```javascript
+// Check existing distribution
+db.collection.aggregate([
+  { $group: { _id: "$proposedShardKey", count: { $sum: 1 } } },
+  { $sort: { count: -1 } },
+  { $limit: 10 }
+])
+
+// Analyze query patterns
+db.setProfilingLevel(2)
+// Run typical queries
+db.system.profile.find({ ns: "mydb.collection" })
+```
+
+**Migration Considerations:**
+- Cannot change shard key after sharding (before MongoDB 5.0)
+- From 5.0+, can refine shard key by adding suffix fields
+- Plan carefully - migration is expensive
+
+---
+
+## Backup, Restore & Monitoring
+
+### 131. What's the difference between mongodump and oplog-based backups?
+
+#### **mongodump**
+
+**Logical Backup Tool:**
+```bash
+# Basic dump
+mongodump --uri="mongodb://localhost:27017" --out=/backup
+
+# Specific database
+mongodump --db=myapp --out=/backup
+
+# Specific collection
+mongodump --db=myapp --collection=users --out=/backup
+
+# With compression
+mongodump --gzip --archive=/backup/myapp.gz
+
+# Exclude collections
+mongodump --db=myapp --excludeCollection=logs --out=/backup
+```
+
+**Characteristics:**
+- Reads data using regular queries
+- Creates BSON files for each collection
+- Includes indexes
+- Can backup specific databases/collections
+- No point-in-time recovery
+- Causes read load on database
+- Slower for large datasets
+
+**Pros:**
+- Portable across MongoDB versions
+- Human-readable format (with bsondump)
+- Selective backup/restore
+- Works on any MongoDB deployment
+
+**Cons:**
+- Not suitable for point-in-time recovery
+- Impacts production performance
+- Longer restore time for large datasets
+- No transactional consistency across collections
+
+#### **Oplog-Based Backups**
+
+**Continuous Backup:**
+```javascript
+// Manual oplog backup
+mongodump --oplog --out=/backup/base
+mongodump --uri="mongodb://localhost:27017/local" --collection=oplog.rs --out=/backup/oplog
+```
+
+**Characteristics:**
+- Captures base snapshot + oplog changes
+- Enables point-in-time recovery (PITR)
+- Continuous incremental backups
+- Transactionally consistent
+- Lower impact on production
+
+**Implementation with MongoDB Ops Manager/Atlas:**
+```javascript
+// Atlas Continuous Backup
+// - Automatic snapshots every 6-24 hours
+// - Oplog stored for point-in-time recovery
+// - Restore to any point within retention window
+```
+
+**Pros:**
+- Point-in-time recovery to any second
+- Minimal performance impact
+- Transactional consistency
+- Automated in Atlas/Ops Manager
+
+**Cons:**
+- Requires replica set
+- More complex setup
+- Larger storage requirements
+- Requires continuous oplog retention
+
+#### Comparison Table
+
+| Feature | mongodump | Oplog-Based |
+|---------|-----------|-------------|
+| **Backup Type** | Logical snapshot | Continuous |
+| **PITR** | ❌ No | ✅ Yes |
+| **Performance Impact** | Medium-High | Low |
+| **Storage** | Moderate | Higher |
+| **Complexity** | Simple | Complex |
+| **Selective Backup** | ✅ Yes | ❌ No |
+| **Transactional** | ❌ No | ✅ Yes |
+| **Version Portability** | ✅ Yes | Limited |
+
+#### Hybrid Approach
+```bash
+# Daily mongodump for disaster recovery
+mongodump --oplog --gzip --archive=/backup/daily/$(date +%Y%m%d).gz
+
+# Continuous oplog backup for PITR
+# Use MongoDB Ops Manager or Cloud Manager
+
+# Or manual oplog tailing
+mongodump --host=primary:27017 \
+  --db=local --collection=oplog.rs \
+  --query='{"ts":{"$gte":Timestamp(1699900800, 1)}}' \
+  --out=/backup/oplog/$(date +%Y%m%d_%H%M)
+```
+
+---
+
+### 132. How do you restore a specific collection from a dump?
+
+**Using mongorestore:**
+
+#### Basic Collection Restore
+```bash
+# Restore single collection
+mongorestore --db=myapp --collection=users /backup/myapp/users.bson
+
+# With URI
+mongorestore --uri="mongodb://localhost:27017" \
+  --db=myapp \
+  --collection=users \
+  /backup/myapp/users.bson
+```
+
+#### Restore with Options
+```bash
+# Drop existing collection first
+mongorestore --drop --db=myapp --collection=users /backup/myapp/users.bson
+
+# Restore to different collection name
+mongorestore --db=myapp \
+  --collection=users_backup \
+  /backup/myapp/users.bson
+
+# Restore to different database
+mongorestore --db=myapp_new \
+  --collection=users \
+  /backup/myapp/users.bson
+
+# From gzip archive
+mongorestore --gzip \
+  --db=myapp \
+  --collection=users \
+  /backup/myapp/users.bson.gz
+```
+
+#### Restore from Archive
+```bash
+# Extract specific collection from archive
+mongorestore --gzip \
+  --archive=/backup/myapp.gz \
+  --nsInclude="myapp.users"
+
+# Multiple collections
+mongorestore --archive=/backup/full.gz \
+  --nsInclude="myapp.users" \
+  --nsInclude="myapp.orders"
+```
+
+#### Selective Restore with Filter
+```bash
+# Not directly supported, but workaround:
+
+# 1. Export to JSON
+bsondump /backup/myapp/users.bson > users.json
+
+# 2. Filter with jq or similar
+cat users.json | jq 'select(.status == "active")' > filtered.json
+
+# 3. Import filtered data
+mongoimport --db=myapp --collection=users_filtered filtered.json
+```
+
+#### Restore Indexes
+```bash
+# Indexes are restored automatically with --restoreIndexes (default)
+mongorestore --db=myapp --collection=users /backup/myapp/users.bson
+
+# Skip index restoration
+mongorestore --noIndexRestore --db=myapp --collection=users /backup/myapp/users.bson
+
+# Restore indexes separately
+mongorestore --db=myapp /backup/myapp/users.metadata.json
+```
+
+#### Production Restore Strategy
+
+**Zero-Downtime Restore:**
+```bash
+# 1. Restore to temporary collection
+mongorestore --db=myapp --collection=users_temp /backup/myapp/users.bson
+
+# 2. Verify data
+mongosh --eval 'db.users_temp.countDocuments()'
+
+# 3. Atomic rename (requires some downtime)
+mongosh --eval '
+  db.users.renameCollection("users_old");
+  db.users_temp.renameCollection("users");
+'
+
+# 4. Cleanup
+mongosh --eval 'db.users_old.drop()'
+```
+
+**Parallel Restore:**
+```bash
+# Faster restore with multiple jobs
+mongorestore --numParallelCollections=4 \
+  --db=myapp \
+  --collection=users \
+  /backup/myapp/users.bson
+```
+
+#### Restore to Replica Set
+```bash
+# Connect to primary
+mongorestore --host=replicaset/primary:27017,secondary1:27017,secondary2:27017 \
+  --db=myapp \
+  --collection=users \
+  /backup/myapp/users.bson
+
+# With authentication
+mongorestore --uri="mongodb://user:pass@primary:27017,secondary:27017/?replicaSet=rs0" \
+  --db=myapp \
+  --collection=users \
+  /backup/myapp/users.bson
+```
+
+#### Monitoring Restore Progress
+```bash
+# Verbose output
+mongorestore --verbose --db=myapp --collection=users /backup/myapp/users.bson
+
+# In another terminal, monitor
+mongosh --eval 'db.currentOp({"command.restoreIndex": {$exists: true}})'
+mongosh --eval 'db.serverStatus().metrics.commands.insert'
+```
+
+---
+
+### 133. How do you monitor replication lag?
+
+**Replication Lag** = time delay between primary writes and secondary replication
+
+#### Check Lag via Replica Set Status
+
+```javascript
+// Connect to any replica set member
+rs.status()
+
+// Look for 'optimeDate' difference
+rs.status().members.forEach(member => {
+  print(member.name + " - " + member.optimeDate)
+})
+
+// Calculate lag
+var primary = rs.status().members.find(m => m.stateStr === "PRIMARY")
+var secondaries = rs.status().members.filter(m => m.stateStr === "SECONDARY")
+
+secondaries.forEach(sec => {
+  var lagMs = primary.optimeDate - sec.optimeDate
+  print(sec.name + " lag: " + lagMs + "ms")
+})
+```
+
+#### Simpler Lag Check
+```javascript
+// Get replication info
+rs.printReplicationInfo()  // Shows oplog details
+
+rs.printSecondaryReplicationInfo()  // Shows lag for each secondary
+// Output:
+// source: secondary1:27017
+//   syncedTo: Thu Nov 12 2025 10:30:45 GMT+0000 (UTC)
+//   3 secs (0 hrs) behind the primary
+```
+
+#### Programmatic Monitoring
+
+**Using `replSetGetStatus`:**
+```javascript
+var status = db.adminCommand({ replSetGetStatus: 1 })
+
+status.members.forEach(member => {
+  if (member.state === 2) {  // SECONDARY
+    var lag = (status.date - member.optimeDate) / 1000  // Convert to seconds
+    print(member.name + ": " + lag + " seconds behind")
+  }
+})
+```
+
+**Node.js Example:**
+```javascript
+const { MongoClient } = require('mongodb')
+
+async function checkReplicationLag() {
+  const client = await MongoClient.connect('mongodb://replica-set-uri')
+  const admin = client.db().admin()
+  
+  const status = await admin.command({ replSetGetStatus: 1 })
+  const primary = status.members.find(m => m.state === 1)
+  
+  status.members.forEach(member => {
+    if (member.state === 2) {
+      const lagMs = primary.optimeDate - member.optimeDate
+      console.log(`${member.name}: ${lagMs}ms lag`)
+      
+      if (lagMs > 10000) {  // Alert if > 10 seconds
+        console.error(`HIGH LAG ALERT: ${member.name}`)
+      }
+    }
+  })
+  
+  client.close()
+}
+
+setInterval(checkReplicationLag, 60000)  // Check every minute
+```
+
+#### Monitoring with MongoDB Tools
+
+**mongostat:**
+```bash
+# Show replication lag
+mongostat --host=secondary:27017 --discover
+
+# Output includes:
+# - repllag: replication lag in seconds
+```
+
+**Ops Manager / Cloud Manager:**
+- Visual graphs for replication lag
+- Automatic alerts when lag exceeds threshold
+- Historical lag data
+
+**Atlas Metrics:**
+- Replication Lag chart in Metrics tab
+- Configurable alerts
+
+#### Set Up Alerts
+
+**MongoDB Alert Example:**
+```javascript
+// In Atlas or Ops Manager, configure alert:
+// Metric: Replication Lag
+// Threshold: > 10 seconds
+// Notification: Email/Slack/PagerDuty
+```
+
+**Custom Monitoring Script:**
+```python
+from pymongo import MongoClient
+import time
+
+def check_lag():
+    client = MongoClient('mongodb://replica-set-uri')
+    status = client.admin.command('replSetGetStatus')
+    
+    primary = next(m for m in status['members'] if m['state'] == 1)
+    primary_time = primary['optimeDate']
+    
+    for member in status['members']:
+        if member['state'] == 2:  # Secondary
+            lag = (primary_time - member['optimeDate']).total_seconds()
+            
+            if lag > 10:
+                send_alert(f"Replication lag on {member['name']}: {lag}s")
+    
+    client.close()
+
+while True:
+    check_lag()
+    time.sleep(60)
+```
+
+#### Common Causes of Replication Lag
+
+1. **Network Issues** - Check connectivity between nodes
+2. **High Write Load** - Scale or optimize writes
+3. **Secondary Hardware** - Underpowered secondary
+4. **Large Transactions** - Break into smaller operations
+5. **Index Builds** - Background index builds on secondaries
+6. **Long-Running Operations** - Blocking operations on secondary
+
+**Troubleshooting Steps:**
+```javascript
+// Check oplog size
+db.getReplicationInfo()
+
+// Check current operations on secondary
+db.currentOp(true)
+
+// Check network stats
+db.serverStatus().network
+
+// Monitor secondary application of oplog
+db.serverStatus().metrics.repl
+```
+
+---
+
+### 134. What metrics do you track for MongoDB health?
+
+#### **Core Performance Metrics**
+
+**1. Operations Per Second (IOPS)**
+```javascript
+db.serverStatus().opcounters
+// {
+//   insert: 1000000,
+//   query: 5000000,
+//   update: 500000,
+//   delete: 100000,
+//   getmore: 200000,
+//   command: 3000000
+// }
+
+// Calculate ops/sec by sampling over time
+```
+
+**2. Connection Pool**
+```javascript
+db.serverStatus().connections
+// {
+//   current: 250,      // Current connections
+//   available: 51688,  // Available connections
+//   totalCreated: 5000 // Lifetime connections created
+// }
+
+// Alert if current approaches available
+```
+
+**3. Memory Usage**
+```javascript
+db.serverStatus().mem
+// {
+//   resident: 2048,  // MB in RAM
+//   virtual: 4096,   // MB virtual
+//   mapped: 0        // Memory-mapped (deprecated)
+// }
+
+db.serverStatus().wiredTiger.cache
+// {
+//   "bytes currently in cache": 1073741824,
+//   "maximum bytes configured": 2147483648,
+//   "percentage full": 50
+// }
+```
+
+**4. Disk I/O and Storage**
+```javascript
+db.serverStatus().wiredTiger.cache['pages read into cache']
+db.serverStatus().wiredTiger.cache['pages written from cache']
+
+// Collection statistics
+db.collection.stats()
+// {
+//   size: 1000000,           // Total size in bytes
+//   storageSize: 500000,     // Allocated storage
+//   totalIndexSize: 200000,  // Index size
+//   indexSizes: {...}
+// }
+```
+
+**5. Query Performance**
+```javascript
+// Enable profiling
+db.setProfilingLevel(1, { slowms: 100 })
+
+// Query slow operations
+db.system.profile.find({ millis: { $gt: 100 } }).sort({ ts: -1 })
+
+// Average query time
+db.system.profile.aggregate([
+  { $group: { _id: "$ns", avgMs: { $avg: "$millis" }, count: { $sum: 1 } } },
+  { $sort: { avgMs: -1 } }
+])
+```
+
+**6. Replication Metrics**
+```javascript
+rs.status()
+// Monitor:
+// - Replication lag (optimeDate difference)
+// - Member health (state)
+// - Heartbeat status
+
+db.serverStatus().repl
+// {
+//   hosts: [...],
+//   setName: "rs0",
+//   primary: "host1:27017"
+// }
+```
+
+**7. Lock Statistics**
+```javascript
+db.serverStatus().locks
+// Shows lock contention by lock type
+
+db.serverStatus().globalLock
+// {
+//   totalTime: 1000000,
+//   currentQueue: { total: 0, readers: 0, writers: 0 },
+//   activeClients: { total: 50, readers: 40, writers: 10 }
+// }
+```
+
+#### **Essential Metrics Dashboard**
+
+**CPU & System:**
+- CPU utilization (target: <80%)
+- System load average
+- Disk I/O wait time
+- Network throughput
+
+**MongoDB Specific:**
+- Page faults per second
+- Cache hit ratio (target: >95%)
+- Queue depth (readers/writers)
+- Ticket availability (WiredTiger)
+
+**Application Level:**
+- Average query latency
+- P95/P99 query latency
+- Query error rate
+- Connection pool exhaustion
+
+**Replication (if applicable):**
+- Replication lag (target: <10s)
+- Oplog window (target: >24 hours)
+- Secondary read preference load
+
+**Sharding (if applicable):**
+- Chunk distribution balance
+- Migration activity
+- Jumbo chunks count
+
+#### **Monitoring Script Example**
+```javascript
+// Comprehensive health check
+function mongoHealthCheck() {
+  const status = db.serverStatus()
+  const replStatus = rs.status()
+  
+  return {
+    connections: {
+      current: status.connections.current,
+      available: status.connections.available,
+      utilization: (status.connections.current / status.connections.available * 100).toFixed(2) + "%"
+    },
+    memory: {
+      residentMB: status.mem.resident,
+      cacheUsage: ((status.wiredTiger.cache["bytes currently in cache"] / 
+                    status.wiredTiger.cache["maximum bytes configured"]) * 100).toFixed(2) + "%"
+    },
+    operations: {
+      insertsPerSec: status.opcounters.insert,
+      queriesPerSec: status.opcounters.query,
+      updatesPerSec: status.opcounters.update
+    },
+    replication: replStatus.members.map(m => ({
+      name: m.name,
+      state: m.stateStr,
+      health: m.health,
+      lag: m.optimeDate ? (Date.now() - m.optimeDate) / 1000 : null
+    })),
+    locks: {
+      queuedReaders: status.globalLock.currentQueue.readers,
+      queuedWriters: status.globalLock.currentQueue.writers
+    }
+  }
+}
+
+printjson(mongoHealthCheck())
+```
+
+#### **Alert Thresholds (Recommended)**
+
+```yaml
+Critical:
+  - Replication lag > 60 seconds
+  - Connection usage > 90%
+  - Cache usage > 95%
+  - Disk usage > 85%
+  - Primary unavailable
+
+Warning:
+  - Replication lag > 10 seconds
+  - Connection usage > 75%
+  - Cache usage > 80%
+  - Slow queries > 1000ms (P95)
+  - Queue depth > 100
+```
+
+---
+
+### 135. How do you integrate MongoDB with Prometheus / Grafana for monitoring?
+
+#### **Architecture Overview**
+
+```
+MongoDB → MongoDB Exporter → Prometheus → Grafana
+```
+
+#### **Step 1: Install MongoDB Exporter**
+
+**Docker:**
+```bash
+docker run -d \
+  --name mongodb-exporter \
+  -p 9216:9216 \
+  percona/mongodb_exporter:0.40 \
+  --mongodb.uri=mongodb://monitoring_user:password@mongodb:27017
+```
+
+**Binary Installation:**
+```bash
+# Download
+wget https://github.com/percona/mongodb_exporter/releases/download/v0.40.0/mongodb_exporter-0.40.0.linux-amd64.tar.gz
+tar xvzf mongodb_exporter-0.40.0.linux-amd64.tar.gz
+
+# Run
+./mongodb_exporter --mongodb.uri="mongodb://localhost:27017" \
+  --web.listen-address=":9216"
+```
+
+**Create Monitoring User:**
+```javascript
+// In MongoDB
+use admin
+db.createUser({
+  user: "mongodb_exporter",
+  pwd: "secure_password",
+  roles: [
+    { role: "clusterMonitor", db: "admin" },
+    { role: "read", db: "local" }
+  ]
+})
+```
+
+#### **Step 2: Configure Prometheus**
+
+**prometheus.yml:**
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['localhost:9216']
+        labels:
+          environment: 'production'
+          cluster: 'main'
+    
+    # For multiple MongoDB instances
+  - job_name: 'mongodb-replica-set'
+    static_configs:
+      - targets:
+        - 'mongodb-primary:9216'
+        - 'mongodb-secondary-1:9216'
+        - 'mongodb-secondary-2:9216'
+        labels:
+          replica_set: 'rs0'
+
+  # Service discovery (Kubernetes)
+  - job_name: 'mongodb-k8s'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: mongodb-exporter
+        action: keep
+```
+
+**Start Prometheus:**
+```bash
+docker run -d \
+  --name prometheus \
+  -p 9090:9090 \
+  -v /path/to/prometheus.yml:/etc/prometheus/prometheus.yml \
+  prom/prometheus
+```
+
+#### **Step 3: Set Up Grafana**
+
+**Install Grafana:**
+```bash
+docker run -d \
+  --name grafana \
+  -p 3000:3000 \
+  -e "GF_SECURITY_ADMIN_PASSWORD=admin" \
+  grafana/grafana
+```
+
+**Add Prometheus Data Source:**
+1. Login to Grafana (http://localhost:3000)
+2. Configuration → Data Sources → Add data source
+3. Select Prometheus
+4. URL: http://prometheus:9090
+5. Save & Test
+
+**Import MongoDB Dashboard:**
+1. Dashboards → Import
+2. Use dashboard ID: **2583** (MongoDB Exporter Dashboard)
+3. Or **7353** (Percona MongoDB Dashboard)
+4. Select Prometheus data source
+5. Import
+
+#### **Step 4: Key Prometheus Queries**
+
+**Operations Per Second:**
+```promql
+# Total operations
+rate(mongodb_opcounters_total[5m])
+
+# By operation type
+rate(mongodb_opcounters_insert_total[5m])
+rate(mongodb_opcounters_query_total[5m])
+rate(mongodb_opcounters_update_total[5m])
+```
+
+**Memory Usage:**
+```promql
+# Resident memory
+mongodb_memory_resident_bytes
+
+# Cache usage percentage
+(mongodb_wiredTiger_cache_bytes / mongodb_wiredTiger_cache_maximum_bytes) * 100
+```
+
+**Connections:**
+```promql
+# Current connections
+mongodb_connections{state="current"}
+
+# Available connections
+mongodb_connections{state="available"}
+
+# Connection usage percentage
+(mongodb_connections{state="current"} / mongodb_connections{state="available"}) * 100
+```
+
+**Replication Lag:**
+```promql
+# Lag in seconds
+mongodb_replset_member_replication_lag_seconds
+
+# Alert on high lag
+mongodb_replset_member_replication_lag_seconds > 10
+```
+
+**Query Performance:**
+```promql
+# Average query time
+rate(mongodb_mongod_metrics_query_executor_total[5m])
+
+# Slow queries
+increase(mongodb_mongod_slow_queries_total[5m])
+```
+
+**Lock Contention:**
+```promql
+# Queued operations
+mongodb_mongod_global_lock_current_queue_readers
+mongodb_mongod_global_lock_current_queue_writers
+
+# Active clients
+mongodb_mongod_global_lock_active_clients_readers
+mongodb_mongod_global_lock_active_clients_writers
+```
+
+#### **Step 5: Create Custom Grafana Dashboard**
+
+**Example Panel Queries:**
+
+```json
+{
+  "panels": [
+    {
+      "title": "Operations Per Second",
+      "targets": [
+        {
+          "expr": "sum(rate(mongodb_opcounters_total[5m])) by (type)",
+          "legendFormat": "{{type}}"
+        }
+      ]
+    },
+    {
+      "title": "Replication Lag",
+      "targets": [
+        {
+          "expr": "mongodb_replset_member_replication_lag_seconds",
+          "legendFormat": "{{member}}"
+        }
+      ],
+      "alert": {
+        "conditions": [
+          {
+            "evaluator": { "params": [10], "type": "gt" },
+            "query": { "params": ["A", "5m", "now"] }
+          }
+        ]
+      }
+    },
+    {
+      "title": "Connection Pool Usage",
+      "targets": [
+        {
+          "expr": "(mongodb_connections{state='current'} / mongodb_connections{state='available'}) * 100",
+          "legendFormat": "Usage %"
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### **Step 6: Configure Alerts**
+
+**Prometheus Alert Rules (alerts.yml):**
+```yaml
+groups:
+  - name: mongodb_alerts
+    interval: 30s
+    rules:
+      - alert: MongoDBDown
+        expr: up{job="mongodb"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MongoDB instance down"
+          description: "MongoDB instance {{ $labels.instance }} is down"
+      
+      - alert: MongoDBReplicationLag
+        expr: mongodb_replset_member_replication_lag_seconds > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High replication lag"
+          description: "Replication lag on {{ $labels.member }} is {{ $value }}s"
+      
+      - alert: MongoDBConnectionsHigh
+        expr: (mongodb_connections{state="current"} / mongodb_connections{state="available"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Connection pool usage high"
+          description: "Connection usage is {{ $value }}%"
+      
+      - alert: MongoDBCursorTimeout
+        expr: increase(mongodb_mongod_metrics_cursor_timed_out_total[5m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High cursor timeout rate"
+      
+      - alert: MongoDBSlowQueries
+        expr: increase(mongodb_mongod_slow_queries_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "High slow query rate"
+```
+
+**Grafana Alerting:**
+1. Edit panel → Alert tab
+2. Create alert rule
+3. Configure notification channels (Slack, PagerDuty, Email)
+
+#### **Step 7: Production Best Practices**
+
+**Security:**
+```yaml
+# Use TLS for MongoDB exporter
+mongodb_exporter --mongodb.uri="mongodb://user:pass@host:27017/?ssl=true" \
+  --web.listen-address=":9216"
+
+# Enable authentication in Prometheus
+basic_auth:
+  username: admin
+  password: secure_password
+```
+
+**High Availability:**
+```yaml
+# Monitor all replica set members
+scrape_configs:
+  - job_name: 'mongodb-rs'
+    static_configs:
+      - targets:
+        - 'primary:9216'
+        - 'secondary1:9216'
+        - 'secondary2:9216'
+```
+
+**Retention:**
+```yaml
+# Prometheus storage retention
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 50GB
+```
+
+---
+
+## Security & Compliance
+
+### 136. What are MongoDB's authentication mechanisms (SCRAM, x.509, LDAP, Kerberos)?
+
+MongoDB supports multiple authentication mechanisms for different use cases:
+
+#### **1. SCRAM (Salted Challenge Response Authentication Mechanism)**
+
+**Default mechanism** - username/password based
+
+**SCRAM-SHA-256 (Recommended):**
+```javascript
+// Enable authentication in mongod.conf
+security:
+  authorization: enabled
+
+// Create admin user
+use admin
+db.createUser({
+  user: "admin",
+  pwd: "securePassword123",
+  roles: [ { role: "root", db: "admin" } ]
+})
+
+// Create application user
+use myapp
+db.createUser({
+  user: "app_user",
+  pwd: "appPassword456",
+  roles: [
+    { role: "readWrite", db: "myapp" },
+    { role: "read", db: "analytics" }
+  ]
+})
+
+// Connect with authentication
+mongosh "mongodb://app_user:appPassword456@localhost:27017/myapp?authSource=myapp"
+```
+
+**SCRAM-SHA-1 (Legacy):**
+```javascript
+// Still supported but SHA-256 is preferred
+db.createUser({
+  user: "legacy_user",
+  pwd: "password",
+  roles: ["readWrite"],
+  mechanisms: ["SCRAM-SHA-1"]  // Explicit mechanism
+})
+```
+
+**Pros:**
+- Simple to implement
+- No external dependencies
+- Built-in to MongoDB
+
+**Cons:**
+- Password management complexity
+- No centralized authentication
+- Manual user provisioning
+
+---
+
+#### **2. x.509 Certificate Authentication**
+
+**Certificate-based authentication** - no passwords needed
+
+**Setup:**
+
+1. **Generate Certificates:**
+```bash
+# CA certificate
+openssl genrsa -out ca.key 4096
+openssl req -new -x509 -days 3650 -key ca.key -out ca.crt
+
+# Server certificate
+openssl genrsa -out server.key 4096
+openssl req -new -key server.key -out server.csr
+openssl x509 -req -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
+
+# Client certificate
+openssl genrsa -out client.key 4096
+openssl req -new -key client.key -out client.csr
+# CN must match username: CN=app_client,OU=MyOrg,O=MyCompany
+openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -out client.crt
+
+# Combine for MongoDB
+cat client.crt client.key > client.pem
+```
+
+2. **Configure MongoDB:**
+```yaml
+# mongod.conf
+net:
+  tls:
+    mode: requireTLS
+    certificateKeyFile: /etc/ssl/mongodb/server.pem
+    CAFile: /etc/ssl/mongodb/ca.crt
+
+security:
+  authorization: enabled
+  clusterAuthMode: x509
+```
+
+3. **Create User:**
+```javascript
+db.getSiblingDB("$external").createUser({
+  user: "CN=app_client,OU=MyOrg,O=MyCompany,L=NYC,ST=NY,C=US",
+  roles: [
+    { role: "readWrite", db: "myapp" }
+  ]
+})
+```
+
+4. **Connect:**
+```bash
+mongosh "mongodb://localhost:27017/myapp?authMechanism=MONGODB-X509&tls=true" \
+  --tlsCertificateKeyFile /etc/ssl/client.pem \
+  --tlsCAFile /etc/ssl/ca.crt
+```
+
+**Pros:**
+- No password transmission
+- Strong cryptographic authentication
+- Certificate revocation possible
+- Good for service-to-service auth
+
+**Cons:**
+- Complex certificate management
+- Certificate rotation overhead
+- Requires PKI infrastructure
+
+---
+
+#### **3. LDAP Authentication**
+
+**Enterprise feature** - centralized user management
+
+**Configuration:**
+```yaml
+# mongod.conf
+security:
+  authorization: enabled
+  ldap:
+    servers: "ldap.company.com"
+    bind:
+      method: "simple"
+      queryUser: "cn=admin,dc=company,dc=com"
+      queryPassword: "ldapPassword"
+    userToDNMapping:
+      '[
+        {
+          match: "(.+)",
+          substitution: "uid={0},ou=users,dc=company,dc=com"
+        }
+      ]'
+    authz:
+      queryTemplate: "ou=groups,dc=company,dc=com??sub?(&(objectClass=groupOfNames)(member=uid={USER},ou=users,dc=company,dc=com))"
+
+setParameter:
+  authenticationMechanisms: PLAIN,SCRAM-SHA-256
+```
+
+**Map LDAP Groups to Roles:**
+```javascript
+db.getSiblingDB("admin").createRole({
+  role: "CN=MongoDB Admins,OU=Groups,DC=company,DC=com",
+  privileges: [],
+  roles: [ "root" ]
+})
+
+db.getSiblingDB("admin").createRole({
+  role: "CN=MongoDB Developers,OU=Groups,DC=company,DC=com",
+  privileges: [],
+  roles: [
+    { role: "readWrite", db: "myapp" }
+  ]
+})
+```
+
+**Connect:**
+```bash
+mongosh "mongodb://jdoe:ldapPassword@localhost:27017/myapp?authMechanism=PLAIN&authSource=$external"
+```
+
+**Pros:**
+- Centralized user management
+- Single sign-on integration
+- Automatic group-based authorization
+- No duplicate user databases
+
+**Cons:**
+- Requires MongoDB Enterprise
+- LDAP infrastructure dependency
+- Network latency for auth
+- Password sent in plaintext (use TLS!)
+
+---
+
+#### **4. Kerberos Authentication**
+
+**Enterprise feature** - for Windows/Unix environments with Kerberos
+
+**Setup:**
+
+1. **Configure KDC and Create Service Principal:**
+```bash
+# On KDC server
+kadmin.local
+addprinc -randkey mongodb/mongodb-server.company.com@COMPANY.COM
+ktadd -k /etc/mongodb.keytab mongodb/mongodb-server.company.com@COMPANY.COM
+```
+
+2. **Configure MongoDB:**
+```yaml
+# mongod.conf
+security:
+  authorization: enabled
+
+setParameter:
+  authenticationMechanisms: GSSAPI
+
+# Set environment variable
+export KRB5_KTNAME=/etc/mongodb.keytab
+```
+
+3. **Create User:**
+```javascript
+db.getSiblingDB("$external").createUser({
+  user: "app_user@COMPANY.COM",
+  roles: [
+    { role: "readWrite", db: "myapp" }
+  ]
+})
+```
+
+4. **Client Setup:**
+```bash
+# Get Kerberos ticket
+kinit app_user@COMPANY.COM
+
+# Connect
+mongosh "mongodb://app_user%40COMPANY.COM@mongodb-server.company.com/myapp?authMechanism=GSSAPI&authSource=$external"
+```
+
+**Pros:**
+- Strong, ticket-based authentication
+- No password transmission
+- Integrated with Windows Active Directory
+- Mutual authentication
+
+**Cons:**
+- Requires MongoDB Enterprise
+- Complex Kerberos infrastructure
+- Difficult to troubleshoot
+- Clock synchronization critical
+
+---
+
+#### **Comparison Table**
+
+| Mechanism | MongoDB Edition | Complexity | Use Case |
+|-----------|----------------|------------|----------|
+| **SCRAM-SHA-256** | Community | Low | General purpose, small deployments |
+| **x.509** | Community | Medium | Service accounts, microservices |
+| **LDAP** | Enterprise | Medium | Enterprise with existing LDAP |
+| **Kerberos** | Enterprise | High | Windows/AD environments |
 
 ---
