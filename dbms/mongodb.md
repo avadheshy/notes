@@ -10240,3 +10240,3151 @@ mongosh "mongodb://app_user%40COMPANY.COM@mongodb-server.company.com/myapp?authM
 | **Kerberos** | Enterprise | High | Windows/AD environments |
 
 ---
+
+
+
+### 137. What are field-level and queryable encryption features in MongoDB 7.0+?
+
+**Field-Level Encryption (FLE)**
+
+MongoDB provides client-side field-level encryption to protect sensitive data:
+
+**Manual FLE**
+- Application handles encryption/decryption
+- Full control over encryption logic
+- Uses encryption keys stored in key management system
+
+```javascript
+const { ClientEncryption } = require('mongodb-client-encryption');
+
+// Create encryption client
+const encryption = new ClientEncryption(client, {
+  keyVaultNamespace: 'encryption.__keyVault',
+  kmsProviders: {
+    local: {
+      key: Buffer.from('your-96-byte-master-key', 'base64')
+    }
+  }
+});
+
+// Encrypt a field
+const encryptedSSN = await encryption.encrypt('123-45-6789', {
+  algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic',
+  keyId: dataKeyId
+});
+```
+
+**Automatic FLE (Queryable Encryption in MongoDB 7.0+)**
+
+MongoDB 7.0 introduced Queryable Encryption, which allows encrypted fields to be queried:
+
+```javascript
+// Schema with encrypted fields
+const encryptedFieldsMap = {
+  'medical.patients': {
+    fields: [
+      {
+        path: 'ssn',
+        bsonType: 'string',
+        queries: { queryType: 'equality' } // Allows exact match queries
+      },
+      {
+        path: 'bloodType',
+        bsonType: 'string',
+        queries: { queryType: 'equality' }
+      }
+    ]
+  }
+};
+
+// Create encrypted collection
+await db.createCollection('patients', {
+  encryptedFields: encryptedFieldsMap
+});
+
+// Query encrypted fields (automatically decrypted on client)
+const patient = await db.collection('patients').findOne({
+  ssn: '123-45-6789' // This is encrypted but queryable
+});
+```
+
+**Key Features of Queryable Encryption**:
+- Equality queries on encrypted fields
+- Range queries (MongoDB 7.2+)
+- Cryptographically secure
+- Keys stored in KMS (AWS, Azure, GCP)
+- Data remains encrypted on server
+
+### 138. How do you implement IP whitelisting for MongoDB?
+
+**Network-level IP Whitelisting**
+
+```yaml
+# mongod.conf
+net:
+  bindIp: 127.0.0.1,192.168.1.100  # Only allow specific IPs
+  port: 27017
+  
+# Or using bindIpAll (not recommended for production)
+net:
+  bindIpAll: true  # Allows all IPs - use with firewall
+```
+
+**Using Firewall Rules (iptables)**
+
+```bash
+# Allow specific IP
+sudo iptables -A INPUT -p tcp -s 192.168.1.100 --dport 27017 -j ACCEPT
+
+# Block all other IPs
+sudo iptables -A INPUT -p tcp --dport 27017 -j DROP
+
+# Save rules
+sudo iptables-save > /etc/iptables/rules.v4
+```
+
+**MongoDB Atlas IP Whitelist**
+
+```javascript
+// Using Atlas API to add IP whitelist entry
+const atlasAPI = 'https://cloud.mongodb.com/api/atlas/v1.0';
+const projectId = 'your-project-id';
+
+fetch(`${atlasAPI}/groups/${projectId}/whitelist`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Digest username:apiKey'
+  },
+  body: JSON.stringify([
+    {
+      ipAddress: '203.0.113.0',
+      comment: 'Office IP'
+    },
+    {
+      cidrBlock: '10.0.0.0/24',
+      comment: 'Internal network'
+    }
+  ])
+});
+```
+
+**Security Groups (AWS)**
+
+```bash
+# AWS Security Group rule
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-12345678 \
+  --protocol tcp \
+  --port 27017 \
+  --cidr 203.0.113.0/32
+```
+
+### 139. What is audit logging and how do you enable it?
+
+Audit logging tracks database operations for security and compliance (Enterprise feature).
+
+**Enable Audit Logging**
+
+```yaml
+# mongod.conf
+auditLog:
+  destination: file
+  format: JSON
+  path: /var/log/mongodb/audit.json
+  filter: '{ atype: { $in: ["authenticate", "createUser", "dropUser"] } }'
+```
+
+**Audit Events**
+
+```javascript
+// Filter for specific operations
+const auditFilter = {
+  atype: {
+    $in: [
+      'authenticate',      // Login attempts
+      'authCheck',        // Authorization checks
+      'createCollection', // Collection creation
+      'dropCollection',   // Collection deletion
+      'createUser',       // User management
+      'dropUser',
+      'createIndex',
+      'dropIndex'
+    ]
+  }
+};
+```
+
+**Start mongod with Auditing**
+
+```bash
+mongod --dbpath /data/db \
+       --auditDestination file \
+       --auditFormat JSON \
+       --auditPath /var/log/mongodb/audit.json
+```
+
+**Audit Log Example**
+
+```json
+{
+  "atype": "authenticate",
+  "ts": { "$date": "2024-11-13T10:30:00.000Z" },
+  "local": { "ip": "127.0.0.1", "port": 27017 },
+  "remote": { "ip": "192.168.1.100", "port": 52000 },
+  "users": [{ "user": "admin", "db": "admin" }],
+  "result": 0,
+  "param": {
+    "user": "admin",
+    "db": "admin",
+    "mechanism": "SCRAM-SHA-256"
+  }
+}
+```
+
+**Advanced Filtering**
+
+```javascript
+// Audit only failed operations
+{
+  result: { $ne: 0 }
+}
+
+// Audit operations on specific database
+{
+  'param.ns': /^production\./
+}
+
+// Audit operations by specific users
+{
+  'users.user': { $in: ['admin', 'superuser'] }
+}
+```
+
+### 140. What are MongoDB's compliance certifications (HIPAA, GDPR, etc.)?
+
+**MongoDB Compliance Certifications**
+
+**SOC 2 Type II**
+- Security, availability, and confidentiality
+- Independent audit of security controls
+- Atlas and Enterprise Advanced certified
+
+**ISO 27001**
+- International information security standard
+- Risk management and security controls
+- Covers data centers and operations
+
+**PCI DSS (Payment Card Industry Data Security Standard)**
+- Required for payment card data
+- Atlas certified for PCI DSS compliance
+- Encryption, access controls, monitoring
+
+**HIPAA (Health Insurance Portability and Accountability Act)**
+- US healthcare data protection
+- Atlas supports HIPAA compliance with BAA
+- Requires encryption, audit logging, access controls
+
+```javascript
+// HIPAA-compliant setup example
+const client = new MongoClient(uri, {
+  tls: true,
+  tlsCertificateKeyFile: './client.pem',
+  authMechanism: 'MONGODB-X509',
+  auditLog: {
+    destination: 'file',
+    path: '/var/log/mongodb/audit.json'
+  }
+});
+```
+
+**GDPR (General Data Protection Regulation)**
+- EU data protection regulation
+- Atlas provides data residency controls
+- Right to erasure and data portability
+
+```javascript
+// GDPR data deletion
+await db.collection('users').deleteOne({ 
+  email: 'user@example.com' 
+});
+
+// GDPR data export
+const userData = await db.collection('users').findOne({
+  email: 'user@example.com'
+});
+```
+
+**FedRAMP (Federal Risk and Authorization Management Program)**
+- US government cloud security
+- Atlas Government (GovCloud) is FedRAMP authorized
+
+**IRAP (Australian Government)**
+- Australian government security assessment
+- Atlas available in Australian regions
+
+**Key Compliance Features in MongoDB**
+- Encryption at rest and in transit
+- Field-level encryption
+- Audit logging
+- RBAC (Role-Based Access Control)
+- Network isolation
+- Geographic data residency
+- Backup and disaster recovery
+
+---
+
+## Deployment & Cloud
+
+### 141. What's the difference between MongoDB Atlas, Ops Manager, and Enterprise Advanced?
+
+**MongoDB Atlas (Fully Managed Cloud)**
+
+- **Deployment**: Fully managed DBaaS on AWS, Azure, GCP
+- **Management**: Automated by MongoDB
+- **Best For**: Organizations wanting no infrastructure management
+
+Key Features:
+- Automated backups and point-in-time recovery
+- Auto-scaling (storage and compute)
+- Built-in monitoring and alerting
+- Global clusters and multi-region
+- Atlas Search, Data Lake, Charts
+- Pay-as-you-go pricing
+
+```javascript
+// Atlas connection string
+const uri = "mongodb+srv://user:pass@cluster0.mongodb.net/mydb?retryWrites=true";
+```
+
+**MongoDB Ops Manager (Self-Hosted Management)**
+
+- **Deployment**: On-premises or private cloud
+- **Management**: Self-managed with Ops Manager GUI
+- **Best For**: Organizations with on-prem requirements
+
+Key Features:
+- Central management for multiple deployments
+- Automated backup (Enterprise only)
+- Monitoring and alerting
+- Automation for deployment and upgrades
+- Query optimization suggestions
+- Requires Enterprise subscription
+
+```yaml
+# Ops Manager configuration
+mms:
+  centralUrl: https://opsmanager.company.com:8080
+  apiKey: your-api-key
+```
+
+**MongoDB Enterprise Advanced (Self-Managed)**
+
+- **Deployment**: On-premises, any cloud, or hybrid
+- **Management**: Fully self-managed
+- **Best For**: Organizations needing full control
+
+Key Features:
+- All Enterprise features (LDAP, Kerberos, encryption)
+- Advanced security (audit logging, FIPS mode)
+- In-memory storage engine
+- No Ops Manager included (separate license)
+- Platform Certification
+- Commercial support
+
+**Comparison Table**
+
+| Feature | Atlas | Ops Manager | Enterprise Advanced |
+|---------|-------|-------------|---------------------|
+| Hosting | Cloud (managed) | Self-hosted | Self-hosted |
+| Infrastructure | Managed | Self-managed | Self-managed |
+| Backups | Automated | Manual/Automated | Manual |
+| Scaling | Automatic | Manual | Manual |
+| Monitoring | Built-in | Built-in | DIY/Ops Manager |
+| Security | Enterprise | Enterprise | Enterprise |
+| Best For | Simplicity | On-prem with tools | Full control |
+
+### 142. How does auto-scaling work in Atlas?
+
+**Storage Auto-Scaling**
+
+Atlas automatically increases storage when disk usage reaches 90%.
+
+```javascript
+// Configure via Atlas API
+{
+  "autoScaling": {
+    "diskGBEnabled": true
+  }
+}
+```
+
+**Features**:
+- Scales up automatically (incremental increases)
+- Never scales down automatically
+- No downtime during scaling
+- Works on M10+ clusters
+
+**Compute Auto-Scaling**
+
+Atlas can automatically adjust cluster tier based on workload.
+
+```javascript
+// Configure cluster auto-scaling
+{
+  "autoScaling": {
+    "compute": {
+      "enabled": true,
+      "scaleDownEnabled": true,
+      "minInstanceSize": "M10",
+      "maxInstanceSize": "M40"
+    }
+  }
+}
+```
+
+**Scaling Triggers**:
+- CPU utilization > 75% for 2 hours → scale up
+- CPU utilization < 50% for 24 hours → scale down
+- Memory pressure
+- IOPS saturation
+
+**Auto-Scaling Process**:
+
+```
+1. Monitor metrics (CPU, memory, IOPS)
+2. Trigger threshold reached
+3. Initiate scaling operation
+4. Rolling upgrade (no downtime)
+5. New instance size active
+```
+
+**Connection String Handling**
+
+```javascript
+// Use SRV connection string for seamless scaling
+const uri = "mongodb+srv://cluster0.mongodb.net/mydb";
+// Automatically discovers new node configurations
+```
+
+**Manual Scaling Override**
+
+```javascript
+// Temporarily disable auto-scaling
+await atlasAPI.patch(`/clusters/${clusterId}`, {
+  autoScaling: {
+    compute: { enabled: false }
+  }
+});
+```
+
+### 143. How do you set up continuous backups in Atlas?
+
+**Cloud Backup (Continuous Backups)**
+
+Atlas provides continuous cloud backups with point-in-time recovery.
+
+**Enable Cloud Backup**
+
+```javascript
+// Via Atlas API
+{
+  "backupEnabled": true,
+  "pitEnabled": true,  // Point-in-time restore
+  "providerBackupEnabled": true
+}
+```
+
+**Backup Schedule Configuration**
+
+```javascript
+{
+  "policies": [
+    {
+      "id": "daily-policy",
+      "policyItems": [
+        {
+          "frequencyType": "daily",
+          "frequencyInterval": 1,
+          "retentionValue": 7,
+          "retentionUnit": "days"
+        },
+        {
+          "frequencyType": "weekly",
+          "frequencyInterval": 1,
+          "retentionValue": 4,
+          "retentionUnit": "weeks"
+        },
+        {
+          "frequencyType": "monthly",
+          "frequencyInterval": 1,
+          "retentionValue": 12,
+          "retentionUnit": "months"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Point-in-Time Restore**
+
+```javascript
+// Restore to specific timestamp
+{
+  "snapshotId": "snapshot-id",
+  "pointInTimeUTCSeconds": 1699876543,  // Unix timestamp
+  "targetClusterName": "restored-cluster",
+  "targetGroupId": "project-id"
+}
+```
+
+**Backup Features**:
+- Continuous snapshots (every 6-8 hours)
+- Point-in-time restore (any second within retention window)
+- Cross-region backup copying
+- Encrypted backups
+- Instant snapshots before major operations
+
+**Restore Options**
+
+```javascript
+// Restore to new cluster
+POST /groups/{groupId}/clusters/{clusterName}/backup/restoreJobs
+
+// Restore to existing cluster (overwrites)
+{
+  "deliveryType": "automated",
+  "targetClusterName": "production-cluster"
+}
+
+// Download backup snapshot
+{
+  "deliveryType": "download"
+}
+```
+
+**Backup Monitoring**
+
+```javascript
+// Check backup status
+GET /groups/{groupId}/clusters/{clusterName}/backup/snapshots
+
+// Response
+{
+  "snapshots": [
+    {
+      "id": "snapshot-123",
+      "createdAt": "2024-11-13T00:00:00Z",
+      "expiresAt": "2024-12-13T00:00:00Z",
+      "status": "completed",
+      "type": "scheduled"
+    }
+  ]
+}
+```
+
+### 144. What is Atlas Data Federation?
+
+Atlas Data Federation allows you to query data across Atlas clusters, AWS S3, and HTTP endpoints using MongoDB Query Language.
+
+**Key Features**
+
+- **Federated Queries**: Single query across multiple data sources
+- **S3 Integration**: Query JSON, CSV, Parquet, Avro files in S3
+- **No ETL Required**: Query data in place without copying
+- **Atlas SQL**: Query using SQL syntax
+- **Virtual Collections**: Define schemas for external data
+
+**Setting Up Data Federation**
+
+```javascript
+// Define virtual database
+{
+  "name": "VirtualDB",
+  "collections": [
+    {
+      "name": "transactions",
+      "dataSources": [
+        {
+          "storeName": "S3Store",
+          "path": "transactions/{year}/{month}/*",
+          "defaultFormat": "json"
+        },
+        {
+          "storeName": "AtlasCluster",
+          "database": "prod",
+          "collection": "recent_transactions"
+        }
+      ]
+    }
+  ],
+  "stores": [
+    {
+      "name": "S3Store",
+      "provider": "s3",
+      "region": "us-east-1",
+      "bucket": "company-data"
+    },
+    {
+      "name": "AtlasCluster",
+      "provider": "atlas",
+      "clusterName": "Cluster0"
+    }
+  ]
+}
+```
+
+**Querying Federated Data**
+
+```javascript
+// Connect to Data Federation
+const client = new MongoClient(
+  "mongodb://datafederation.mongodb.com"
+);
+
+// Query across S3 and Atlas
+const results = await client.db('VirtualDB')
+  .collection('transactions')
+  .aggregate([
+    { $match: { amount: { $gt: 1000 } } },
+    { $group: {
+        _id: "$customerId",
+        totalSpent: { $sum: "$amount" }
+    }}
+  ]);
+```
+
+**Use Cases**
+- Data lake querying (S3 data archives)
+- Cross-cluster analytics
+- Historical data analysis
+- Compliance and audit queries
+- Cost optimization (S3 storage cheaper than Atlas)
+
+**Partitioned Data Example**
+
+```javascript
+// S3 structure: s3://bucket/logs/year=2024/month=11/day=13/
+{
+  "path": "logs/year={year}/month={month}/day={day}/*",
+  "defaultFormat": "json"
+}
+
+// Query with partition pruning
+db.logs.find({
+  year: 2024,
+  month: 11,
+  day: 13,
+  level: "ERROR"
+})
+```
+
+### 145. How does MongoDB Atlas Search differ from regular text indexes?
+
+**Regular Text Indexes**
+
+```javascript
+// Create text index
+db.articles.createIndex({ 
+  title: "text", 
+  content: "text" 
+});
+
+// Simple text search
+db.articles.find({ 
+  $text: { $search: "mongodb database" } 
+});
+```
+
+**Limitations**:
+- Basic stemming only
+- Limited language support
+- No relevance scoring customization
+- No fuzzy matching
+- No faceting
+- Single index per collection
+
+**Atlas Search (Powered by Apache Lucene)**
+
+```javascript
+// Create Atlas Search index
+{
+  "mappings": {
+    "dynamic": false,
+    "fields": {
+      "title": {
+        "type": "string",
+        "analyzer": "lucene.english"
+      },
+      "content": {
+        "type": "string",
+        "analyzer": "lucene.standard"
+      },
+      "tags": {
+        "type": "string",
+        "analyzer": "lucene.keyword"
+      },
+      "price": {
+        "type": "number"
+      }
+    }
+  }
+}
+```
+
+**Advanced Search Query**
+
+```javascript
+db.articles.aggregate([
+  {
+    $search: {
+      "compound": {
+        "must": [
+          {
+            "text": {
+              "query": "mongodb database",
+              "path": "content",
+              "fuzzy": {
+                "maxEdits": 2  // Typo tolerance
+              }
+            }
+          }
+        ],
+        "should": [
+          {
+            "text": {
+              "query": "Atlas",
+              "path": "title",
+              "score": { "boost": { "value": 2 } }
+            }
+          }
+        ],
+        "filter": [
+          {
+            "range": {
+              "path": "publishDate",
+              "gte": ISODate("2024-01-01")
+            }
+          }
+        ]
+      },
+      "highlight": {
+        "path": "content"
+      }
+    }
+  },
+  {
+    $project: {
+      title: 1,
+      content: 1,
+      score: { $meta: "searchScore" },
+      highlights: { $meta: "searchHighlights" }
+    }
+  }
+])
+```
+
+**Key Differences**
+
+| Feature | Text Index | Atlas Search |
+|---------|-----------|--------------|
+| Engine | MongoDB native | Apache Lucene |
+| Relevance | Basic | Advanced scoring |
+| Fuzzy Search | No | Yes |
+| Faceting | No | Yes |
+| Autocomplete | No | Yes |
+| Synonyms | No | Yes |
+| Custom Analyzers | Limited | Extensive |
+| Multiple Indexes | One per collection | Multiple |
+| Language Support | Limited | 40+ languages |
+
+**Atlas Search Features**
+
+```javascript
+// Autocomplete
+{
+  $search: {
+    "autocomplete": {
+      "query": "mon",
+      "path": "title",
+      "tokenOrder": "sequential"
+    }
+  }
+}
+
+// Faceting
+{
+  $searchMeta: {
+    "facet": {
+      "operator": {
+        "text": { "query": "laptop", "path": "description" }
+      },
+      "facets": {
+        "categoryFacet": {
+          "type": "string",
+          "path": "category"
+        },
+        "priceFacet": {
+          "type": "number",
+          "path": "price",
+          "boundaries": [0, 500, 1000, 2000]
+        }
+      }
+    }
+  }
+}
+
+// Synonyms
+{
+  "synonyms": [
+    {
+      "name": "product_synonyms",
+      "analyzer": "lucene.standard",
+      "source": {
+        "collection": "synonyms"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Tools & Ecosystem
+
+### 146. What is Compass and how does it differ from Robo 3T?
+
+**MongoDB Compass (Official GUI)**
+
+Official MongoDB GUI tool with advanced features.
+
+**Key Features**:
+- Visual query builder (no code required)
+- Aggregation pipeline builder with preview
+- Schema analysis and visualization
+- Index performance recommendations
+- Real-time server stats
+- Explain plans visualization
+- Validation rules editor
+- Document editing with JSON/Table view
+
+```javascript
+// Compass Query Bar Example
+{
+  status: "active",
+  createdAt: { $gte: new Date("2024-01-01") }
+}
+
+// Aggregation Pipeline Builder (visual)
+[
+  { $match: { status: "active" } },
+  { $group: { _id: "$category", total: { $sum: 1 } } },
+  { $sort: { total: -1 } }
+]
+```
+
+**Robo 3T / Studio 3T (Third-Party)**
+
+Lightweight, shell-centric MongoDB client.
+
+**Key Features**:
+- Embedded MongoDB shell
+- Multiple shell tabs
+- Query autocompletion
+- Result viewing (tree, table, text)
+- Basic collection management
+- Lightweight and fast
+- Free version available (Robo 3T)
+
+**Comparison**
+
+| Feature | Compass | Robo 3T |
+|---------|---------|---------|
+| Developer | MongoDB Inc. | 3T Software |
+| Interface | Modern GUI | Shell-focused |
+| Query Builder | Visual | Shell only |
+| Aggregation | Pipeline builder | Shell code |
+| Schema Analysis | Advanced | None |
+| Performance | Heavier | Lightweight |
+| Index Suggestions | Yes | No |
+| Price | Free | Free/Paid versions |
+
+**When to Use Compass**:
+- Visual query building
+- Schema exploration
+- Performance optimization
+- Production monitoring
+- Learning MongoDB
+
+**When to Use Robo 3T**:
+- Quick queries
+- Shell command preference
+- Lightweight tool needed
+- Multiple connections management
+- Scripts and automation
+
+### 147. What is MongoMirror used for?
+
+MongoMirror is a migration tool for moving data from one MongoDB cluster to another with minimal downtime.
+
+**Primary Use Case**: Migrating to MongoDB Atlas
+
+**Key Features**:
+- Live migration (minimal downtime)
+- Continuous sync during migration
+- No application code changes
+- Validation checks
+- Resume capability
+
+**Migration Process**
+
+```bash
+# 1. Install MongoMirror
+curl https://mongomirror.mongodb.com/mongomirror-linux-x86_64 \
+  -o mongomirror
+chmod +x mongomirror
+
+# 2. Initial sync
+./mongomirror \
+  --source "mongodb://source-cluster:27017" \
+  --destination "mongodb+srv://atlas-cluster.mongodb.net" \
+  --databases "prodDB,analyticsDB" \
+  --drop \
+  --numParallelCollections 4
+
+# 3. Continuous sync (oplog tailing)
+./mongomirror \
+  --source "mongodb://source-cluster:27017" \
+  --destination "mongodb+srv://atlas-cluster.mongodb.net" \
+  --oplogPath /data/oplog \
+  --tail
+
+# 4. Cutover validation
+./mongomirror \
+  --source "mongodb://source-cluster:27017" \
+  --destination "mongodb+srv://atlas-cluster.mongodb.net" \
+  --compare
+```
+
+**Migration Phases**
+
+```
+Phase 1: Initial Sync
+├── Copy all data
+├── Copy indexes
+└── Validate counts
+
+Phase 2: Oplog Sync
+├── Tail source oplog
+├── Apply changes to destination
+└── Minimal lag (<1 second)
+
+Phase 3: Cutover
+├── Stop application writes
+├── Final oplog sync
+├── Validate data integrity
+└── Switch connection string
+```
+
+**MongoMirror vs Other Tools**
+
+| Tool | Use Case | Downtime |
+|------|----------|----------|
+| MongoMirror | Live migration to Atlas | Minimal |
+| mongodump/restore | Backup/restore | Full outage |
+| mongoexport/import | Small datasets | Full outage |
+| Change Streams | Custom sync | None (DIY) |
+
+**Alternative: Atlas Live Migration**
+
+Atlas now has built-in live migration that uses MongoMirror internally:
+
+```javascript
+// Via Atlas UI or API
+POST /groups/{groupId}/liveMigrations
+{
+  "source": {
+    "clusterName": "source-cluster",
+    "username": "admin",
+    "password": "secret"
+  },
+  "destination": {
+    "clusterName": "atlas-cluster"
+  },
+  "migrationHosts": [
+    "source1.example.com:27017",
+    "source2.example.com:27017"
+  ]
+}
+```
+
+### 148. How do you use mongostat and mongotop for performance monitoring?
+
+**mongostat - Real-time Statistics**
+
+Displays server statistics similar to Unix `vmstat`.
+
+```bash
+# Basic usage (1 second intervals)
+mongostat --host localhost:27017
+
+# Output
+insert query update delete getmore command dirty used flushes mapped vsize  res faults qrw arw net_in net_out conn time
+    *0    *0     *0     *0       0     2|0  0.0% 0.0%       0        3.25G 25.0M    0 0|0 0|0   157b   43.6k    2 Nov 13 10:30:00
+    *0    *0     *0     *0       0     1|0  0.0% 0.0%       0        3.25G 25.0M    0 0|0 0|0   157b   43.6k    2 Nov 13 10:30:01
+```
+
+**Key Metrics**:
+- **insert/query/update/delete**: Operations per second
+- **command**: Commands per second
+- **dirty**: Percentage of dirty cache
+- **used**: Percentage of cache in use
+- **flushes**: Disk flushes per second
+- **qrw**: Queued readers/writers
+- **arw**: Active readers/writers
+- **net_in/out**: Network traffic
+- **conn**: Active connections
+
+**Advanced mongostat Usage**
+
+```bash
+# Monitor specific database
+mongostat --host localhost:27017 --database prodDB
+
+# Custom columns
+mongostat --host localhost:27017 -O 'host,repl,time'
+
+# JSON output for parsing
+mongostat --host localhost:27017 -o json > stats.json
+
+# Connect with authentication
+mongostat --host localhost:27017 \
+  --username admin \
+  --password secret \
+  --authenticationDatabase admin
+
+# Monitor replica set
+mongostat --host replica-set/node1:27017,node2:27017,node3:27017
+
+# Row count (run 10 times then exit)
+mongostat --host localhost:27017 --rowcount 10
+```
+
+**mongotop - Collection-Level I/O**
+
+Shows read/write time spent on each collection.
+
+```bash
+# Basic usage (default 1 second intervals)
+mongotop --host localhost:27017
+
+# Output
+                    ns    total    read    write
+    prodDB.users       15ms     5ms     10ms
+    prodDB.orders     100ms    50ms     50ms
+    prodDB.products     2ms     2ms      0ms
+```
+
+**Advanced mongotop Usage**
+
+```bash
+# Custom interval (5 seconds)
+mongotop --host localhost:27017 5
+
+# Monitor specific database
+mongotop --host localhost:27017 --locks prodDB
+
+# JSON output
+mongotop --host localhost:27017 --json
+
+# Row count
+mongotop --host localhost:27017 --rowcount 20
+```
+
+**Monitoring Script Example**
+
+```bash
+#!/bin/bash
+# monitor.sh - Combined monitoring
+
+echo "=== Server Stats ==="
+mongostat --host localhost:27017 --rowcount 1
+
+echo -e "\n=== Top Collections ==="
+mongotop --host localhost:27017 1 --rowcount 1
+
+echo -e "\n=== Current Operations ==="
+mongosh --quiet --eval "db.currentOp({'active': true, 'secs_running': { \$gt: 3 }})"
+
+echo -e "\n=== Slow Queries (>100ms) ==="
+mongosh --quiet --eval "db.system.profile.find({millis: {\$gt: 100}}).sort({ts: -1}).limit(5)"
+```
+
+**Performance Alerts**
+
+```bash
+# Alert if connections > 1000
+while true; do
+  CONN=$(mongostat --rowcount 1 | tail -1 | awk '{print $14}')
+  if [ "$CONN" -gt 1000 ]; then
+    echo "ALERT: High connections: $CONN" | mail -s "MongoDB Alert" admin@company.com
+  fi
+  sleep 60
+done
+```
+
+### 149. What's the use of mongoexport and mongoimport commands?
+
+**mongoexport - Export Data**
+
+Exports collection data to JSON or CSV format.
+
+```bash
+# Export to JSON
+mongoexport --db prodDB --collection users --out users.json
+
+# Export to CSV with specific fields
+mongoexport --db prodDB --collection users \
+  --type=csv \
+  --fields=name,email,createdAt \
+  --out users.csv
+
+# Export with query filter
+mongoexport --db prodDB --collection orders \
+  --query '{"status": "completed", "total": {"$gt": 100}}' \
+  --out completed_orders.json
+
+# Export from remote server with auth
+mongoexport --host mongodb.example.com:27017 \
+  --username admin \
+  --password secret \
+  --authenticationDatabase admin \
+  --db prodDB \
+  --collection users \
+  --out users.json
+
+# Export with pretty JSON
+mongoexport --db prodDB --collection users \
+  --jsonArray \
+  --pretty \
+  --out users_pretty.json
+
+# Export specific fields only
+mongoexport --db prodDB --collection products \
+  --fields _id,name,price,category \
+  --out products.json
+
+# Export with sort
+mongoexport --db prodDB --collection logs \
+  --sort '{"timestamp": -1}' \
+  --limit 1000 \
+  --out recent_logs.json
+```
+
+**mongoexport Options**:
+- `--type`: json (default) or csv
+- `--fields`: Comma-separated field list (CSV)
+- `--query`: Filter documents
+- `--sort`: Sort order
+- `--limit`: Limit number of documents
+- `--skip`: Skip documents
+- `--jsonArray`: Export as JSON array
+- `--pretty`: Pretty-print JSON
+
+**mongoimport - Import Data**
+
+Imports data from JSON, CSV, or TSV files.
+
+```bash
+# Import JSON file
+mongoimport --db prodDB --collection users --file users.json
+
+# Import CSV with header row
+mongoimport --db prodDB --collection users \
+  --type=csv \
+  --headerline \
+  --file users.csv
+
+# Import CSV with explicit fields
+mongoimport --db prodDB --collection products \
+  --type=csv \
+  --fields=name,price,category \
+  --file products.csv
+
+# Import JSON array
+mongoimport --db prodDB --collection users \
+  --jsonArray \
+  --file users.json
+
+# Import with upsert (update existing docs)
+mongoimport --db prodDB --collection users \
+  --mode=upsert \
+  --upsertFields=email \
+  --file users.json
+
+# Import and replace collection
+mongoimport --db prodDB --collection users \
+  --drop \
+  --file users.json
+
+# Import from remote server
+mongoimport --host mongodb.example.com:27017 \
+  --username admin \
+  --password secret \
+  --authenticationDatabase admin \
+  --db prodDB \
+  --collection users \
+  --file users.json
+
+# Import with custom delimiter (TSV)
+mongoimport --db prodDB --collection data \
+  --type=tsv \
+  --headerline \
+  --file data.tsv
+```
+
+**mongoimport Modes**:
+- `--mode=insert`: Insert only (default, fails on duplicates)
+- `--mode=upsert`: Update or insert
+- `--mode=merge`: Merge fields into existing documents
+- `--mode=delete`: Delete matching documents
+
+**Data Transformation Example**
+
+```bash
+# Export, transform with jq, and import
+mongoexport --db oldDB --collection users --out - | \
+  jq '.email = (.email | ascii_downcase)' | \
+  mongoimport --db newDB --collection users
+
+# CSV transformation with awk
+mongoexport --db prodDB --collection products \
+  --type=csv \
+  --fields=name,price \
+  --out - | \
+  awk -F',' 'NR==1 {print $0",discountPrice"} NR>1 {print $0","$2*0.9}' | \
+  mongoimport --db prodDB --collection products_sale \
+  --type=csv \
+  --headerline
+```
+
+**Limitations**:
+- Not suitable for large datasets (use mongodump/mongorestore)
+- No support for special BSON types (use mongodump)
+- CSV doesn't handle nested documents well
+- Extended JSON format may be needed for dates
+
+**Best Practices**
+
+```bash
+# Always test import with --dryRun (MongoDB 4.4+)
+mongoimport --db testDB --collection users \
+  --file users.json \
+  --dryRun
+
+# Use --stopOnError for production imports
+mongoimport --db prodDB --collection users \
+  --file users.json \
+  --stopOnError
+
+# Parallel imports for large files
+split -l 100000 large_file.json chunk_
+for file in chunk_*; do
+  mongoimport --db prodDB --collection users --file $file &
+done
+wait
+```
+
+### 150. How do you automate MongoDB deployments using Terraform or Ansible?
+
+**Terraform for MongoDB Atlas**
+
+Terraform is ideal for provisioning Atlas infrastructure.
+
+**Install Atlas Provider**
+
+```hcl
+# versions.tf
+terraform {
+  required_providers {
+    mongodbatlas = {
+      source  = "mongodb/mongodbatlas"
+      version = "~> 1.14"
+    }
+  }
+}
+
+provider "mongodbatlas" {
+  public_key  = var.atlas_public_key
+  private_key = var.atlas_private_key
+}
+```
+
+**Create Atlas Cluster**
+
+```hcl
+# main.tf
+resource "mongodbatlas_project" "project" {
+  name   = "production"
+  org_id = var.atlas_org_id
+}
+
+resource "mongodbatlas_cluster" "cluster" {
+  project_id = mongodbatlas_project.project.id
+  name       = "prod-cluster"
+
+  # Provider settings
+  provider_name               = "AWS"
+  provider_region_name        = "US_EAST_1"
+  provider_instance_size_name = "M10"
+
+  # Cluster configuration
+  cluster_type = "REPLICASET"
+  mongo_db_major_version = "7.0"
+  
+  # Auto-scaling
+  auto_scaling_disk_gb_enabled = true
+  auto_scaling_compute_enabled = true
+  auto_scaling_compute_scale_down_enabled = true
+
+  # Backup
+  backup_enabled               = true
+  pit_enabled                 = true
+  
+  # Advanced configuration
+  advanced_configuration {
+    javascript_enabled           = false
+    minimum_enabled_tls_protocol = "TLS1_2"
+  }
+}
+
+# Database user
+resource "mongodbatlas_database_user" "user" {
+  username           = "app-user"
+  password           = var.db_password
+  project_id         = mongodbatlas_project.project.id
+  auth_database_name = "admin"
+
+  roles {
+    role_name     = "readWrite"
+    database_name = "production"
+  }
+
+  scopes {
+    name = mongodbatlas_cluster.cluster.name
+    type = "CLUSTER"
+  }
+}
+
+# IP Whitelist
+resource "mongodbatlas_project_ip_access_list" "ip" {
+  project_id = mongodbatlas_project.project.id
+  cidr_block = "10.0.0.0/24"
+  comment    = "Production VPC"
+}
+
+# Alert configuration
+resource "mongodbatlas_alert_configuration" "cpu_alert" {
+  project_id = mongodbatlas_project.project.id
+  event_type = "OUTSIDE_METRIC_THRESHOLD"
+  enabled    = true
+
+  notification {
+    type_name     = "EMAIL"
+    email_address = "ops@company.com"
+    interval_min  = 5
+    delay_min     = 0
+  }
+
+  matcher {
+    field_name = "CLUSTER_NAME"
+    operator   = "EQUALS"
+    value      = mongodbatlas_cluster.cluster.name
+  }
+
+  metric_threshold_config {
+    metric_name = "NORMALIZED_SYSTEM_CPU_USER"
+    operator    = "GREATER_THAN"
+    threshold   = 90.0
+    units       = "RAW"
+    mode        = "AVERAGE"
+  }
+}
+
+# Output connection string
+output "connection_string" {
+  value     = mongodbatlas_cluster.cluster.connection_strings[0].standard_srv
+  sensitive = true
+}
+```
+
+**Variables File**
+
+```hcl
+# variables.tf
+variable "atlas_public_key" {
+  description = "Atlas API public key"
+  type        = string
+}
+
+variable "atlas_private_key" {
+  description = "Atlas API private key"
+  type        = string
+  sensitive   = true
+}
+
+variable "atlas_org_id" {
+  description = "Atlas organization ID"
+  type        = string
+}
+
+variable "db_password" {
+  description = "Database user password"
+  type        = string
+  sensitive   = true
+}
+```
+
+**Deploy**
+
+```bash
+# Initialize Terraform
+terraform init
+
+# Plan deployment
+terraform plan
+
+# Apply configuration
+terraform apply
+
+# Get connection string
+terraform output -raw connection_string
+```
+
+**Ansible for MongoDB Deployment**
+
+Ansible is ideal for configuring self-hosted MongoDB.
+
+**Install MongoDB with Ansible**
+
+```yaml
+# playbook.yml
+---
+- name: Deploy MongoDB Replica Set
+  hosts: mongodb_servers
+  become: yes
+  vars:
+    mongodb_version: "7.0"
+    replica_set_name: "rs0"
+    mongodb_port: 27017
+
+  tasks:
+    - name: Import MongoDB GPG key
+      apt_key:
+        url: https://www.mongodb.org/static/pgp/server-{{ mongodb_version }}.asc
+        state: present
+
+    - name: Add MongoDB repository
+      apt_repository:
+        repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_version }} multiverse"
+        state: present
+
+    - name: Install MongoDB
+      apt:
+        name: mongodb-org
+        state: present
+        update_cache: yes
+
+    - name: Create data directory
+      file:
+        path: /data/db
+        state: directory
+        owner: mongodb
+        group: mongodb
+        mode: '0755'
+
+    - name: Configure MongoDB
+      template:
+        src: mongod.conf.j2
+        dest: /etc/mongod.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart mongodb
+
+    - name: Start MongoDB service
+      systemd:
+        name: mongod
+        state: started
+        enabled: yes
+
+    - name: Wait for MongoDB to start
+      wait_for:
+        port: "{{ mongodb_port }}"
+        delay: 5
+
+    - name: Initialize replica set (on primary only)
+      command: >
+        mongosh --eval '
+        rs.initiate({
+          _id: "{{ replica_set_name }}",
+          members: [
+            { _id: 0, host: "{{ groups.mongodb_servers[0] }}:{{ mongodb_port }}" },
+            { _id: 1, host: "{{ groups.mongodb_servers[1] }}:{{ mongodb_port }}" },
+            { _id: 2, host: "{{ groups.mongodb_servers[2] }}:{{ mongodb_port }}" }
+          ]
+        })'
+      when: inventory_hostname == groups.mongodb_servers[0]
+      register: rs_init
+      changed_when: "'already initialized' not in rs_init.stdout"
+
+    - name: Create admin user
+      command: >
+        mongosh admin --eval '
+        db.createUser({
+          user: "admin",
+          pwd: "{{ admin_password }}",
+          roles: [ { role: "root", db: "admin" } ]
+        })'
+      when: inventory_hostname == groups.mongodb_servers[0]
+
+  handlers:
+    - name: restart mongodb
+      systemd:
+        name: mongod
+        state: restarted
+```
+
+**MongoDB Configuration Template**
+
+```yaml
+# templates/mongod.conf.j2
+systemLog:
+  destination: file
+  path: /var/log/mongodb/mongod.log
+  logAppend: true
+  logRotate: reopen
+
+storage:
+  dbPath: /data/db
+  journal:
+    enabled: true
+  engine: wiredTiger
+  wiredTiger:
+    engineConfig:
+      cacheSizeGB: {{ (ansible_memtotal_mb * 0.5 / 1024) | round | int }}
+
+net:
+  port: {{ mongodb_port }}
+  bindIp: 0.0.0.0
+
+replication:
+  replSetName: {{ replica_set_name }}
+
+security:
+  authorization: enabled
+  keyFile: /etc/mongodb-keyfile
+
+processManagement:
+  timeZoneInfo: /usr/share/zoneinfo
+```
+
+**Inventory File**
+
+```ini
+# inventory.ini
+[mongodb_servers]
+mongo1.example.com ansible_host=10.0.1.10
+mongo2.example.com ansible_host=10.0.1.11
+mongo3.example.com ansible_host=10.0.1.12
+
+[mongodb_servers:vars]
+ansible_user=ubuntu
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+```
+
+**Run Playbook**
+
+```bash
+# Run deployment
+ansible-playbook -i inventory.ini playbook.yml \
+  --extra-vars "admin_password=SecurePassword123"
+
+# Check status
+ansible mongodb_servers -i inventory.ini -m command \
+  -a "systemctl status mongod"
+```
+
+**Advanced Ansible Roles Structure**
+
+```
+mongodb-deployment/
+├── ansible.cfg
+├── inventory/
+│   ├── production
+│   └── staging
+├── playbooks/
+│   ├── deploy.yml
+│   ├── backup.yml
+│   └── upgrade.yml
+└── roles/
+    ├── mongodb/
+    │   ├── tasks/
+    │   │   ├── main.yml
+    │   │   ├── install.yml
+    │   │   ├── configure.yml
+    │   │   └── security.yml
+    │   ├── templates/
+    │   │   ├── mongod.conf.j2
+    │   │   └── keyfile.j2
+    │   ├── handlers/
+    │   │   └── main.yml
+    │   └── defaults/
+    │       └── main.yml
+    └── monitoring/
+        ├── tasks/
+        │   └── main.yml
+        └── templates/
+            └── prometheus_exporter.yml.j2
+```
+
+---
+
+## Bonus — Real Interview Scenarios
+
+### 151. Describe a situation where you optimized a slow query.
+
+**Scenario**: E-commerce product search taking 5+ seconds
+
+**Initial Query**
+
+```javascript
+// Slow query (5000ms)
+db.products.find({
+  category: "Electronics",
+  price: { $gte: 100, $lte: 1000 },
+  inStock: true,
+  "reviews.rating": { $gte: 4 }
+}).sort({ createdAt: -1 }).limit(20)
+```
+
+**Investigation Steps**
+
+```javascript
+// 1. Check explain plan
+db.products.find({
+  category: "Electronics",
+  price: { $gte: 100, $lte: 1000 },
+  inStock: true,
+  "reviews.rating": { $gte: 4 }
+}).sort({ createdAt: -1 }).limit(20).explain("executionStats")
+
+// Result showed:
+// - COLLSCAN (collection scan)
+// - 1,000,000 documents examined
+// - 20 documents returned
+// - No index used
+```
+
+**Optimization Process**
+
+```javascript
+// 2. Create compound index
+db.products.createIndex({
+  category: 1,
+  inStock: 1,
+  price: 1,
+  createdAt: -1
+})
+
+// Result: Still slow (3000ms)
+// Issue: reviews.rating not in index
+
+// 3. Schema redesign - denormalize average rating
+db.products.updateMany({}, [
+  {
+    $set: {
+      avgRating: { $avg: "$reviews.rating" },
+      reviewCount: { $size: "$reviews" }
+    }
+  }
+])
+
+// 4. Create optimized compound index
+db.products.createIndex({
+  category: 1,
+  inStock: 1,
+  avgRating: 1,
+  price: 1,
+  createdAt: -1
+})
+
+// 5. Rewrite query
+db.products.find({
+  category: "Electronics",
+  inStock: true,
+  avgRating: { $gte: 4 },
+  price: { $gte: 100, $lte: 1000 }
+}).sort({ createdAt: -1 }).limit(20)
+
+// Result: 50ms (100x improvement!)
+```
+
+**Explain Plan Analysis**
+
+```javascript
+// Before optimization
+{
+  "executionStats": {
+    "executionTimeMillis": 5247,
+    "totalDocsExamined": 1000000,
+    "totalKeysExamined": 0,
+    "nReturned": 20,
+    "executionStages": {
+      "stage": "SORT",
+      "inputStage": {
+        "stage": "COLLSCAN",  // Full collection scan!
+        "filter": { ... }
+      }
+    }
+  }
+}
+
+// After optimization
+{
+  "executionStats": {
+    "executionTimeMillis": 52,
+    "totalDocsExamined": 20,
+    "totalKeysExamined": 342,
+    "nReturned": 20,
+    "executionStages": {
+      "stage": "LIMIT",
+      "inputStage": {
+        "stage": "FETCH",
+        "inputStage": {
+          "stage": "IXSCAN",  // Index scan!
+          "indexName": "category_1_inStock_1_avgRating_1_price_1_createdAt_-1"
+        }
+      }
+    }
+  }
+}
+```
+
+**Additional Optimizations**
+
+```javascript
+// 6. Add projection to reduce data transfer
+db.products.find({
+  category: "Electronics",
+  inStock: true,
+  avgRating: { $gte: 4 },
+  price: { $gte: 100, $lte: 1000 }
+}, {
+  _id: 1,
+  name: 1,
+  price: 1,
+  avgRating: 1,
+  thumbnail: 1
+}).sort({ createdAt: -1 }).limit(20)
+
+// 7. Use covered query (all fields in index)
+db.products.createIndex({
+  category: 1,
+  inStock: 1,
+  avgRating: 1,
+  price: 1,
+  createdAt: -1,
+  name: 1,
+  thumbnail: 1
+})
+
+// Result: 25ms (200x improvement!)
+```
+
+**Lessons Learned**:
+- Always check explain plans
+- Denormalize when necessary
+- Index field order matters
+- Use covered queries when possible
+- Monitor index usage regularly
+
+### 152. How would you migrate a 500GB MongoDB database to a new cluster with minimal downtime?
+
+**Migration Strategy**: Replica set migration with oplog replay
+
+**Pre-Migration Planning**
+
+```bash
+# 1. Assess current database
+mongosh --eval '
+  db.adminCommand({dbStats: 1}).forEach(stat => {
+    print("DB:", stat.db, "Size:", stat.dataSize / 1024 / 1024 / 1024, "GB");
+  })
+'
+
+# 2. Check indexes and collections
+mongosh --eval '
+  db.getCollectionNames().forEach(col => {
+    print("Collection:", col);
+    print("Indexes:", db[col].getIndexes().length);
+    print("Size:", db[col].stats().size / 1024 / 1024, "MB");
+  })
+'
+
+# 3. Test network bandwidth
+iperf3 -c new-cluster-host -t 60
+```
+
+**Migration Steps**
+
+```bash
+# Phase 1: Initial Sync (2-4 hours for 500GB)
+# =========================================
+
+# 1. Start mongorestore with oplog replay
+mongodump --host old-cluster:27017 \
+  --username admin \
+  --password secret \
+  --oplog \
+  --gzip \
+  --out /backup/initial-dump
+
+# 2. Restore to new cluster
+mongorestore --host new-cluster:27017 \
+  --username admin \
+  --password secret \
+  --oplogReplay \
+  --gzip \
+  --dir /backup/initial-dump \
+  --numParallelCollections=4
+
+# Phase 2: Continuous Sync (ongoing)
+# ===================================
+
+# 3. Set up change streams for live sync
+```
+
+```javascript
+// sync-service.js - Continuous sync using change streams
+const { MongoClient } = require('mongodb');
+
+const sourceClient = new MongoClient('mongodb://old-cluster:27017');
+const targetClient = new MongoClient('mongodb://new-cluster:27017');
+
+async function continuousSync() {
+  await sourceClient.connect();
+  await targetClient.connect();
+
+  const sourceDB = sourceClient.db('production');
+  const targetDB = targetClient.db('production');
+
+  // Watch all collections
+  const changeStream = sourceDB.watch([], { fullDocument: 'updateLookup' });
+
+  console.log('Starting continuous sync...');
+  
+  for await (const change of changeStream) {
+    try {
+      const collection = targetDB.collection(change.ns.coll);
+      
+      switch (change.operationType) {
+        case 'insert':
+          await collection.insertOne(change.fullDocument);
+          break;
+        case 'update':
+          await collection.updateOne(
+            { _id: change.documentKey._id },
+            { $set: change.fullDocument }
+          );
+          break;
+        case 'replace':
+          await collection.replaceOne(
+            { _id: change.documentKey._id },
+            change.fullDocument
+          );
+          break;
+        case 'delete':
+          await collection.deleteOne({ _id: change.documentKey._id });
+          break;
+      }
+      
+      console.log(`Synced ${change.operationType} on ${change.ns.coll}`);
+    } catch (error) {
+      console.error('Sync error:', error);
+      // Log to monitoring system
+    }
+  }
+}
+
+continuousSync().catch(console.error);
+```
+
+```bash
+# Run sync service
+node sync-service.js &
+
+# Phase 3: Validation (30 minutes)
+# =================================
+
+# 4. Compare document counts
+mongosh --eval '
+  const source = connect("mongodb://old-cluster:27017/production");
+  const target = connect("mongodb://new-cluster:27017/production");
+  
+  source.getCollectionNames().forEach(col => {
+    const sourceCount = source[col].countDocuments();
+    const targetCount = target[col].countDocuments();
+    print(col, "Source:", sourceCount, "Target:", targetCount, 
+          "Match:", sourceCount === targetCount);
+  });
+'
+
+# 5. Checksum validation
+```
+
+```javascript
+// validate-migration.js
+async function validateMigration() {
+  const sourceClient = new MongoClient('mongodb://old-cluster:27017');
+  const targetClient = new MongoClient('mongodb://new-cluster:27017');
+
+  await sourceClient.connect();
+  await targetClient.connect();
+
+  const sourceDB = sourceClient.db('production');
+  const targetDB = targetClient.db('production');
+
+  const collections = await sourceDB.listCollections().toArray();
+
+  for (const collInfo of collections) {
+    const collName = collInfo.name;
+    console.log(`Validating ${collName}...`);
+
+    // Sample validation (check 1000 random documents)
+    const sourceDocs = await sourceDB.collection(collName)
+      .aggregate([{ $sample: { size: 1000 } }])
+      .toArray();
+
+    for (const doc of sourceDocs) {
+      const targetDoc = await targetDB.collection(collName)
+        .findOne({ _id: doc._id });
+
+      if (JSON.stringify(doc) !== JSON.stringify(targetDoc)) {
+        console.error(`Mismatch in ${collName}:`, doc._id);
+      }
+    }
+  }
+
+  console.log('Validation complete');
+}
+
+validateMigration().catch(console.error);
+```
+
+```bash
+# Phase 4: Cutover (5-10 minutes downtime)
+# ==========================================
+
+# 6. Enable read-only mode on old cluster
+mongosh --eval '
+  db.adminCommand({
+    setParameter: 1,
+    readOnly: 1
+  })
+'
+
+# 7. Final sync (ensure all changes replicated)
+# Wait for sync service to catch up (check lag)
+
+# 8. Stop sync service
+kill $(pgrep -f sync-service.js)
+
+# 9. Update application connection strings
+# Deploy new config with new cluster URI
+
+# 10. Verify application connectivity
+curl -f http://app-server/health || echo "Health check failed!"
+
+# 11. Monitor new cluster
+mongostat --host new-cluster:27017
+
+# 12. Keep old cluster running for 24-48 hours as backup
+```
+
+**Rollback Plan**
+
+```bash
+# If issues arise, rollback to old cluster
+# 1. Update connection strings back to old cluster
+# 2. Disable read-only mode
+mongosh old-cluster --eval 'db.adminCommand({setParameter: 1, readOnly: 0})'
+```
+
+**Alternative: Using MongoMirror (Atlas Migration)**
+
+```bash
+# For Atlas migrations (minimal code)
+mongomirror \
+  --host old-cluster:27017 \
+  --username admin \
+  --password secret \
+  --destination "mongodb+srv://new-cluster.mongodb.net" \
+  --destinationUsername admin \
+  --destinationPassword secret \
+  --numParallelCollections 8 \
+  --writeConcern "{w: 'majority'}"
+
+# Continuous sync automatically handles oplog
+# Cutover when lag < 1 second
+```
+
+**Post-Migration**
+
+```bash
+# Monitor performance
+mongotop --host new-cluster:27017
+mongostat --host new-cluster:27017
+
+# Rebuild indexes if needed
+mongosh new-cluster --eval 'db.collection.reIndex()'
+
+# Update monitoring and backups
+# Decommission old cluster after 1 week
+```
+
+### 153. How would you design MongoDB for an ecommerce site (products, users, orders)?
+
+**Schema Design Strategy**
+
+**1. Users Collection**
+
+```javascript
+// users collection
+{
+  _id: ObjectId("..."),
+  email: "user@example.com",
+  passwordHash: "$2b$10$...",
+  profile: {
+    firstName: "John",
+    lastName: "Doe",
+    phone: "+1234567890",
+    avatar: "https://cdn.example.com/avatars/user123.jpg"
+  },
+  addresses: [
+    {
+      _id: ObjectId("..."),
+      type: "shipping",
+      street: "123 Main St",
+      city: "New York",
+      state: "NY",
+      zipCode: "10001",
+      country: "USA",
+      isDefault: true
+    }
+  ],
+  paymentMethods: [
+    {
+      _id: ObjectId("..."),
+      type: "card",
+      last4: "4242",
+      brand: "visa",
+      expiryMonth: 12,
+      expiryYear: 2025,
+      isDefault: true
+    }
+  ],
+  preferences: {
+    currency: "USD",
+    language: "en",
+    notifications: {
+      email: true,
+      sms: false
+    }
+  },
+  metadata: {
+    lastLogin: ISODate("2024-11-13T10:00:00Z"),
+    loginCount: 156,
+    createdAt: ISODate("2023-01-15T08:00:00Z"),
+    updatedAt: ISODate("2024-11-13T10:00:00Z")
+  }
+}
+
+// Indexes
+db.users.createIndex({ email: 1 }, { unique: true })
+db.users.createIndex({ "profile.phone": 1 })
+db.users.createIndex({ "metadata.lastLogin": -1 })
+```
+
+**2. Products Collection**
+
+```javascript
+// products collection
+{
+  _id: ObjectId("..."),
+  sku: "LAPTOP-XPS-15-2024",
+  name: "Dell XPS 15 Laptop",
+  slug: "dell-xps-15-laptop",
+  description: "High-performance laptop...",
+  category: {
+    _id: ObjectId("..."),
+    name: "Electronics",
+    path: "/electronics/computers/laptops",
+    breadcrumbs: ["Electronics", "Computers", "Laptops"]
+  },
+  pricing: {
+    basePrice: 1299.99,
+    salePrice: 1199.99,
+    currency: "USD",
+    discountPercentage: 7.7,
+    validUntil: ISODate("2024-12-31T23:59:59Z")
+  },
+  inventory: {
+    quantity: 45,
+    reserved: 5,  // Items in pending orders
+    available: 40,  // quantity - reserved
+    reorderLevel: 10,
+    reorderQuantity: 50,
+    warehouses: [
+      { location: "US-EAST", quantity: 25 },
+      { location: "US-WEST", quantity: 20 }
+    ]
+  },
+  specifications: {
+    processor: "Intel Core i7-13700H",
+    ram: "16GB DDR5",
+    storage: "512GB SSD",
+    display: "15.6\" 4K OLED",
+    weight: "4.2 lbs"
+  },
+  images: [
+    {
+      url: "https://cdn.example.com/products/laptop-main.jpg",
+      alt: "Dell XPS 15 Front View",
+      isPrimary: true
+    },
+    {
+      url: "https://cdn.example.com/products/laptop-side.jpg",
+      alt: "Dell XPS 15 Side View",
+      isPrimary: false
+    }
+  ],
+  variants: [
+    {
+      _id: ObjectId("..."),
+      sku: "LAPTOP-XPS-15-2024-32GB",
+      attributes: { ram: "32GB" },
+      priceAdjustment: 200,
+      inventory: { quantity: 15 }
+    }
+  ],
+  seo: {
+    title: "Dell XPS 15 - Best Laptop 2024",
+    metaDescription: "High-performance laptop...",
+    keywords: ["laptop", "dell", "xps 15"]
+  },
+  // Denormalized review summary for performance
+  reviews: {
+    averageRating: 4.7,
+    totalCount: 2847,
+    ratingDistribution: {
+      5: 2100,
+      4: 500,
+      3: 150,
+      2: 50,
+      1: 47
+    }
+  },
+  tags: ["bestseller", "new-arrival", "featured"],
+  status: "active",
+  metadata: {
+    createdAt: ISODate("2024-01-01T00:00:00Z"),
+    updatedAt: ISODate("2024-11-13T10:00:00Z"),
+    createdBy: ObjectId("..."),
+    viewCount: 125483,
+    purchaseCount: 847
+  }
+}
+
+// Indexes
+db.products.createIndex({ sku: 1 }, { unique: true })
+db.products.createIndex({ slug: 1 }, { unique: true })
+db.products.createIndex({ "category.path": 1, status: 1 })
+db.products.createIndex({ status: 1, "pricing.salePrice": 1 })
+db.products.createIndex({ tags: 1 })
+db.products.createIndex({ "reviews.averageRating": -1, "metadata.purchaseCount": -1 })
+
+// Text search index
+db.products.createIndex({ 
+  name: "text", 
+  description: "text", 
+  "specifications": "text" 
+})
+```
+
+**3. Orders Collection**
+
+```javascript
+// orders collection
+{
+  _id: ObjectId("..."),
+  orderNumber: "ORD-2024-11-00123456",
+  userId: ObjectId("..."),
+  
+  // Embedded customer info for historical record
+  customer: {
+    email: "user@example.com",
+    name: "John Doe",
+    phone: "+1234567890"
+  },
+  
+  items: [
+    {
+      productId: ObjectId("..."),
+      sku: "LAPTOP-XPS-15-2024",
+      name: "Dell XPS 15 Laptop",  // Denormalized for historical record
+      quantity: 1,
+      unitPrice: 1199.99,
+      subtotal: 1199.99,
+      thumbnail: "https://cdn.example.com/products/laptop-thumb.jpg",
+      
+      // Snapshot of product specs at time of order
+      specifications: {
+        processor: "Intel Core i7-13700H",
+        ram: "16GB DDR5"
+      }
+    },
+    {
+      productId: ObjectId("..."),
+      sku: "MOUSE-MX-MASTER-3S",
+      name: "Logitech MX Master 3S",
+      quantity: 1,
+      unitPrice: 99.99,
+      subtotal: 99.99,
+      thumbnail: "https://cdn.example.com/products/mouse-thumb.jpg"
+    }
+  ],
+  
+  pricing: {
+    subtotal: 1299.98,
+    tax: 104.00,
+    shipping: 0,
+    discount: 50.00,
+    total: 1353.98,
+    currency: "USD"
+  },
+  
+  shippingAddress: {
+    street: "123 Main St",
+    city: "New York",
+    state: "NY",
+    zipCode: "10001",
+    country: "USA"
+  },
+  
+  billingAddress: {
+    street: "123 Main St",
+    city: "New York",
+    state: "NY",
+    zipCode: "10001",
+    country: "USA"
+  },
+  
+  payment: {
+    method: "card",
+    last4: "4242",
+    transactionId: "ch_3Abc123...",
+    processor: "stripe",
+    status: "completed",
+    paidAt: ISODate("2024-11-13T10:05:00Z")
+  },
+  
+  shipping: {
+    carrier: "UPS",
+    service: "Ground",
+    trackingNumber: "1Z999AA10123456784",
+    estimatedDelivery: ISODate("2024-11-18T23:59:59Z"),
+    shippedAt: ISODate("2024-11-14T10:00:00Z"),
+    deliveredAt: null
+  },
+  
+  status: "processing",  // pending, processing, shipped, delivered, cancelled
+  
+  // Order lifecycle events
+  timeline: [
+    {
+      status: "pending",
+      timestamp: ISODate("2024-11-13T10:00:00Z"),
+      note: "Order placed"
+    },
+    {
+      status: "processing",
+      timestamp: ISODate("2024-11-13T10:05:00Z"),
+      note: "Payment confirmed"
+    }
+  ],
+  
+  metadata: {
+    source: "web",  // web, mobile, api
+    ipAddress: "203.0.113.42",
+    userAgent: "Mozilla/5.0...",
+    createdAt: ISODate("2024-11-13T10:00:00Z"),
+    updatedAt: ISODate("2024-11-13T10:05:00Z")
+  }
+}
+
+// Indexes
+db.orders.createIndex({ orderNumber: 1 }, { unique: true })
+db.orders.createIndex({ userId: 1, "metadata.createdAt": -1 })
+db.orders.createIndex({ status: 1, "metadata.createdAt": -1 })
+db.orders.createIndex({ "customer.email": 1 })
+db.orders.createIndex({ "payment.transactionId": 1 })
+db.orders.createIndex({ "shipping.trackingNumber": 1 })
+db.orders.createIndex({ "metadata.createdAt": -1 })
+```
+
+**4. Reviews Collection (Separate for scalability)**
+
+```javascript
+// reviews collection
+{
+  _id: ObjectId("..."),
+  productId: ObjectId("..."),
+  userId: ObjectId("..."),
+  orderId: ObjectId("..."),  // Verified purchase
+  
+  rating: 5,
+  title: "Excellent laptop!",
+  comment: "Best laptop I've ever owned. Fast and reliable.",
+  
+  // Embedded user info (denormalized)
+  author: {
+    name: "John D.",
+    avatar: "https://cdn.example.com/avatars/user123.jpg",
+    verified: true  // Verified purchase
+  },
+  
+  images: [
+    "https://cdn.example.com/reviews/img1.jpg",
+    "https://cdn.example.com/reviews/img2.jpg"
+  ],
+  
+  helpfulCount: 24,
+  notHelpfulCount: 2,
+  
+  response: {  // Seller response
+    text: "Thank you for your review!",
+    respondedAt: ISODate("2024-11-14T10:00:00Z"),
+    responderName: "Dell Support"
+  },
+  
+  status: "approved",  // pending, approved, rejected
+  
+  metadata: {
+    createdAt: ISODate("2024-11-13T10:00:00Z"),
+    updatedAt: ISODate("2024-11-13T10:00:00Z")
+  }
+}
+
+// Indexes
+db.reviews.createIndex({ productId: 1, "metadata.createdAt": -1 })
+db.reviews.createIndex({ userId: 1, "metadata.createdAt": -1 })
+db.reviews.createIndex({ productId: 1, status: 1, rating: -1 })
+```
+
+**5. Cart Collection (Temporary Data)**
+
+```javascript
+// carts collection
+{
+  _id: ObjectId("..."),
+  userId: ObjectId("..."),  // null for guest users
+  sessionId: "sess_abc123...",  // For guest carts
+  
+  items: [
+    {
+      productId: ObjectId("..."),
+      sku: "LAPTOP-XPS-15-2024",
+      quantity: 1,
+      addedAt: ISODate("2024-11-13T09:00:00Z")
+    }
+  ],
+  
+  // TTL index will auto-delete after 30 days
+  expiresAt: ISODate("2024-12-13T10:00:00Z"),
+  
+  metadata: {
+    createdAt: ISODate("2024-11-13T09:00:00Z"),
+    updatedAt: ISODate("2024-11-13T10:00:00Z")
+  }
+}
+
+// Indexes
+db.carts.createIndex({ userId: 1 })
+db.carts.createIndex({ sessionId: 1 })
+db.carts.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })  // TTL
+```
+
+**Key Design Decisions**
+
+**1. Embedding vs Referencing**
+```javascript
+// Embed: One-to-few relationships, data doesn't change often
+// - Order items (historical snapshot)
+// - User addresses
+// - Product images
+
+// Reference: One-to-many or many-to-many, frequently updated
+// - Product reviews (could be thousands)
+// - Order -> User (user data changes)
+// - Product -> Category (shared across products)
+```
+
+**2. Denormalization for Performance**
+```javascript
+// Product review summary embedded in products
+{
+  reviews: {
+    averageRating: 4.7,
+    totalCount: 2847
+  }
+}
+
+// Update using aggregation pipeline
+db.products.updateOne(
+  { _id: productId },
+  [
+    {
+      $set: {
+        "reviews.averageRating": "$calculatedAverage",
+        "reviews.totalCount": "$reviewCount"
+      }
+    }
+  ]
+);
+```
+
+**3. Sharding Strategy**
+```javascript
+// Shard orders by userId for even distribution
+sh.shardCollection("ecommerce.orders", { userId: "hashed" })
+
+// Shard products by category for geographic distribution
+sh.shardCollection("ecommerce.products", { "category._id": 1 })
+```
+
+**4. Inventory Management with Transactions**
+```javascript
+// Ensure inventory consistency
+async function placeOrder(userId, items) {
+  const session = client.startSession();
+  
+  try {
+    await session.withTransaction(async () => {
+      // 1. Reserve inventory
+      for (const item of items) {
+        const result = await db.collection('products').updateOne(
+          {
+            _id: item.productId,
+            "inventory.available": { $gte: item.quantity }
+          },
+          {
+            $inc: {
+              "inventory.reserved": item.quantity,
+              "inventory.available": -item.quantity
+            }
+          },
+          { session }
+        );
+        
+        if (result.modifiedCount === 0) {
+          throw new Error(`Insufficient inventory for ${item.sku}`);
+        }
+      }
+      
+      // 2. Create order
+      const order = await db.collection('orders').insertOne({
+        userId,
+        items,
+        status: "pending",
+        createdAt: new Date()
+      }, { session });
+      
+      return order;
+    });
+    
+    console.log("Order placed successfully");
+  } finally {
+    await session.endSession();
+  }
+}
+```
+
+### 154. How would you store and query logs or IoT data efficiently?
+
+**Schema Design for Time-Series Data**
+
+**Option 1: Time-Series Collections (MongoDB 5.0+)**
+
+```javascript
+// Create time-series collection
+db.createCollection("iot_sensors", {
+  timeseries: {
+    timeField: "timestamp",
+    metaField: "metadata",
+    granularity: "minutes"  // seconds, minutes, or hours
+  }
+});
+
+// Document structure
+{
+  timestamp: ISODate("2024-11-13T10:30:00Z"),
+  metadata: {
+    sensorId: "sensor_001",
+    location: "warehouse_a",
+    type: "temperature"
+  },
+  temperature: 22.5,
+  humidity: 45.2,
+  pressure: 1013.25
+}
+
+// Efficient queries
+db.iot_sensors.find({
+  "metadata.sensorId": "sensor_001",
+  timestamp: {
+    $gte: ISODate("2024-11-13T00:00:00Z"),
+    $lt: ISODate("2024-11-14T00:00:00Z")
+  }
+});
+
+// Aggregation with automatic bucketing
+db.iot_sensors.aggregate([
+  {
+    $match: {
+      "metadata.location": "warehouse_a",
+      timestamp: {
+        $gte: ISODate("2024-11-13T00:00:00Z")
+      }
+    }
+  },
+  {
+    $group: {
+      _id: {
+        $dateTrunc: {
+          date: "$timestamp",
+          unit: "hour"
+        }
+      },
+      avgTemp: { $avg: "$temperature" },
+      maxTemp: { $max: "$temperature" },
+      minTemp: { $min: "$temperature" },
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $sort: { _id: 1 }
+  }
+]);
+```
+
+**Option 2: Bucketing Pattern (Pre-aggregated documents)**
+
+```javascript
+// Store one document per hour with measurements array
+{
+  _id: ObjectId("..."),
+  sensorId: "sensor_001",
+  location: "warehouse_a",
+  bucketDate: ISODate("2024-11-13T10:00:00Z"),  // Start of hour
+  
+  measurements: [
+    {
+      timestamp: ISODate("2024-11-13T10:00:15Z"),
+      temperature: 22.5,
+      humidity: 45.2
+    },
+    {
+      timestamp: ISODate("2024-11-13T10:01:15Z"),
+      temperature: 22.6,
+      humidity: 45.1
+    }
+    // ... up to 3600 measurements (one per second)
+  ],
+  
+  // Pre-computed statistics
+  stats: {
+    count: 3600,
+    temperature: {
+      min: 21.8,
+      max: 23.2,
+      avg: 22.4,
+      sum: 80640
+    },
+    humidity: {
+      min: 44.0,
+      max: 46.5,
+      avg: 45.2
+    }
+  }
+}
+
+// Indexes
+db.iot_buckets.createIndex({ sensorId: 1, bucketDate: -1 })
+db.iot_buckets.createIndex({ location: 1, bucketDate: -1 })
+
+// Insert new measurement
+db.iot_buckets.updateOne(
+  {
+    sensorId: "sensor_001",
+    bucketDate: ISODate("2024-11-13T10:00:00Z"),
+    "measurements.599": { $exists: false }  // Check if bucket not full
+  },
+  {
+    $push: {
+      measurements: {
+        timestamp: ISODate("2024-11-13T10:30:15Z"),
+        temperature: 22.5,
+        humidity: 45.2
+      }
+    },
+    $inc: {
+      "stats.count": 1,
+      "stats.temperature.sum": 22.5
+    },
+    $min: {
+      "stats.temperature.min": 22.5
+    },
+    $max: {
+      "stats.temperature.max": 22.5
+    }
+  },
+  { upsert: true }
+);
+
+// Query hourly averages (fast - uses pre-computed stats)
+db.iot_buckets.find({
+  sensorId: "sensor_001",
+  bucketDate: {
+    $gte: ISODate("2024-11-13T00:00:00Z"),
+    $lt: ISODate("2024-11-14T00:00:00Z")
+  }
+}, {
+  bucketDate: 1,
+  "stats.temperature.avg": 1
+});
+```
+
+**Application Logs Schema**
+
+```javascript
+// logs collection
+{
+  _id: ObjectId("..."),
+  timestamp: ISODate("2024-11-13T10:30:15.123Z"),
+  level: "error",  // debug, info, warn, error, fatal
+  
+  service: {
+    name: "api-gateway",
+    version: "2.1.0",
+    instance: "api-gw-01"
+  },
+  
+  message: "Database connection timeout",
+  
+  context: {
+    userId: "user_123",
+    requestId: "req_abc123",
+    endpoint: "/api/products",
+    method: "GET",
+    statusCode: 500,
+    duration: 5000  // milliseconds
+  },
+  
+  error: {
+    name: "TimeoutError",
+    message: "Connection timeout after 5000ms",
+    stack: "TimeoutError: Connection timeout...",
+    code: "ETIMEDOUT"
+  },
+  
+  metadata: {
+    hostname: "server-01",
+    pid: 12345,
+    environment: "production",
+    region: "us-east-1"
+  }
+}
+
+// Indexes for log querying
+db.logs.createIndex({ timestamp: -1 })
+db.logs.createIndex({ level: 1, timestamp: -1 })
+db.logs.createIndex({ "service.name": 1, timestamp: -1 })
+db.logs.createIndex({ "context.userId": 1, timestamp: -1 })
+db.logs.createIndex({ "context.requestId": 1 })
+
+// TTL index - auto-delete logs after 30 days
+db.logs.createIndex(
+  { timestamp: 1 },
+  { expireAfterSeconds: 2592000 }  // 30 days
+);
+```
+
+**Efficient Log Queries**
+
+```javascript
+// 1. Find errors in last hour
+db.logs.find({
+  level: "error",
+  timestamp: {
+    $gte: new Date(Date.now() - 3600000)
+  }
+}).sort({ timestamp: -1 }).limit(100);
+
+// 2. Aggregation for error trends
+db.logs.aggregate([
+  {
+    $match: {
+      level: { $in: ["error", "fatal"] },
+      timestamp: {
+        $gte: ISODate("2024-11-13T00:00:00Z")
+      }
+    }
+  },
+  {
+    $group: {
+      _id: {
+        service: "$service.name",
+        hour: {
+          $dateToString: {
+            format: "%Y-%m-%d %H:00",
+            date: "$timestamp"
+          }
+        }
+      },
+      count: { $sum: 1 },
+      uniqueErrors: { $addToSet: "$error.name" }
+    }
+  },
+  {
+    $sort: { "_id.hour": -1, count: -1 }
+  }
+]);
+
+// 3. Find slow requests
+db.logs.find({
+  "context.duration": { $gt: 1000 },
+  timestamp: {
+    $gte: new Date(Date.now() - 3600000)
+  }
+}).sort({ "context.duration": -1 }).limit(10);
+
+// 4. Trace request across services
+db.logs.find({
+  "context.requestId": "req_abc123"
+}).sort({ timestamp: 1 });
+```
+
+**Data Retention Strategy**
+
+```javascript
+// Archive old logs to cold storage (S3, Data Lake)
+const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600000);
+
+// Export to S3 using mongoexport
+mongoexport --db logs --collection logs \
+  --query '{"timestamp": {"$lt": {"$date": "2024-10-14T00:00:00Z"}}}' \
+  --out logs_archive_2024_10.json
+
+// Upload to S3
+aws s3 cp logs_archive_2024_10.json s3://company-logs/archives/2024/10/
+
+// Delete archived logs
+db.logs.deleteMany({
+  timestamp: { $lt: thirtyDaysAgo }
+});
+```
+
+**Performance Optimization**
+
+```javascript
+// 1. Use capped collections for real-time logs (limited size)
+db.createCollection("realtime_logs", {
+  capped: true,
+  size: 10485760,  // 10MB
+  max: 10000       // Max 10k documents
+});
+
+// 2. Sharding for horizontal scaling
+sh.shardCollection("logs.logs", { 
+  "service.name": 1, 
+  timestamp: 1 
+});
+
+// 3. Use $out to create summary collections
+db.logs.aggregate([
+  {
+    $match: {
+      timestamp: {
+        $gte: ISODate("2024-11-13T00:00:00Z"),
+        $lt: ISODate("2024-11-14T00:00:00Z")
+      }
+    }
+  },
+  {
+    $group: {
+      _id: {
+        service: "$service.name",
+        level: "$level"
+      },
+      count: { $sum: 1 }
+    }
+  },
+  {
+    $out: "daily_log_summary"
+  }
+]);
+```
+
+### 155. What's your strategy for schema versioning and backward compatibility?
+
+**Schema Versioning Strategy**
+
+**1. Version Field Approach**
+
+```javascript
+// Add schema version to documents
+{
+  _id: ObjectId("..."),
+  schemaVersion: 2,  // Current version
+  
+  // Version 2 fields
+  email: "user@example.com",
+  profile: {
+    firstName: "John",
+    lastName: "Doe",
+    fullName: "John Doe"  // Added in v2
+  },
+  
+  // Deprecated fields (kept for backward compatibility)
+  name: "John Doe",  // Deprecated in v2, use profile.fullName
+  
+  createdAt: ISODate("2023-01-01T00:00:00Z"),
+  updatedAt: ISODate("2024-11-13T10:00:00Z")
+}
+```
+
+**2. Migration Scripts**
+
+```javascript
+// migration_v1_to_v2.js
+async function migrateUsersV1ToV2() {
+  const users = db.users.find({ 
+    $or: [
+      { schemaVersion: { $exists: false } },
+      { schemaVersion: 1 }
+    ]
+  });
+
+  let migrated = 0;
+  let failed = 0;
+
+  for await (const user of users) {
+    try {
+      // Split name into firstName and lastName
+      const [firstName, ...lastNameParts] = user.name.split(' ');
+      const lastName = lastNameParts.join(' ');
+
+      await db.users.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            schemaVersion: 2,
+            "profile.firstName": firstName,
+            "profile.lastName": lastName,
+            "profile.fullName": user.name,
+            updatedAt: new Date()
+          }
+          // Keep old 'name' field for backward compatibility
+        }
+      );
+
+      migrated++;
+      
+      if (migrated % 1000 === 0) {
+        console.log(`Migrated ${migrated} users...`);
+      }
+    } catch (error) {
+      console.error(`Failed to migrate user ${user._id}:`, error);
+      failed++;
+    }
+  }
+
+  console.log(`Migration complete: ${migrated} migrated, ${failed} failed`);
+}
+
+// Run migration
+migrateUsersV1ToV2();
+```
+
+**3. Lazy Migration Approach**
+
+```javascript
+// Migrate documents on read/write
+class UserRepository {
+  async findById(userId) {
+    const user = await db.collection('users').findOne({ _id: userId });
+    
+    if (!user) return null;
+    
+    // Migrate if needed
+    if (!user.schemaVersion || user.schemaVersion < 2) {
+      return await this.migrateAndReturn(user);
+    }
+    
+    return user;
+  }
+
+  async migrateAndReturn(user) {
+    const migrated = this.migrateUserToV2(user);
+    
+    // Save migrated version
+    await db.collection('users').updateOne(
+      { _id: user._id },
+      { $set: migrated }
+    );
+    
+    return migrated;
+  }
+
+  migrateUserToV2(user) {
+    // Apply transformations
+    const [firstName, ...lastNameParts] = user.name.split(' ');
+    
+    return {
+      ...user,
+      schemaVersion: 2,
+      profile: {
+        ...user.profile,
+        firstName,
+        lastName: lastNameParts.join(' '),
+        fullName: user.name
+      }
+    };
+  }
+}
+```
+
+**4. Schema Validation with Versioning**
+
+```javascript
+// Define schemas for different versions
+const schemaV1 = {
+  $jsonSchema: {
+    bsonType: "object",
+    required: ["email", "name"],
+    properties: {
+      schemaVersion: { enum: [1] },
+      email: { bsonType: "string" },
+      name: { bsonType: "string" }
+    }
+  }
+};
+
+const schemaV2 = {
+  $jsonSchema: {
+    bsonType: "object",
+    required: ["email", "profile"],
+    properties: {
+      schemaVersion: { enum: [2] },
+      email: { bsonType: "string" },
+      profile: {
+        bsonType: "object",
+        required: ["firstName", "lastName", "fullName"],
+        properties: {
+          firstName: { bsonType: "string" },
+          lastName: { bsonType: "string" },
+          fullName: { bsonType: "string" }
+        }
+      }
+    }
+  }
+};
+
+// Combined validation (allows both versions)
+db.runCommand({
+  collMod: "users",
+  validator: {
+    $or: [schemaV1, schemaV2]
+  },
+  validationLevel: "moderate"  // Only validate updates
+});
+```
+
+**5. API Layer Compatibility**
+
+```javascript
+// API versioning to handle different schema versions
+class UserService {
+  async getUser(userId, apiVersion = 'v2') {
+    const user = await db.collection('users').findOne({ _id: userId });
+    
+    if (!user) return null;
+    
+    // Transform based on API version
+    switch (apiVersion) {
+      case 'v1':
+        return this.transformToV1(user);
+      case 'v2':
+      default:
+        return this.transformToV2(user);
+    }
+  }
+
+  transformToV1(user) {
+    // Return v1 format even if stored as v2
+    return {
+      _id: user._id,
+      email: user.email,
+      name: user.profile?.fullName || user.name,
+      createdAt: user.createdAt
+    };
+  }
+
+  transformToV2(user) {
+    // Return v2 format
+    return {
+      _id: user._id,
+      email: user.email,
+      profile: user.profile || {
+        firstName: user.name.split(' ')[0],
+        lastName: user.name.split(' ').slice(1).join(' '),
+        fullName: user.name
+      },
+      createdAt: user.createdAt
+    };
+  }
+}
+
+// Express routes with versioning
+app.get('/v1/users/:id', async (req, res) => {
+  const user = await userService.getUser(req.params.id, 'v1');
+  res.json(user);
+});
+
+app.get('/v2/users/:id', async (req, res) => {
+  const user = await userService.getUser(req.params.id, 'v2');
+  res.json(user);
+});
+```
+
+**6. Rollback Strategy**
+
+```javascript
+// Keep migration history
+{
+  _id: ObjectId("..."),
+  collection: "users",
+  fromVersion: 1,
+  toVersion: 2,
+  migratedCount: 150000,
+  failedCount: 25,
+  startedAt: ISODate("2024-11-13T10:00:00Z"),
+  completedAt: ISODate("2024-11-13T11:30:00Z"),
+  status: "completed"
+}
+
+// Rollback script
+async function rollbackUsersV2ToV1() {
+  const users = db.users.find({ schemaVersion: 2 });
+
+  for await (const user of users) {
+    await db.users.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          schemaVersion: 1,
+          name: user.profile.fullName
+        },
+        $unset: {
+          profile: ""
+        }
+      }
+    );
+  }
+}
+```
+
+**7. Testing Strategy**
+
+```javascript
+// Test compatibility between versions
+describe('Schema Compatibility', () => {
+  it('should read v1 documents with v2 code', async () => {
+    // Insert v1 document
+    await db.collection('users').insertOne({
+      schemaVersion: 1,
+      email: 'test@example.com',
+      name: 'John Doe'
+    });
+
+    // Read with v2 code
+    const user = await userService.getUser(userId, 'v2');
+    
+    expect(user.profile.firstName).toBe('John');
+    expect(user.profile.lastName).toBe('Doe');
+  });
+
+  it('should read v2 documents with v1 code', async () => {
+    // Insert v2 document
+    await db.collection('users').insertOne({
+      schemaVersion: 2,
+      email: 'test@example.com',
+      profile: {
+        firstName: 'John',
+        lastName: 'Doe',
+        fullName: 'John Doe'
+      }
+    });
+
+    // Read with v1 code
+    const user = await userService.getUser(userId, 'v1');
+    
+    expect(user.name).toBe('John Doe');
+  });
+});
+```
+
+**Best Practices Summary**
+
+1. **Always add version field** to track schema versions
+2. **Never delete old fields** immediately - deprecate gradually
+3. **Use lazy migration** for large collections to avoid downtime
+4. **Implement API versioning** to handle different client expectations
+5. **Test both directions** - new code with old data, old code with new data
+6. **Document changes** in migration scripts and changelogs
+7. **Monitor migration progress** with metrics and logging
+8. **Have rollback plans** ready for each migration
+9. **Use validation** sparingly - allow flexibility during migrations
+10. **Communicate changes** to API consumers with deprecation warnings
+
+---
+
+## Conclusion
+
+This guide covered advanced MongoDB topics including:
+- **Security**: Authentication, encryption, IP whitelisting, audit logging, compliance
+- **Deployment**: Atlas, Ops Manager, Enterprise Advanced, auto-scaling, backups
+- **Tools**: Compass, MongoMirror, mongostat, mongotop, import/export, automation
+- **Real Scenarios**: Query optimization, migrations, schema design, logs/IoT, versioning
+
+**Key Takeaways**:
+- Always test in non-production first
+- Monitor performance continuously
+- Plan for scalability from the start
+- Document your schema design decisions
+- Automate deployments and backups
+- Keep security as top priority
+
+For more information, visit [MongoDB Documentation](https://docs.mongodb.com/)
