@@ -465,3 +465,29 @@ limiter = Limiter(key_func=get_remote_address, storage=storage)
 ```
 This way, rate limits are shared across multiple app instances or workers.
 
+
+# Path Operation Configuration¶
+- There are several parameters that you can pass to your path operation decorator to configure it
+## 1. Response Status Code
+
+You can define the (HTTP) status_code to be used in the response of your path operation.
+
+```@app.post("/items/", response_model=Item, status_code=status.HTTP_201_CREATED)
+```
+## 2. Tags
+You can add tags to your path operation, pass the parameter tags with a list of str (commonly just one str):
+```
+@app.post("/items/", response_model=Item, tags=["items"])
+```
+## 3. You can add a summary and description
+## 4. Description from docstring
+## 5. Response description
+## 6. Deprecate a path operation
+If you need to mark a path operation as deprecated, but without removing it, pass the parameter deprecated:
+
+
+
+
+
+
+
