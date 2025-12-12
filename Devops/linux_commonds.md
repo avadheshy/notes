@@ -1,3 +1,10 @@
+# 1. file
+# 2. commands
+# 3. software
+# 4. servers
+
+
+
         open source software is a software with source code that anyone can insect, modify and inhance.
 
         configuration file are stored in /etc
@@ -5,7 +12,20 @@
         server data is located in /var or /srv
         
         RHEL & Centos are RPM based OS & Ubuntu is Debian Based OS.
-
+- Every thing is file in linux
+```
+With adduser command, the home folder for the user will be created as default.
+With useradd command, there is no home folder for the user.
+ ```
+# Why linux as a server
+- Opensource
+- Community support
+- Support wide veriety of hardware
+- Customization
+- Most server run on linux
+- Automation
+- Security
+# Hardware->Kernel->shell->applications
 # Directory system in linux
 
 ## 1. / (Root Directory)

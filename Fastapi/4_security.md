@@ -91,3 +91,11 @@ Use Depends to apply reusable authentication logic.
 Enable CORS only for trusted domains using CORSMiddleware.
 
 Deploy behind HTTPS with proper certificates (e.g., using Nginx or a proxy).
+
+Oauth2
+Oauth1
+OpenID Connect¶
+OpenID (not "OpenID Connect")
+OpenAPI
+what is the difference between decoding/hashing/signing
+root path

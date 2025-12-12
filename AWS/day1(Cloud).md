@@ -1,3 +1,7 @@
+ec2 feature
+price
+components
+
 # What is Cloud (Cloud Computing) ? 
 Cloud computing refers to the delivery of computing services—like servers, storage, databases, networking, software, analytics, and intelligence—over the internet ("the cloud") instead of using local computers or servers.
 

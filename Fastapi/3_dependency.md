@@ -220,3 +220,30 @@ def test_read_users_me():
 | **Managed lifecycle** | Auto-close DB sessions, etc.                 |
 | **Global scope**      | Apply dependencies across all routes         |
 | **Async ready**       | Seamlessly supports `async def` dependencies |
+
+for a class type dependecy we can use like this
+```
+class abc:
+    pass
+dep = anotated(abc,Depends)  # this is == anotated(abc,Depends(abc))
+# for class type dependency only
+```
+- you can create nested dependency as well 
+- if you declare same dependecy multiple type in one path operation function it will be called once per request and its value will be cached by default.
+- you can use dependency in path operation decorator as well . for those which  doesn't return a value.
+```
+@app.get("/items/", dependencies=[Depends(verify_token), Depends(verify_key)])
+
+```
+# Dependencies with yield
+- FastAPI supports dependencies that do some extra steps after finishing.
+- Make sure to use yield one single time per dependency.
+## Sub-dependencies with yield
+- You can have sub-dependencies and "trees" of sub-dependencies of any size and shape, and any or all of them can use yield.
+- FastAPI will make sure that the "exit code" in each dependency with yield is run in the correct order.
+
+
+
+
+
+
