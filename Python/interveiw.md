@@ -7,8 +7,9 @@
 - **Examples**: int, float, string, tuple, frozenset, bool
 - **Characteristics**:
   - When you "modify" them, a new object is created
-  - Safe to use as dictionary keys
+  - Use immutable types for keys in a dictionary or elements in a set (e.g., strings, numbers, tuples), since they must be hashable.
   - Thread-safe by nature
+  - Behave like "pass by value" (outside doesn’t change).
 
 ### Mutable Data Types
 - **Definition**: Objects whose state can be modified after creation
@@ -17,6 +18,7 @@
   - Can be modified in-place
   - Cannot be used as dictionary keys
   - Need synchronization in multi-threaded environments
+  - Behave like "pass by reference" (outside changes if modified).
 
 ```python
 # Immutable example
@@ -33,7 +35,9 @@ list1.append(4)
 print(list1)  # [1, 2, 3, 4]
 print(list2)  # [1, 2, 3, 4] (both changed)
 ```
+- Python uses "call by object reference" (or "call by sharing").
 
+- This means: when you pass a variable to a function, you’re passing a reference to the object, not the actual value.
 ## 2. Difference Between List and Tuple
 
 | Aspect | List | Tuple |
@@ -47,19 +51,37 @@ print(list2)  # [1, 2, 3, 4] (both changed)
 
 ```python
 # List operations
-my_list = [1, 2, 3]
+#when you need dynamic, frequently changing data.
+#Lists are not hashable → cannot be used as dictionary keys or in sets.
+my_list = [1, 2, 3] # Square brackets
 my_list.append(4)  # Works
 my_list[0] = 10    # Works
 
 # Tuple operations
-my_tuple = (1, 2, 3)
+#when you need fixed, read-only data or faster lookups.
+#Tuples are hashable (if they contain only immutable elements).
+my_tuple = (1, 2, 3) # Parentheses
 # my_tuple.append(4)  # Error!
 # my_tuple[0] = 10    # Error!
 ```
+### why list takes more memory than tuple and tuple are faster than list ?
+- Lists in Python are dynamic arrays → they need extra space for flexibility. A list must support: Adding new elements (append, extend). Removing elements (pop, remove). Resizing dynamically. So Python internally over-allocates memory for lists.
+- A tuple doesn’t need this — its size is fixed → memory is tight, no extra padding.
+- Tuples are immutable → no need to support operations like resize, append, remove. This means: Fewer methods → smaller object overhead. No need to check for changes while iterating → faster iteration. They can be cached internally (Python may reuse small tuples).
 
+```
+Lists take more space because they over-allocate memory to allow dynamic resizing.
+Tuples are faster because they are immutable, use less memory, and require fewer runtime checks.
+```
 ## 3. List Comprehension and Filter
-
 ### List Comprehension
+A list comprehension is a concise way to create lists in Python using a single line of code, instead of using loops.
+## Advantages
+- Shorter and more readable (for simple logic).
+- Faster than a normal loop (optimized in CPython).
+## Disadvantages
+- Can become hard to read if too complex (nested conditions, multiple loops).
+- Not memory-efficient if list is huge (better to use generator expressions with () instead of []).
 ```python
 # Basic syntax: [expression for item in iterable if condition]
 squares = [x**2 for x in range(10)]
@@ -202,7 +224,14 @@ def append_item(item, target_list=None):
 ## 9. Generator
 
 ### Definition
-Functions that return an iterator object, yielding items one at a time using `yield`.
+- A generator is a special type of iterator in Python that lets you generate values on the fly (lazy evaluation) instead of storing everything in memory at once.
+- Normal function → returns a single value with return.
+- Generator function → uses yield (instead of return) to return one value at a time, pausing execution and resuming when asked.
+
+## How Generators Work
+- When called, a generator function does not execute immediately.
+- Instead, it returns a generator object (an iterator).
+- Each call to next() resumes the function from where it left off, until StopIteration is raised.
 
 ```python
 # Generator function
@@ -229,8 +258,15 @@ for _ in range(5):
 ## 10. Decorator
 
 ### Definition
-Functions that modify or extend the behavior of other functions without changing their code.
+- A decorator is a function that takes another function (or class) as input, adds extra functionality to it, and returns the modified function — without changing the original function’s code.
 
+- Think of it like wrapping a function with additional features.
+
+- Python already provides some decorators: @staticmethod @classmethod @property
+### Why use decorators?
+- Add functionality (logging, timing, caching, authentication, etc.)
+- Follow DRY principle (don’t repeat yourself).
+- Keep code clean and reusable.
 ```python
 # Basic decorator
 def my_decorator(func):
@@ -270,7 +306,9 @@ def greet():
 ## 11. Iterator (iter and next)
 
 ### Definition
+An iterator is an object in Python that allows you to iterate (loop) over a sequence of elements one at a time.
 An object that implements the iterator protocol (`__iter__` and `__next__` methods).
+## Difference: iterable provides an iterator, iterator gives next item.
 
 ```python
 # Creating an iterator
@@ -2025,7 +2063,16 @@ def complex_operation():
 ```
 
 ## 43. Match Statement (Python 3.10+)
+the match statement, which is Python’s structural pattern matching introduced in Python 3.10. This is like a much more powerful version of switch-case from other languages.
+The match statement lets you compare a value against patterns and execute code blocks depending on which pattern matches.
+It works with:
 
+- Constants  Variables  Sequences (lists, tuples)  Dictionaries  Classes / objects
+
+## 🔹 Advantages of match statement
+- Cleaner and more readable than long if-elif-else chains.
+- Can destructure complex objects like sequences, dicts, and classes.
+- Powerful for handling structured data (like JSON, tuples, nested data).
 ### Basic Pattern Matching
 ```python
 def handle_data(data):
@@ -2084,7 +2131,22 @@ print(analyze_point(Point(3, 3)))    # On diagonal at (3, 3)
 ```
 
 ## 44. Walrus Operator (:=)
+The walrus operator is called the assignment expression operator.
+It lets you assign a value to a variable as part of an expression.
 
+ In simple words: it allows assignment inside expressions instead of needing a separate line.
+```
+🔹 Normal assignment (without walrus)
+n = len("avadhesh")
+if n > 5:
+    print(f"Length is {n}")
+
+🔹 Using walrus operator
+if (n := len("avadhesh")) > 5:
+    print(f"Length is {n}")
+
+✅ Here, n is assigned and used in the same expression.
+```
 ### Assignment Expressions
 ```python
 # Traditional approach
