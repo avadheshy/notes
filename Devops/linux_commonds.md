@@ -5,7 +5,7 @@
 
 
 
-        open source software is a software with source code that anyone can insect, modify and inhance.
+        open source software is a software with source code that anyone can inspect, modify and inhance.
 
         configuration file are stored in /etc
 
@@ -200,7 +200,7 @@ This command show list of file in a particular format. It start with 10 characte
 
 ## chown -R User:group /file/dir
 This command is used for changing the ower of a file or directory. use -R in case of directory only.
-## chmode ugo+rwx
+## chmod ugo+rwx
 This command is used to add read write and execute permissions to user,group and others. you can use any combination of it. and - to remove permission from it.
 
 ## sudo 

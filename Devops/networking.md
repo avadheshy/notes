@@ -11,7 +11,7 @@ communication between two or more network interfaces.
 7. Application Layer :Network process to application
 6. Presentation  Layer :The functions of the presentation layer are translation, encryption/decryption, and compression.
 5. Session Layer : Interhost communication .This is the layer responsible for opening and closing communication between the two devices. The time between when the communication is opened and closed is known as the session.
-4. Transport layer :It is responsible for end to end delivery and reliablity of the data. (Gateway) Data will be in the from of segment.
+4. Transport layer :It is responsible for end to end delivery and reliablity of the data. (Gateway) Data will be in the form of segment.
 3. Network layer : Here transmission of data from one node to other node happens. It works on IP address. Here data will be in the form of packets. (Router,Firewall and Layer3 switch)
 3. Data Link Layer : Here data will be in the form of frame. Physical addressing happens here. (Bridg,layer2 switch)
 1. Physical Layer : Here Date will be in form of bits (Hub)
