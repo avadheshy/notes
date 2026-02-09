@@ -40,7 +40,16 @@ An **Amazon Machine Image (AMI)** allows you to create and launch EC2 instances 
 
 - Launch EC2 instance from an AMI **on-demand**
 - Create a **Launch Template** using the AMI to automate instance creation in seconds
+- Creates snapshot of ebs volume and contians metadata of ec2.
+- You can copy ec2 from one region to other using AMI .
+- you can share ami to other aws account.
 
+## Launch template
+- create launch template from ami .
+- you have to select instance type.
+- select key pair
+- select security group
+- give tags 
 ---
 
 ##  Create a Target Group for ELB

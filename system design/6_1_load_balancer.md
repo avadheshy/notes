@@ -4,6 +4,9 @@
 - [Load Balancing Concepts](#load-balancing-concepts)
   - [Table of Contents](#table-of-contents)
   - [What is a Load Balancer?](#what-is-a-load-balancer)
+  - [Issues without Load Balancer?](#issues-without-load-balancer)
+  - [Key characteristics of Load Balancers](#key-characteristics-of-load-balancers)
+  - [Benefits of Load Balancer](#benefits-of-load-balancer)
   - [Types of Load Balancers](#types-of-load-balancers)
     - [Layer 4 (Network) Load Balancer](#layer-4-network-load-balancer)
     - [Layer 7 (Application) Load Balancer](#layer-7-application-load-balancer)
@@ -26,7 +29,25 @@
 Load balancing algorithms decide which server should handle each request, making sure they're divvied up fairly. 
 
 You set up a load balancer that sits between your website's users and your servers. When a customer visits your website, their request goes to the load balancer first.
+## Issues without Load Balancer?
+- Single Point of Failure
+- Overloaded Servers
+- Limited Scalability
+## Key characteristics of Load Balancers
+- Traffic Distribution: To keep any one server from becoming overburdened, load balancers divide incoming requests evenly among several servers.
+- High Availability: Applications' reliability and availability are improved by load balancers, which divide traffic among several servers. The load balancer reroutes traffic to servers that are in good condition in the event that one fails.
+- Scalability: By making it simple to add servers or resources to meet growing traffic demands, load balancers enable horizontal scaling.
+- Optimization: Load balancers optimize resource utilization, ensuring efficient use of server capacity and preventing bottlenecks.
+- Health Monitoring: Load balancers often monitor the health of servers, directing traffic away from servers experiencing issues or downtime.
+- SSL Termination: Some load balancers can handle SSL/TLS encryption and decryption, offloading this resource-intensive task from servers.
 
+## Benefits of Load Balancer
+- Better Performance - Distributes traffic across servers so no single server gets overloaded, reducing downtime and improving speed.
+- Scalability - Works with auto-scaling to add more servers during high traffic and remove them when traffic is low.
+Failure Handling - Detects unhealthy servers and redirects traffic to healthy ones, keeping the system available.
+- Prevents Bottlenecks - Handles sudden spikes in traffic smoothly by spreading requests evenly.
+- Efficient Resource Use - Ensures all servers share the workload fairly.
+- Session Persistence - Can maintain user sessions so apps that need continuous sessions (like shopping carts) work properly
 ## Types of Load Balancers
 Load balancers are categorized based on the layer of the OSI model at which they operate.
 

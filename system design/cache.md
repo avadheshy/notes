@@ -17,7 +17,7 @@ Caching is essential for the following reasons:
 
 **Enhanced User Experience**: Faster response times lead to a better user experience, particularly for web and mobile applications
 # 2. Types of caching
-## 2.1 In-Memory Cache
+## 2.1 In-Memory Cache/ Application Server Cache
 In-memory caches store data in the main memory (RAM) for extremely fast access.
 
 These caches are typically used for session management, storing frequently accessed objects, and as a front for databases.

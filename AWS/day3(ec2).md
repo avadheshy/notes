@@ -3,7 +3,7 @@ Amazon EC2 (Elastic Compute Cloud) is a virtual server in the AWS cloud that let
 - In short: An EC2 instance is a virtual machine on AWS.
   
 # Common Use Cases of EC2:
-```
+
 | Use Case                  | Description                                                  |
 | ------------------------- | ------------------------------------------------------------ |
 | **Web Hosting**           | Run websites or web apps (e.g., Django, Node.js, WordPress). |
@@ -15,7 +15,7 @@ Amazon EC2 (Elastic Compute Cloud) is a virtual server in the AWS cloud that let
 | **Gaming Servers**        | Run multiplayer game backend logic.                          |
 | **VPN or Proxy Server**   | Set up a personal VPN or secure proxy.                       |
 
-```
+
 # EC2 Instance Types (Families)
 AWS EC2 offers different instance families optimized for different use cases:
 ![Alt Text](./The-naming-principle-of-AWS-EC2-instance-types-1.png)
@@ -122,7 +122,7 @@ Understanding the concept of virtual servers and instances. Key components of an
 # What is Inbound and Outbound Rules ?
 In network security (especially in cloud services like AWS EC2), Inbound and Outbound Rules control the flow of traffic to and from a resource, like a virtual server or security group.
 - It is related to security group.
-# Security Gooup
+# Security Group
 - Acts as a firewall for one or more instances
 - You can add inbound and outbound rule to security groups that will be apply on ec2.
 - They are statefull.

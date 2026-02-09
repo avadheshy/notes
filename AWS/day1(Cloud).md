@@ -1,7 +1,3 @@
-ec2 feature
-price
-components
-
 # What is Cloud (Cloud Computing) ? 
 Cloud computing refers to the delivery of computing services—like servers, storage, databases, networking, software, analytics, and intelligence—over the internet ("the cloud") instead of using local computers or servers.
 
@@ -135,7 +131,6 @@ Use cutting-edge technologies like:
 
 - You don’t want to manage physical infrastructure.
 
-```markdown
 
 # 1. Region
 ## Definition: 
@@ -159,7 +154,7 @@ Purpose: Forms the building blocks of AZs.
 Each AZ contains multiple data centers, but the exact number is not disclosed by AWS.
 Built with redundancy for power, networking, and cooling to maintain high availability.
 add edge location in this
-```
+
 # 4 Edge Location -
  - Content delivery sites for low-latency access
  - That Edge Locations are separate and used for content delivery (CloudFront, Route 53) rather than infrastructure deployment

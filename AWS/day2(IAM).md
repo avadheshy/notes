@@ -44,7 +44,7 @@ A policy does nothing by itself. It must be attached to a:
 - Group
 - Role
   
-CLI
+
 
 # What is IAM Role ?
 
