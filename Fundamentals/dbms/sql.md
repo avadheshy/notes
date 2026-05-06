@@ -1,194 +1,406 @@
-# Complete SQL Guide - Queries, Design, and Advanced Concepts
+# SQL Complete Reference — Questions & Answers
 
-## 1. SQL Query & Joins
+---
 
-### 1. WHERE vs HAVING
+## Table of Contents
 
-**WHERE** filters rows before grouping, while **HAVING** filters groups after grouping.
+1. [Basic Queries](#1-basic-queries)
+2. [Intermediate Queries](#2-intermediate-queries)
+3. [Advanced Queries & Window Functions](#3-advanced-queries--window-functions)
+4. [SQL Commands & Clauses](#4-sql-commands--clauses)
+5. [Joins](#5-joins)
+6. [Indexing & Performance](#6-indexing--performance)
+7. [Transactions & Concurrency](#7-transactions--concurrency)
+8. [Database Design & Normalization](#8-database-design--normalization)
+9. [Stored Objects — Views, Procedures, Triggers](#9-stored-objects--views-procedures-triggers)
+10. [Advanced & Practical Scenarios](#10-advanced--practical-scenarios)
 
+---
+
+## 1. Basic Queries
+
+---
+
+### Q1. Fetch the second-highest salary from an `Employee` table.
+
+**Method 1 — Subquery (most portable):**
 ```sql
--- WHERE: Filters individual rows
-SELECT department, COUNT(*) as emp_count
-FROM employees
-WHERE salary > 50000  -- Filter rows first
-GROUP BY department;
-
--- HAVING: Filters groups after aggregation
-SELECT department, COUNT(*) as emp_count
-FROM employees
-GROUP BY department
-HAVING COUNT(*) > 5;  -- Filter groups after counting
-
--- Combined usage
-SELECT department, AVG(salary) as avg_salary
-FROM employees
-WHERE hire_date > '2020-01-01'  -- Filter rows first
-GROUP BY department
-HAVING AVG(salary) > 60000;     -- Filter groups after aggregation
+SELECT MAX(salary) AS SecondHighestSalary
+FROM Employee
+WHERE salary < (SELECT MAX(salary) FROM Employee);
 ```
 
-### 2. Types of Joins
-
-#### INNER JOIN
-Returns only matching records from both tables.
-
+**Method 2 — `LIMIT` with `OFFSET`:**
 ```sql
-SELECT e.name, d.department_name
-FROM employees e
-INNER JOIN departments d ON e.department_id = d.id;
-```
-
-#### LEFT JOIN (LEFT OUTER JOIN)
-Returns all records from left table and matching records from right table.
-
-```sql
-SELECT e.name, d.department_name
-FROM employees e
-LEFT JOIN departments d ON e.department_id = d.id;
--- Includes employees without departments (NULL department_name)
-```
-
-#### RIGHT JOIN (RIGHT OUTER JOIN)
-Returns all records from right table and matching records from left table.
-
-```sql
-SELECT e.name, d.department_name
-FROM employees e
-RIGHT JOIN departments d ON e.department_id = d.id;
--- Includes departments without employees (NULL employee names)
-```
-
-#### FULL OUTER JOIN
-Returns all records when there's a match in either table.
-
-```sql
-SELECT e.name, d.department_name
-FROM employees e
-FULL OUTER JOIN departments d ON e.department_id = d.id;
--- Includes all employees and all departments
-```
-
-#### CROSS JOIN
-Returns Cartesian product of both tables.
-
-```sql
-SELECT e.name, d.department_name
-FROM employees e
-CROSS JOIN departments d;
--- Every employee paired with every department
-```
-
-#### Performance Comparison
-1. **INNER JOIN** - Fastest (smallest result set)
-2. **LEFT/RIGHT JOIN** - Moderate performance
-3. **FULL OUTER JOIN** - Slower (larger result set)
-4. **CROSS JOIN** - Slowest (largest result set)
-
-### 3. UNION vs UNION ALL
-
-```sql
--- UNION: Removes duplicates (slower)
-SELECT name FROM employees_2021
-UNION
-SELECT name FROM employees_2022;
-
--- UNION ALL: Keeps duplicates (faster)
-SELECT name FROM employees_2021
-UNION ALL
-SELECT name FROM employees_2022;
-```
-
-**UNION ALL is faster** because it doesn't need to check for and remove duplicates.
-
-### Finding Second Highest Salary
-
-```sql
--- Method 1: Using LIMIT and OFFSET
 SELECT DISTINCT salary
-FROM employees
+FROM Employee
 ORDER BY salary DESC
 LIMIT 1 OFFSET 1;
+```
 
--- Method 2: Using subquery
-SELECT MAX(salary) as second_highest
-FROM employees
-WHERE salary < (SELECT MAX(salary) FROM employees);
-
--- Method 3: Using ROW_NUMBER()
+**Method 3 — `ROW_NUMBER()` window function:**
+```sql
 SELECT salary
 FROM (
-    SELECT salary, ROW_NUMBER() OVER (ORDER BY salary DESC) as rn
-    FROM employees
+    SELECT salary, ROW_NUMBER() OVER (ORDER BY salary DESC) AS rn
+    FROM Employee
 ) ranked
 WHERE rn = 2;
 ```
 
-### 4. Finding Nth Highest Salary
+---
 
+### Q2. Get duplicate records from a table.
+
+**Method 1 — `GROUP BY` + `HAVING`:**
 ```sql
--- Generic solution for Nth highest salary
-SELECT DISTINCT salary
-FROM employees e1
-WHERE (
-    SELECT COUNT(DISTINCT salary)
-    FROM employees e2
-    WHERE e2.salary > e1.salary
-) = N-1;  -- Replace N with desired position
-
--- Using DENSE_RANK() for 3rd highest
-SELECT salary
-FROM (
-    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) as rank
-    FROM employees
-) ranked
-WHERE rank = 3;
-
--- Using LIMIT/OFFSET for 3rd highest
-SELECT DISTINCT salary
-FROM employees
-ORDER BY salary DESC
-LIMIT 1 OFFSET 2;
+SELECT column1, column2, COUNT(*)
+FROM table_name
+GROUP BY column1, column2
+HAVING COUNT(*) > 1;
 ```
 
-### 5. Highest Salary in Each Department
+**Method 2 — Show all duplicate rows with full details:**
+```sql
+SELECT e.*
+FROM Employee e
+INNER JOIN (
+    SELECT name, email
+    FROM Employee
+    GROUP BY name, email
+    HAVING COUNT(*) > 1
+) dups ON e.name = dups.name AND e.email = dups.email;
+```
+
+---
+
+### Q3. Find employees who earn more than their managers.
 
 ```sql
--- Method 1: Using window functions
-SELECT department_id, name, salary
-FROM (
-    SELECT department_id, name, salary,
-           ROW_NUMBER() OVER (PARTITION BY department_id ORDER BY salary DESC) as rn
-    FROM employees
-) ranked
-WHERE rn = 1;
+SELECT e.*
+FROM Employee e
+JOIN Employee m ON e.manager_id = m.id
+WHERE e.salary > m.salary;
+```
 
--- Method 2: Using correlated subquery
-SELECT e1.department_id, e1.name, e1.salary
-FROM employees e1
-WHERE e1.salary = (
-    SELECT MAX(e2.salary)
-    FROM employees e2
-    WHERE e2.department_id = e1.department_id
+---
+
+### Q4. Retrieve the top N records from a table.
+
+```sql
+SELECT *
+FROM table_name
+ORDER BY column_name DESC
+LIMIT N;
+```
+
+> Replace `N` with the desired count. Use `FETCH NEXT N ROWS ONLY` in SQL Server.
+
+---
+
+### Q5. Count the number of employees in each department.
+
+```sql
+SELECT department_id, COUNT(*) AS num_employees
+FROM Employee
+GROUP BY department_id;
+```
+
+---
+
+### Q6. Find the department with the highest number of employees.
+
+```sql
+SELECT department_id, COUNT(*) AS num_employees
+FROM Employee
+GROUP BY department_id
+ORDER BY num_employees DESC
+LIMIT 1;
+```
+
+---
+
+### Q7. Retrieve employees who have the same salary.
+
+**Method 1 — `EXISTS` correlated subquery:**
+```sql
+SELECT *
+FROM Employee e1
+WHERE EXISTS (
+    SELECT 1 FROM Employee e2
+    WHERE e1.salary = e2.salary AND e1.id != e2.id
 );
 ```
 
-### 6. Employees Who Never Submitted a Report
+**Method 2 — Self-join:**
+```sql
+SELECT DISTINCT e1.*
+FROM Employee e1
+JOIN Employee e2 ON e1.salary = e2.salary AND e1.id != e2.id;
+```
+
+---
+
+### Q8. List all employees whose name starts with 'A'.
 
 ```sql
--- Using LEFT JOIN
+SELECT *
+FROM Employee
+WHERE name LIKE 'A%';
+```
+
+---
+
+### Q9. Get the last record from a table.
+
+```sql
+SELECT *
+FROM table_name
+ORDER BY id DESC
+LIMIT 1;
+```
+
+---
+
+### Q10. Get employees who joined in the last 6 months.
+
+```sql
+SELECT *
+FROM Employee
+WHERE join_date >= CURRENT_DATE - INTERVAL 6 MONTH;
+```
+
+> SQL Server equivalent: `WHERE join_date >= DATEADD(MONTH, -6, GETDATE())`
+
+---
+
+## 2. Intermediate Queries
+
+---
+
+### Q11. Find the Nth highest salary.
+
+**Method 1 — Correlated subquery:**
+```sql
+SELECT DISTINCT salary
+FROM Employee e1
+WHERE (N - 1) = (
+    SELECT COUNT(DISTINCT salary)
+    FROM Employee e2
+    WHERE e2.salary > e1.salary
+);
+```
+
+**Method 2 — `DENSE_RANK()`:**
+```sql
+SELECT salary
+FROM (
+    SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk
+    FROM Employee
+) ranked
+WHERE rnk = N;
+```
+
+**Method 3 — `LIMIT` + `OFFSET`:**
+```sql
+SELECT DISTINCT salary
+FROM Employee
+ORDER BY salary DESC
+LIMIT 1 OFFSET N-1;
+```
+
+---
+
+### Q12. Remove duplicate rows without using `DISTINCT`.
+
+**Method 1 — Delete using `ROW_NUMBER()`:**
+```sql
+DELETE FROM Employee
+WHERE id IN (
+    SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY name, email ORDER BY id
+        ) AS rn
+        FROM Employee
+    ) t
+    WHERE rn > 1
+);
+```
+
+**Method 2 — Using `MIN(id)` with `NOT IN`:**
+```sql
+DELETE FROM table_name
+WHERE id NOT IN (
+    SELECT MIN(id)
+    FROM table_name
+    GROUP BY column1, column2
+);
+```
+
+**Method 3 — Create a clean copy:**
+```sql
+CREATE TABLE employees_clean AS
+SELECT DISTINCT * FROM Employee;
+
+DROP TABLE Employee;
+ALTER TABLE employees_clean RENAME TO Employee;
+```
+
+---
+
+### Q13. Find missing numbers in a sequence of IDs.
+
+```sql
+SELECT t1.id + 1 AS missing_id
+FROM table_name t1
+LEFT JOIN table_name t2 ON t1.id + 1 = t2.id
+WHERE t2.id IS NULL;
+```
+
+---
+
+### Q14. Display first name and last name in a single column.
+
+```sql
+SELECT CONCAT(first_name, ' ', last_name) AS full_name
+FROM Employee;
+```
+
+---
+
+### Q15. Get the cumulative sum of salaries.
+
+```sql
+SELECT id, name, salary,
+       SUM(salary) OVER (ORDER BY id) AS cumulative_salary
+FROM Employee;
+```
+
+---
+
+### Q16. Swap the values of two columns without a third variable.
+
+```sql
+UPDATE Employee
+SET column1 = column1 + column2,
+    column2 = column1 - column2,
+    column1 = column1 - column2;
+```
+
+---
+
+### Q17. Fetch employees whose names contain only vowels.
+
+```sql
+SELECT *
+FROM Employee
+WHERE name REGEXP '^[AEIOUaeiou]+$';
+```
+
+---
+
+### Q18. Transpose rows into columns (pivot).
+
+```sql
+SELECT
+    MAX(CASE WHEN month = 'Jan' THEN sales END) AS Jan,
+    MAX(CASE WHEN month = 'Feb' THEN sales END) AS Feb,
+    MAX(CASE WHEN month = 'Mar' THEN sales END) AS Mar
+FROM sales_data;
+```
+
+> For dynamic pivoting, use database-specific dynamic SQL (e.g., `PIVOT` in SQL Server).
+
+---
+
+### Q19. Find employees with the highest salary in each department.
+
+**Method 1 — Correlated subquery:**
+```sql
+SELECT *
+FROM Employee e
+WHERE salary = (
+    SELECT MAX(salary)
+    FROM Employee
+    WHERE department_id = e.department_id
+);
+```
+
+**Method 2 — `ROW_NUMBER()` window function:**
+```sql
+SELECT department_id, name, salary
+FROM (
+    SELECT department_id, name, salary,
+           ROW_NUMBER() OVER (PARTITION BY department_id ORDER BY salary DESC) AS rn
+    FROM Employee
+) ranked
+WHERE rn = 1;
+```
+
+---
+
+### Q20. Find customers who made multiple purchases on the same day.
+
+```sql
+SELECT customer_id, order_date
+FROM Orders
+GROUP BY customer_id, order_date
+HAVING COUNT(*) > 1;
+```
+
+---
+
+### Q21. Update one table using data from another table.
+
+**Method 1 — `UPDATE` with `FROM` (PostgreSQL / SQL Server):**
+```sql
+UPDATE employees e
+SET salary = s.new_salary
+FROM salary_updates s
+WHERE e.id = s.employee_id;
+```
+
+**Method 2 — Correlated subquery:**
+```sql
+UPDATE employees
+SET salary = (
+    SELECT new_salary FROM salary_updates s WHERE s.employee_id = employees.id
+)
+WHERE EXISTS (
+    SELECT 1 FROM salary_updates s WHERE s.employee_id = employees.id
+);
+```
+
+**Method 3 — `JOIN` syntax (MySQL):**
+```sql
+UPDATE employees e
+INNER JOIN salary_updates s ON e.id = s.employee_id
+SET e.salary = s.new_salary;
+```
+
+---
+
+### Q22. Find employees who never submitted a report.
+
+**Method 1 — `LEFT JOIN` + `IS NULL`:**
+```sql
 SELECT e.id, e.name
 FROM employees e
 LEFT JOIN reports r ON e.id = r.employee_id
 WHERE r.employee_id IS NULL;
+```
 
--- Using NOT EXISTS
+**Method 2 — `NOT EXISTS`:**
+```sql
 SELECT e.id, e.name
 FROM employees e
 WHERE NOT EXISTS (
     SELECT 1 FROM reports r WHERE r.employee_id = e.id
 );
+```
 
--- Using NOT IN (careful with NULLs)
+**Method 3 — `NOT IN` (watch for NULLs):**
+```sql
 SELECT e.id, e.name
 FROM employees e
 WHERE e.id NOT IN (
@@ -196,304 +408,365 @@ WHERE e.id NOT IN (
 );
 ```
 
-### 7. Removing Duplicates from a Table
+---
+
+### Q23. Filter NULL values.
 
 ```sql
--- Method 1: Using ROW_NUMBER()
-DELETE FROM employees
-WHERE id IN (
-    SELECT id FROM (
-        SELECT id, ROW_NUMBER() OVER (
-            PARTITION BY name, email ORDER BY id
-        ) as rn
-        FROM employees
-    ) t
-    WHERE rn > 1
-);
-
--- Method 2: Create new table without duplicates
-CREATE TABLE employees_clean AS
-SELECT DISTINCT * FROM employees;
-
-DROP TABLE employees;
-ALTER TABLE employees_clean RENAME TO employees;
-
--- Method 3: Using temporary table
-CREATE TABLE temp_employees AS
-SELECT MIN(id) as id, name, email, salary
-FROM employees
-GROUP BY name, email, salary;
-
-TRUNCATE TABLE employees;
-INSERT INTO employees SELECT * FROM temp_employees;
-DROP TABLE temp_employees;
-```
-
-### 8. Finding Duplicate Rows
-
-```sql
--- Find duplicate records
-SELECT name, email, COUNT(*) as duplicate_count
-FROM employees
-GROUP BY name, email
-HAVING COUNT(*) > 1;
-
--- Show all duplicate rows with details
-SELECT e.*
-FROM employees e
-INNER JOIN (
-    SELECT name, email
-    FROM employees
-    GROUP BY name, email
-    HAVING COUNT(*) > 1
-) duplicates ON e.name = duplicates.name AND e.email = duplicates.email;
-```
-
-### 9. Updating One Table Using Another
-
-```sql
--- Standard UPDATE with JOIN
-UPDATE employees e
-SET salary = s.new_salary
-FROM salary_updates s
-WHERE e.id = s.employee_id;
-
--- Using correlated subquery
-UPDATE employees
-SET salary = (
-    SELECT new_salary
-    FROM salary_updates s
-    WHERE s.employee_id = employees.id
-)
-WHERE EXISTS (
-    SELECT 1 FROM salary_updates s WHERE s.employee_id = employees.id
-);
-
--- MySQL syntax
-UPDATE employees e
-INNER JOIN salary_updates s ON e.id = s.employee_id
-SET e.salary = s.new_salary;
-```
-
-### 10. Filtering NULL Values
-
-```sql
--- Include only non-NULL values
+-- Exclude NULLs
 SELECT * FROM employees WHERE phone_number IS NOT NULL;
 
--- Include only NULL values
+-- Include only NULLs
 SELECT * FROM employees WHERE phone_number IS NULL;
 
--- Using COALESCE to handle NULLs
-SELECT name, COALESCE(phone_number, 'No Phone') as contact
+-- Replace NULLs with a default using COALESCE
+SELECT name, COALESCE(phone_number, 'No Phone') AS contact
 FROM employees;
-
--- Filtering with functions
-SELECT * FROM employees 
-WHERE ISNULL(phone_number, '') != '';  -- SQL Server
 ```
 
-###  11. EXISTS vs IN
+---
+
+### Q24. Implement pagination.
+
+**Method 1 — `LIMIT` / `OFFSET` (MySQL / PostgreSQL):**
+```sql
+SELECT * FROM employees
+ORDER BY id
+LIMIT 10 OFFSET 20;  -- Page 3, 10 rows per page
+```
+
+**Method 2 — `OFFSET`/`FETCH` (SQL Server):**
+```sql
+SELECT * FROM employees
+ORDER BY id
+OFFSET 20 ROWS
+FETCH NEXT 10 ROWS ONLY;
+```
+
+**Method 3 — `ROW_NUMBER()` (universal):**
+```sql
+SELECT * FROM (
+    SELECT *, ROW_NUMBER() OVER (ORDER BY id) AS rn
+    FROM employees
+) t
+WHERE rn BETWEEN 21 AND 30;
+```
+
+**Method 4 — Cursor-based (best for large datasets):**
+```sql
+SELECT * FROM employees
+WHERE id > @last_id
+ORDER BY id
+LIMIT 10;
+```
+
+---
+
+## 3. Advanced Queries & Window Functions
+
+---
+
+### Q25. Get the moving average of sales for the last 3 months.
 
 ```sql
--- EXISTS: Better for large datasets, stops at first match
+SELECT month,
+       AVG(sales) OVER (
+           ORDER BY month
+           ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+       ) AS moving_avg
+FROM sales_data;
+```
+
+---
+
+### Q26. Rank employees by salary within each department.
+
+```sql
+SELECT *, RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) AS dept_rank
+FROM Employee;
+```
+
+---
+
+### Q27. Find employees who have more than one manager.
+
+```sql
+SELECT employee_id
+FROM EmployeeManagers
+GROUP BY employee_id
+HAVING COUNT(manager_id) > 1;
+```
+
+---
+
+### Q28. Retrieve the most frequent order date.
+
+```sql
+SELECT order_date
+FROM Orders
+GROUP BY order_date
+ORDER BY COUNT(*) DESC
+LIMIT 1;
+```
+
+---
+
+### Q29. Compare two tables and find mismatched records.
+
+```sql
+SELECT * FROM table1
+EXCEPT
+SELECT * FROM table2
+
+UNION
+
+SELECT * FROM table2
+EXCEPT
+SELECT * FROM table1;
+```
+
+---
+
+### Q30. Calculate the difference between consecutive rows.
+
+```sql
+SELECT id, value,
+       value - LAG(value) OVER (ORDER BY id) AS diff
+FROM data_table;
+```
+
+---
+
+### Q31. Delete every alternate row from a table.
+
+```sql
+DELETE FROM Employee
+WHERE id % 2 = 0;
+```
+
+---
+
+### Q32. Get the first purchase date for each customer.
+
+```sql
+SELECT customer_id, MIN(order_date) AS first_purchase
+FROM Orders
+GROUP BY customer_id;
+```
+
+---
+
+### Q33. Get the running total of sales per month.
+
+```sql
+SELECT month,
+       SUM(sales) OVER (ORDER BY month) AS running_total
+FROM sales_data;
+```
+
+---
+
+### Q34. Assign a global salary rank to all employees.
+
+```sql
+SELECT *, RANK() OVER (ORDER BY salary DESC) AS salary_rank
+FROM Employee;
+```
+
+---
+
+### Q35. Find the percentage contribution of each employee's salary to the total.
+
+```sql
+SELECT name, salary,
+       ROUND(100.0 * salary / SUM(salary) OVER (), 2) AS percentage
+FROM Employee;
+```
+
+---
+
+### Q36. Get `LEAD()` and `LAG()` salaries for each employee.
+
+```sql
+SELECT name, salary,
+       LAG(salary)  OVER (ORDER BY salary) AS previous_salary,
+       LEAD(salary) OVER (ORDER BY salary) AS next_salary
+FROM Employee;
+```
+
+---
+
+### Q37. Get the difference between two consecutive transactions.
+
+```sql
+SELECT id, transaction_amount,
+       transaction_amount - LAG(transaction_amount) OVER (ORDER BY transaction_date) AS difference
+FROM Transactions;
+```
+
+---
+
+## 4. SQL Commands & Clauses
+
+---
+
+### Q38. What is the difference between `WHERE` and `HAVING`?
+
+`WHERE` filters **individual rows before** grouping. `HAVING` filters **groups after** aggregation.
+
+```sql
+-- WHERE filters rows first
+SELECT department, COUNT(*) AS emp_count
+FROM employees
+WHERE salary > 50000
+GROUP BY department;
+
+-- HAVING filters groups after aggregation
+SELECT department, COUNT(*) AS emp_count
+FROM employees
+GROUP BY department
+HAVING COUNT(*) > 5;
+
+-- Combined
+SELECT department, AVG(salary) AS avg_salary
+FROM employees
+WHERE hire_date > '2020-01-01'
+GROUP BY department
+HAVING AVG(salary) > 60000;
+```
+
+---
+
+### Q39. What is the difference between `UNION` and `UNION ALL`?
+
+```sql
+-- UNION: removes duplicates (slower — requires deduplication)
+SELECT name FROM employees_2023
+UNION
+SELECT name FROM employees_2024;
+
+-- UNION ALL: keeps duplicates (faster — no dedup step)
+SELECT name FROM employees_2023
+UNION ALL
+SELECT name FROM employees_2024;
+```
+
+> **Prefer `UNION ALL`** when you know the result sets are already distinct or duplicates are acceptable.
+
+---
+
+### Q40. What is the difference between `DELETE`, `TRUNCATE`, and `DROP`?
+
+```sql
+-- DELETE: removes specific rows, can be rolled back, fires triggers
+DELETE FROM employees WHERE department_id = 5;
+
+-- TRUNCATE: removes all rows, minimal logging, resets identity column
+TRUNCATE TABLE employees;
+
+-- DROP: removes the entire table structure and data permanently
+DROP TABLE employees;
+```
+
+| Operation | Speed  | Rollback | Triggers | WHERE Clause | Identity Reset |
+|-----------|--------|----------|----------|--------------|----------------|
+| DELETE    | Slow   | Yes      | Yes      | Yes          | No             |
+| TRUNCATE  | Fast   | Limited  | No       | No           | Yes            |
+| DROP      | Fast   | DDL only | No       | No           | N/A            |
+
+---
+
+### Q41. What is the difference between `EXISTS` and `IN`?
+
+```sql
+-- EXISTS: short-circuits on first match; better for large subquery results
 SELECT * FROM employees e
 WHERE EXISTS (
-    SELECT 1 FROM departments d 
+    SELECT 1 FROM departments d
     WHERE d.id = e.department_id AND d.active = 1
 );
 
--- IN: Better for small, static lists
+-- IN: better for small, static lists; careful with NULLs in subquery
 SELECT * FROM employees
-WHERE department_id IN (1, 2, 3, 4);
-
--- IN with subquery (careful with NULLs)
-SELECT * FROM employees
-WHERE department_id IN (
-    SELECT id FROM departments WHERE active = 1
-);
+WHERE department_id IN (1, 2, 3);
 ```
 
-**Performance**: EXISTS is generally faster for large datasets because it can short-circuit.
+> **Rule of thumb:** Use `EXISTS` for large datasets and correlated lookups; use `IN` for small, known value lists.
 
-### 12. GROUP BY vs ORDER BY
+---
+
+### Q42. What is the difference between `GROUP BY` and `ORDER BY`?
 
 ```sql
--- GROUP BY: Groups rows by specified columns for aggregation
+-- GROUP BY: collapses rows into groups for aggregation
 SELECT department_id, COUNT(*), AVG(salary)
 FROM employees
 GROUP BY department_id;
 
--- ORDER BY: Sorts the result set
+-- ORDER BY: sorts the final result set
 SELECT * FROM employees
 ORDER BY salary DESC, name ASC;
 
--- Combined usage
-SELECT department_id, AVG(salary) as avg_salary
+-- Combined
+SELECT department_id, AVG(salary) AS avg_salary
 FROM employees
 GROUP BY department_id
 ORDER BY avg_salary DESC;
 ```
 
-### 13. Aggregate Functions with NULLs
+---
+
+### Q43. How do aggregate functions handle `NULL` values?
 
 ```sql
--- NULL values are ignored by aggregate functions
-SELECT 
-    COUNT(*) as total_rows,           -- Counts all rows including NULLs
-    COUNT(commission) as non_null_comm, -- Counts only non-NULL commissions
-    AVG(commission) as avg_commission,  -- Averages only non-NULL values
-    SUM(commission) as total_commission -- Sums only non-NULL values
+SELECT
+    COUNT(*)           AS total_rows,          -- Counts ALL rows including NULLs
+    COUNT(commission)  AS non_null_count,       -- Skips NULLs
+    AVG(commission)    AS avg_non_null,         -- Averages only non-NULLs
+    SUM(commission)    AS sum_non_null          -- Sums only non-NULLs
 FROM employees;
 
--- Handling NULLs explicitly
-SELECT 
-    AVG(COALESCE(commission, 0)) as avg_with_zeros,
-    COUNT(CASE WHEN commission IS NOT NULL THEN 1 END) as non_null_count
+-- Treat NULLs as zero
+SELECT AVG(COALESCE(commission, 0)) AS avg_with_zeros
 FROM employees;
 ```
 
-### 14. Implementing Pagination
+---
+
+### Q44. What is the difference between `PRIMARY KEY` and `UNIQUE`?
 
 ```sql
--- Standard LIMIT/OFFSET (PostgreSQL, MySQL)
-SELECT * FROM employees
-ORDER BY id
-LIMIT 10 OFFSET 20;  -- Page 3, 10 records per page
-
--- SQL Server using OFFSET/FETCH
-SELECT * FROM employees
-ORDER BY id
-OFFSET 20 ROWS
-FETCH NEXT 10 ROWS ONLY;
-
--- ROW_NUMBER() approach (works on all databases)
-SELECT * FROM (
-    SELECT *, ROW_NUMBER() OVER (ORDER BY id) as rn
-    FROM employees
-) t
-WHERE rn BETWEEN 21 AND 30;
-
--- Cursor-based pagination (better performance for large datasets)
-SELECT * FROM employees
-WHERE id > @last_id  -- Last ID from previous page
-ORDER BY id
-LIMIT 10;
-```
-
-## 2. SQL Commands & Clauses
-
-### 15. DELETE vs TRUNCATE vs DROP
-
-```sql
--- DELETE: Removes specific rows, can be rolled back, fires triggers
-DELETE FROM employees WHERE department_id = 5;
-DELETE FROM employees;  -- Removes all rows but keeps table structure
-
--- TRUNCATE: Removes all rows, faster, minimal logging, resets identity
-TRUNCATE TABLE employees;  -- Cannot be rolled back in some databases
-
--- DROP: Removes entire table structure and data
-DROP TABLE employees;  -- Table no longer exists
-```
-
-| Operation | Speed | Rollback | Triggers | Where Clause | Identity Reset |
-|-----------|-------|----------|----------|--------------|----------------|
-| DELETE    | Slow  | Yes      | Yes      | Yes          | No             |
-| TRUNCATE  | Fast  | Limited  | No       | No           | Yes            |
-| DROP      | Fast  | DDL*     | No       | No           | N/A            |
-
-### 16. PRIMARY KEY vs UNIQUE
-
-```sql
--- PRIMARY KEY: Unique + NOT NULL, only one per table
+-- PRIMARY KEY: enforces uniqueness + NOT NULL; only one per table
 CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    email VARCHAR(100) UNIQUE,
-    phone VARCHAR(20) UNIQUE
+    id    INT PRIMARY KEY,
+    email VARCHAR(100) UNIQUE   -- UNIQUE allows one NULL; multiple per table
 );
-
--- UNIQUE: Allows one NULL value, multiple unique constraints allowed
-ALTER TABLE employees ADD CONSTRAINT uk_ssn UNIQUE (ssn);
 
 -- Composite PRIMARY KEY
 CREATE TABLE order_items (
-    order_id INT,
+    order_id   INT,
     product_id INT,
-    quantity INT,
     PRIMARY KEY (order_id, product_id)
 );
 ```
 
-### CHECK Constraints
+| Property   | PRIMARY KEY          | UNIQUE                     |
+|------------|----------------------|----------------------------|
+| NULL       | Not allowed          | One NULL allowed           |
+| Per table  | Only one             | Multiple allowed           |
+| Purpose    | Row identity         | Business uniqueness        |
+
+---
+
+### Q45. Subqueries and Correlated Subqueries — what's the difference?
 
 ```sql
--- Column-level CHECK constraint
-CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    salary DECIMAL(10,2) CHECK (salary > 0),
-    age INT CHECK (age >= 18 AND age <= 65),
-    email VARCHAR(100) CHECK (email LIKE '%@%')
-);
-
--- Table-level CHECK constraint
-CREATE TABLE products (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    price DECIMAL(10,2),
-    discount_price DECIMAL(10,2),
-    CONSTRAINT chk_price CHECK (price > 0),
-    CONSTRAINT chk_discount CHECK (discount_price <= price)
-);
-
--- Adding CHECK constraint to existing table
-ALTER TABLE employees 
-ADD CONSTRAINT chk_salary_range 
-CHECK (salary BETWEEN 30000 AND 200000);
-
--- Dropping CHECK constraint
-ALTER TABLE employees DROP CONSTRAINT chk_salary_range;
-```
-
-### Adding/Removing Columns
-
-```sql
--- Add single column
-ALTER TABLE employees ADD COLUMN middle_name VARCHAR(50);
-
--- Add multiple columns
-ALTER TABLE employees 
-ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN updated_at TIMESTAMP;
-
--- Add column with constraints
-ALTER TABLE employees 
-ADD COLUMN status VARCHAR(20) DEFAULT 'ACTIVE' 
-CHECK (status IN ('ACTIVE', 'INACTIVE', 'TERMINATED'));
-
--- Drop column
-ALTER TABLE employees DROP COLUMN middle_name;
-
--- Modify column (varies by database)
--- PostgreSQL
-ALTER TABLE employees ALTER COLUMN salary TYPE DECIMAL(12,2);
-
--- MySQL
-ALTER TABLE employees MODIFY COLUMN salary DECIMAL(12,2);
-
--- SQL Server
-ALTER TABLE employees ALTER COLUMN salary DECIMAL(12,2);
-```
-
-### Subqueries and Correlated Subqueries
-
-```sql
--- Regular subquery (executed once)
+-- Regular subquery: runs ONCE, result reused for all rows
 SELECT name, salary
 FROM employees
 WHERE salary > (SELECT AVG(salary) FROM employees);
 
--- Correlated subquery (executed for each row)
+-- Correlated subquery: runs FOR EACH ROW of the outer query
 SELECT e1.name, e1.salary, e1.department_id
 FROM employees e1
 WHERE e1.salary > (
@@ -501,24 +774,11 @@ WHERE e1.salary > (
     FROM employees e2
     WHERE e2.department_id = e1.department_id
 );
-
--- EXISTS with correlated subquery
-SELECT d.name
-FROM departments d
-WHERE EXISTS (
-    SELECT 1 FROM employees e WHERE e.department_id = d.id
-);
-
--- Subquery in SELECT clause
-SELECT 
-    name,
-    salary,
-    (SELECT AVG(salary) FROM employees) as company_avg,
-    salary - (SELECT AVG(salary) FROM employees) as difference
-FROM employees;
 ```
 
-### Common Table Expressions (CTEs)
+---
+
+### Q46. What are Common Table Expressions (CTEs)?
 
 ```sql
 -- Simple CTE
@@ -532,823 +792,423 @@ FROM high_earners he
 JOIN departments d ON he.department_id = d.id;
 
 -- Multiple CTEs
-WITH 
+WITH
 dept_stats AS (
-    SELECT department_id, COUNT(*) as emp_count, AVG(salary) as avg_salary
+    SELECT department_id, COUNT(*) AS emp_count, AVG(salary) AS avg_salary
     FROM employees
     GROUP BY department_id
 ),
-high_paying_depts AS (
+high_paying AS (
     SELECT * FROM dept_stats WHERE avg_salary > 80000
 )
-SELECT d.department_name, hpd.emp_count, hpd.avg_salary
-FROM high_paying_depts hpd
-JOIN departments d ON hpd.department_id = d.id;
+SELECT d.department_name, hp.emp_count, hp.avg_salary
+FROM high_paying hp
+JOIN departments d ON hp.department_id = d.id;
 
--- Recursive CTE (for hierarchical data)
-WITH RECURSIVE employee_hierarchy AS (
-    -- Anchor: Find top-level managers
-    SELECT id, name, manager_id, 0 as level
-    FROM employees
-    WHERE manager_id IS NULL
-    
+-- Recursive CTE (org hierarchy)
+WITH RECURSIVE emp_hierarchy AS (
+    SELECT id, name, manager_id, 0 AS level
+    FROM employees WHERE manager_id IS NULL        -- anchor
     UNION ALL
-    
-    -- Recursive: Find subordinates
-    SELECT e.id, e.name, e.manager_id, eh.level + 1
+    SELECT e.id, e.name, e.manager_id, h.level + 1
     FROM employees e
-    JOIN employee_hierarchy eh ON e.manager_id = eh.id
+    JOIN emp_hierarchy h ON e.manager_id = h.id   -- recursive step
 )
-SELECT * FROM employee_hierarchy ORDER BY level, name;
+SELECT * FROM emp_hierarchy ORDER BY level, name;
 ```
 
-### VIEW vs TABLE
+---
+
+## 5. Joins
+
+---
+
+### Q47. Explain all types of SQL JOINs with examples.
 
 ```sql
--- Creating a VIEW
-CREATE VIEW employee_summary AS
-SELECT 
-    e.name,
-    e.salary,
-    d.department_name,
-    CASE WHEN e.salary > 80000 THEN 'High' ELSE 'Standard' END as salary_grade
-FROM employees e
-JOIN departments d ON e.department_id = d.id;
-
--- Using the VIEW
-SELECT * FROM employee_summary WHERE salary_grade = 'High';
-
--- Updating through VIEW (if updatable)
-UPDATE employee_summary SET salary = 85000 WHERE name = 'John Doe';
-```
-
-| Aspect | VIEW | TABLE |
-|--------|------|-------|
-| Storage | No data stored | Data physically stored |
-| Performance | Query executed each time | Direct data access |
-| Real-time | Always current | May be outdated |
-| Updates | Limited updatability | Full update capability |
-| Indexes | Cannot be indexed directly | Can be indexed |
-
-### Materialized Views
-
-```sql
--- Creating a materialized view (PostgreSQL)
-CREATE MATERIALIZED VIEW dept_employee_stats AS
-SELECT 
-    d.department_name,
-    COUNT(e.id) as employee_count,
-    AVG(e.salary) as avg_salary,
-    MAX(e.salary) as max_salary
-FROM departments d
-LEFT JOIN employees e ON d.id = e.department_id
-GROUP BY d.id, d.department_name;
-
--- Refreshing materialized view
-REFRESH MATERIALIZED VIEW dept_employee_stats;
-
--- Concurrent refresh (PostgreSQL)
-REFRESH MATERIALIZED VIEW CONCURRENTLY dept_employee_stats;
-```
-
-## 3. Indexing & Performance
-
-### What is Indexing?
-
-Indexes are data structures that improve query performance by creating shortcuts to data.
-
-```sql
--- Creating indexes
-CREATE INDEX idx_employee_salary ON employees(salary);
-CREATE INDEX idx_employee_dept_salary ON employees(department_id, salary);
-CREATE UNIQUE INDEX idx_employee_email ON employees(email);
-
--- Composite index
-CREATE INDEX idx_employee_lookup ON employees(department_id, hire_date, salary);
-
--- Partial index (PostgreSQL)
-CREATE INDEX idx_active_employees ON employees(salary) WHERE status = 'ACTIVE';
-
--- Functional index
-CREATE INDEX idx_employee_upper_name ON employees(UPPER(name));
-```
-
-**When to use indexes:**
-- Columns frequently used in WHERE clauses
-- Columns used in JOINs
-- Columns used in ORDER BY
-- Foreign key columns
-
-### Clustered vs Non-Clustered Index
-
-```sql
--- Clustered Index (SQL Server) - physically orders data
-CREATE CLUSTERED INDEX idx_employee_id ON employees(id);
-
--- Non-Clustered Index - points to data locations
-CREATE NONCLUSTERED INDEX idx_employee_name ON employees(name);
-```
-
-| Type | Data Storage | Per Table | Key Lookup |
-|------|-------------|-----------|------------|
-| Clustered | Data pages ordered by index | Only 1 | Direct |
-| Non-Clustered | Separate index structure | Multiple | Additional lookup |
-
-### Index Impact on DML Operations
-
-```sql
--- Indexes slow down INSERT/UPDATE/DELETE
--- Each index must be maintained when data changes
-
--- Before adding indexes - measure performance
-INSERT INTO employees (name, salary, department_id) 
-VALUES ('New Employee', 50000, 1);
-
--- After adding indexes - slower INSERTs but faster SELECTs
--- Consider dropping indexes for bulk operations
-DROP INDEX idx_employee_salary;
--- Bulk insert operations
--- Recreate index
-CREATE INDEX idx_employee_salary ON employees(salary);
-```
-
-### Query Optimization
-
-```sql
--- Use EXPLAIN to analyze queries
-EXPLAIN SELECT * FROM employees WHERE salary > 50000;
-
--- Optimize with proper indexing
-CREATE INDEX idx_salary ON employees(salary);
-
--- Use covering indexes
-CREATE INDEX idx_covering ON employees(department_id, salary, name);
-SELECT name FROM employees WHERE department_id = 1 ORDER BY salary;
-
--- Avoid functions in WHERE clauses
--- Bad: WHERE YEAR(hire_date) = 2023
--- Good: WHERE hire_date >= '2023-01-01' AND hire_date < '2024-01-01'
-
--- Use LIMIT for large result sets
-SELECT * FROM employees ORDER BY salary DESC LIMIT 10;
-
--- Optimize JOINs
+-- INNER JOIN: only matching rows from both tables
 SELECT e.name, d.department_name
 FROM employees e
-JOIN departments d ON e.department_id = d.id  -- Ensure both columns are indexed
-WHERE e.salary > 50000;  -- Filter early
+INNER JOIN departments d ON e.department_id = d.id;
+
+-- LEFT JOIN: all rows from left + matching from right (NULLs where no match)
+SELECT e.name, d.department_name
+FROM employees e
+LEFT JOIN departments d ON e.department_id = d.id;
+
+-- RIGHT JOIN: all rows from right + matching from left
+SELECT e.name, d.department_name
+FROM employees e
+RIGHT JOIN departments d ON e.department_id = d.id;
+
+-- FULL OUTER JOIN: all rows from both tables
+SELECT e.name, d.department_name
+FROM employees e
+FULL OUTER JOIN departments d ON e.department_id = d.id;
+
+-- CROSS JOIN: Cartesian product (every row × every row)
+SELECT e.name, d.department_name
+FROM employees e
+CROSS JOIN departments d;
+
+-- SELF JOIN: join a table to itself (e.g., employee-manager)
+SELECT e.name AS employee, m.name AS manager
+FROM employees e
+JOIN employees m ON e.manager_id = m.id;
 ```
 
-### Database Optimizer
+**Performance order (fastest → slowest):**
+`INNER JOIN` → `LEFT/RIGHT JOIN` → `FULL OUTER JOIN` → `CROSS JOIN`
 
-The query optimizer chooses the best execution plan:
+---
+
+## 6. Indexing & Performance
+
+---
+
+### Q48. What is an index and when should you use one?
+
+Indexes are data structures that speed up data retrieval by creating a lookup shortcut.
 
 ```sql
--- View execution plan
-EXPLAIN (ANALYZE, BUFFERS) 
+-- Single-column index
+CREATE INDEX idx_salary ON employees(salary);
+
+-- Composite index
+CREATE INDEX idx_dept_salary ON employees(department_id, salary);
+
+-- Unique index
+CREATE UNIQUE INDEX idx_email ON employees(email);
+
+-- Partial index (PostgreSQL)
+CREATE INDEX idx_active_emp ON employees(salary) WHERE status = 'ACTIVE';
+
+-- Functional index
+CREATE INDEX idx_upper_name ON employees(UPPER(name));
+```
+
+**Use indexes on columns that appear frequently in:** `WHERE`, `JOIN ON`, `ORDER BY`, foreign keys.
+
+---
+
+### Q49. Clustered vs Non-Clustered Index — what's the difference?
+
+```sql
+-- Clustered: physically reorders rows on disk; only ONE per table
+CREATE CLUSTERED INDEX idx_emp_id ON employees(id);       -- SQL Server
+
+-- Non-Clustered: separate structure pointing to rows; multiple allowed
+CREATE NONCLUSTERED INDEX idx_emp_name ON employees(name);
+```
+
+| Type           | Data Storage           | Per Table | Lookup Speed |
+|----------------|------------------------|-----------|--------------|
+| Clustered      | Rows ordered by index  | Only 1    | Direct       |
+| Non-Clustered  | Separate index pages   | Multiple  | Extra lookup |
+
+---
+
+### Q50. How do indexes affect DML performance?
+
+Every `INSERT`, `UPDATE`, or `DELETE` must also update all associated indexes, making writes slower. For bulk loads, it's often best to drop indexes, load, then recreate them.
+
+```sql
+-- Drop before bulk insert
+DROP INDEX idx_salary ON employees;
+-- ... bulk insert ...
+-- Recreate after
+CREATE INDEX idx_salary ON employees(salary);
+```
+
+---
+
+### Q51. How do you analyze and optimize a slow query?
+
+```sql
+-- Use EXPLAIN / EXPLAIN ANALYZE
+EXPLAIN (ANALYZE, BUFFERS, VERBOSE)
 SELECT e.name, d.department_name
 FROM employees e
 JOIN departments d ON e.department_id = d.id
 WHERE e.salary > 50000;
 
--- Update table statistics for better optimization
-ANALYZE employees;
-ANALYZE departments;
+-- Avoid functions on indexed columns in WHERE
+-- BAD:
+WHERE YEAR(hire_date) = 2023
+-- GOOD:
+WHERE hire_date >= '2023-01-01' AND hire_date < '2024-01-01'
 
--- Force index usage (when necessary)
+-- Use covering indexes to avoid table lookups
+CREATE INDEX idx_covering ON employees(department_id, salary, name);
+
+-- Force index (when necessary)
 SELECT * FROM employees USE INDEX (idx_salary) WHERE salary > 50000;
+
+-- Update statistics
+ANALYZE employees;
 ```
 
-### EXPLAIN PLAN Analysis
+---
+
+## 7. Transactions & Concurrency
+
+---
+
+### Q52. What are ACID properties?
 
 ```sql
--- PostgreSQL EXPLAIN
-EXPLAIN (ANALYZE, BUFFERS, VERBOSE)
-SELECT * FROM employees WHERE salary > 50000;
-
--- Key metrics to look for:
--- 1. Seq Scan vs Index Scan
--- 2. Cost estimates
--- 3. Actual vs estimated rows
--- 4. Buffer usage
--- 5. Execution time
-```
-
-## 4. Transactions & Concurrency
-
-### ACID Properties
-
-```sql
--- ATOMICITY: All or nothing
+-- ATOMICITY: All-or-nothing
 BEGIN TRANSACTION;
-UPDATE accounts SET balance = balance - 100 WHERE id = 1;
-UPDATE accounts SET balance = balance + 100 WHERE id = 2;
--- Either both succeed or both fail
-COMMIT;
+    UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+    UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;   -- Both succeed, or ROLLBACK makes both disappear
 
--- CONSISTENCY: Database rules maintained
--- CHECK constraints, foreign keys ensure consistency
+-- CONSISTENCY: Constraints always maintained (CHECK, FK, etc.)
 
 -- ISOLATION: Concurrent transactions don't interfere
--- Controlled by isolation levels
+-- Controlled via isolation levels
 
--- DURABILITY: Committed changes persist
--- Handled by database engine (WAL, etc.)
+-- DURABILITY: Committed data survives crashes (WAL / redo logs)
 ```
 
-### Transaction Management
+---
+
+### Q53. What are Transaction Isolation Levels?
 
 ```sql
--- Basic transaction
-BEGIN TRANSACTION;
-INSERT INTO orders (customer_id, total) VALUES (1, 100.00);
-INSERT INTO order_items (order_id, product_id, quantity) VALUES (LAST_INSERT_ID(), 1, 2);
-COMMIT;
-
--- Transaction with error handling
-BEGIN TRANSACTION;
-BEGIN TRY
-    UPDATE inventory SET quantity = quantity - 5 WHERE product_id = 1;
-    INSERT INTO sales (product_id, quantity) VALUES (1, 5);
-    COMMIT;
-END TRY
-BEGIN CATCH
-    ROLLBACK;
-    THROW;
-END CATCH;
-
--- Savepoints
-BEGIN TRANSACTION;
-INSERT INTO audit_log (action) VALUES ('Start process');
-SAVEPOINT sp1;
-UPDATE products SET price = price * 1.1;
-SAVEPOINT sp2;
-DELETE FROM products WHERE discontinued = 1;
--- If error occurs, can rollback to sp2 or sp1
-ROLLBACK TO sp2;
-COMMIT;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;  -- Allows dirty reads
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;    -- Prevents dirty reads
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;   -- Prevents dirty + non-repeatable reads
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;      -- Prevents all anomalies (strictest)
 ```
 
-### Isolation Levels
+| Level            | Dirty Read | Non-Repeatable Read | Phantom Read |
+|------------------|-----------|---------------------|--------------|
+| READ UNCOMMITTED | Yes        | Yes                 | Yes          |
+| READ COMMITTED   | No         | Yes                 | Yes          |
+| REPEATABLE READ  | No         | No                  | Yes          |
+| SERIALIZABLE     | No         | No                  | No           |
+
+---
+
+### Q54. How do you prevent deadlocks?
 
 ```sql
--- READ UNCOMMITTED: Lowest isolation, allows dirty reads
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+-- Strategy 1: Always acquire locks in a consistent order
+BEGIN TRANSACTION;
+    SELECT * FROM accounts WHERE id = 1 FOR UPDATE;  -- lower ID first
+    SELECT * FROM accounts WHERE id = 2 FOR UPDATE;
+COMMIT;
 
--- READ COMMITTED: Prevents dirty reads
+-- Strategy 2: Keep transactions short
+BEGIN TRANSACTION;
+    UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+COMMIT;
+
+-- Strategy 3: Use appropriate isolation levels
 SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
--- REPEATABLE READ: Prevents dirty and non-repeatable reads
-SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-
--- SERIALIZABLE: Highest isolation, prevents all phenomena
-SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+-- Strategy 4: Implement retry logic in application code
 ```
 
-### Concurrency Issues
+---
+
+### Q55. Pessimistic vs Optimistic locking — what's the difference?
 
 ```sql
--- Dirty Read: Reading uncommitted data
--- Transaction 1:
+-- Pessimistic: lock the row before reading; others must wait
 BEGIN TRANSACTION;
-UPDATE products SET price = 200 WHERE id = 1;
--- Transaction 2 reads price = 200 (uncommitted)
-ROLLBACK;  -- Price returns to original value
-
--- Non-repeatable Read: Same query returns different results
--- Transaction 1:
-BEGIN TRANSACTION;
-SELECT price FROM products WHERE id = 1;  -- Returns 100
--- Transaction 2 updates price to 150 and commits
-SELECT price FROM products WHERE id = 1;  -- Returns 150
+    SELECT * FROM products WHERE id = 1 FOR UPDATE;
+    UPDATE products SET quantity = quantity - 1 WHERE id = 1;
 COMMIT;
 
--- Phantom Read: New rows appear in result set
--- Transaction 1:
-BEGIN TRANSACTION;
-SELECT COUNT(*) FROM products WHERE category = 'Electronics';  -- Returns 5
--- Transaction 2 inserts new Electronics product and commits
-SELECT COUNT(*) FROM products WHERE category = 'Electronics';  -- Returns 6
-COMMIT;
-```
-
-### Preventing Deadlocks
-
-```sql
--- Deadlock prevention strategies:
-
--- 1. Consistent locking order
--- Always acquire locks in same order (e.g., by primary key)
-BEGIN TRANSACTION;
-SELECT * FROM accounts WHERE id = 1 FOR UPDATE;  -- Lock account 1 first
-SELECT * FROM accounts WHERE id = 2 FOR UPDATE;  -- Then account 2
--- Perform operations
-COMMIT;
-
--- 2. Use shorter transactions
-BEGIN TRANSACTION;
--- Minimize time between BEGIN and COMMIT
-UPDATE accounts SET balance = balance - 100 WHERE id = 1;
-COMMIT;
-
--- 3. Use appropriate isolation levels
-SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-
--- 4. Implement retry logic in application
--- DEADLOCK_RETRY:
--- BEGIN TRANSACTION;
--- ... operations ...
--- ON DEADLOCK: ROLLBACK; wait random time; GOTO DEADLOCK_RETRY;
-```
-
-### Locking Strategies
-
-```sql
--- Pessimistic Locking: Lock before reading
-BEGIN TRANSACTION;
-SELECT * FROM products WHERE id = 1 FOR UPDATE;  -- Exclusive lock
--- Other transactions wait
-UPDATE products SET quantity = quantity - 1 WHERE id = 1;
-COMMIT;
-
--- Optimistic Locking: Check version before update
--- Add version column to table
+-- Optimistic: no lock; check version before saving
+-- (requires a `version` column)
 SELECT id, name, price, version FROM products WHERE id = 1;
--- Application logic: user modifies data
-UPDATE products 
-SET name = 'New Name', price = 150, version = version + 1 
+-- ... user edits in app ...
+UPDATE products
+SET price = 150, version = version + 1
 WHERE id = 1 AND version = @original_version;
--- Check if @@ROWCOUNT = 1, if not, record was modified by another user
+-- If 0 rows affected → another user already updated it
 ```
 
-## 5. Database Design & Integrity
+---
 
-### Normalization
+## 8. Database Design & Normalization
 
-#### First Normal Form (1NF)
-- Eliminate repeating groups
-- Each cell contains atomic values
+---
 
+### Q56. What are the normal forms? (1NF → 3NF)
+
+**1NF — Atomic values, no repeating groups:**
 ```sql
 -- Violates 1NF (multiple phones in one column)
-CREATE TABLE employees_bad (
-    id INT,
-    name VARCHAR(100),
-    phones VARCHAR(200)  -- "123-456-7890, 098-765-4321"
-);
+CREATE TABLE employees_bad (id INT, phones VARCHAR(200));
 
 -- 1NF compliant
-CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100)
-);
-
 CREATE TABLE employee_phones (
     employee_id INT,
-    phone VARCHAR(20),
+    phone       VARCHAR(20),
     FOREIGN KEY (employee_id) REFERENCES employees(id)
 );
 ```
 
-#### Second Normal Form (2NF)
-- Must be in 1NF
-- No partial dependencies on composite primary key
-
+**2NF — No partial dependency on a composite key:**
 ```sql
--- Violates 2NF
+-- Violates 2NF (product_name depends only on product_id, not order_id)
 CREATE TABLE order_items_bad (
-    order_id INT,
-    product_id INT,
-    quantity INT,
-    product_name VARCHAR(100),  -- Depends only on product_id
-    product_price DECIMAL(10,2), -- Depends only on product_id
+    order_id INT, product_id INT, product_name VARCHAR(100),
     PRIMARY KEY (order_id, product_id)
 );
 
--- 2NF compliant
-CREATE TABLE orders (
-    id INT PRIMARY KEY,
-    customer_id INT,
-    order_date DATE
-);
-
-CREATE TABLE products (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    price DECIMAL(10,2)
-);
-
-CREATE TABLE order_items (
-    order_id INT,
-    product_id INT,
-    quantity INT,
-    PRIMARY KEY (order_id, product_id),
-    FOREIGN KEY (order_id) REFERENCES orders(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
-);
+-- 2NF compliant: move product_name to a products table
+CREATE TABLE products   (id INT PRIMARY KEY, name VARCHAR(100), price DECIMAL(10,2));
+CREATE TABLE order_items(order_id INT, product_id INT, quantity INT,
+    PRIMARY KEY (order_id, product_id));
 ```
 
-#### Third Normal Form (3NF)
-- Must be in 2NF
-- No transitive dependencies
-
+**3NF — No transitive dependency:**
 ```sql
--- Violates 3NF
+-- Violates 3NF (department_name depends on department_id, not employee id)
 CREATE TABLE employees_bad (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    department_id INT,
-    department_name VARCHAR(100),  -- Transitively dependent on department_id
-    department_location VARCHAR(100)  -- Transitively dependent on department_id
+    id INT PRIMARY KEY, name VARCHAR(100),
+    department_id INT, department_name VARCHAR(100)
 );
 
 -- 3NF compliant
-CREATE TABLE departments (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    location VARCHAR(100)
-);
-
-CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    department_id INT,
-    FOREIGN KEY (department_id) REFERENCES departments(id)
-);
-```
-
-### Denormalization
-
-Used for performance optimization, introducing controlled redundancy:
-
-```sql
--- Normalized (3NF)
-CREATE TABLE orders (
-    id INT PRIMARY KEY,
-    customer_id INT,
-    order_date DATE
-);
-
-CREATE TABLE order_items (
-    order_id INT,
-    product_id INT,
-    quantity INT,
-    unit_price DECIMAL(10,2)
-);
-
--- Denormalized for performance
-CREATE TABLE orders_denormalized (
-    id INT PRIMARY KEY,
-    customer_id INT,
-    customer_name VARCHAR(100),  -- Denormalized from customers table
-    order_date DATE,
-    total_amount DECIMAL(10,2),  -- Calculated field
-    item_count INT               -- Calculated field
-);
-```
-
-### Foreign Keys and Referential Integrity
-
-```sql
--- Basic foreign key
-CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    department_id INT,
-    FOREIGN KEY (department_id) REFERENCES departments(id)
-);
-
--- Foreign key with actions
-CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    department_id INT,
-    FOREIGN KEY (department_id) REFERENCES departments(id)
-        ON DELETE SET NULL        -- Set to NULL when department deleted
-        ON UPDATE CASCADE        -- Update when department ID changes
-);
-
--- Composite foreign key
-CREATE TABLE order_items (
-    order_id INT,
-    product_id INT,
-    line_number INT,
-    quantity INT,
-    FOREIGN KEY (order_id, line_number) REFERENCES order_lines(order_id, line_number)
-);
-```
-
-### ER Model Components
-
-```sql
--- Entity: Real-world object
-CREATE TABLE customers (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    email VARCHAR(100)
-);
-
--- Attributes: Properties of entities
--- Simple: name, email
--- Composite: address (street, city, state, zip)
--- Derived: age (calculated from birth_date)
-
-CREATE TABLE customers_detailed (
-    id INT PRIMARY KEY,
-    first_name VARCHAR(50),
-    last_name VARCHAR(50),
-    birth_date DATE,
-    street VARCHAR(100),
-    city VARCHAR(50),
-    state VARCHAR(2),
-    zip VARCHAR(10),
-    -- Derived attribute (calculated)
-    age AS (YEAR(CURRENT_DATE) - YEAR(birth_date))
-);
-
--- Relationships: Associations between entities
--- One-to-Many
 CREATE TABLE departments (id INT PRIMARY KEY, name VARCHAR(100));
+CREATE TABLE employees   (id INT PRIMARY KEY, name VARCHAR(100),
+    department_id INT, FOREIGN KEY (department_id) REFERENCES departments(id));
+```
+
+---
+
+### Q57. What is Denormalization and when is it used?
+
+Denormalization intentionally introduces redundancy to improve **read performance**, often used in reporting or data warehouse scenarios.
+
+```sql
+-- Denormalized orders table (avoids joins at query time)
+CREATE TABLE orders_denormalized (
+    id              INT PRIMARY KEY,
+    customer_id     INT,
+    customer_name   VARCHAR(100),  -- duplicated from customers
+    order_date      DATE,
+    total_amount    DECIMAL(10,2), -- pre-calculated
+    item_count      INT            -- pre-calculated
+);
+```
+
+---
+
+### Q58. What are Foreign Keys and Referential Integrity?
+
+```sql
 CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
+    id            INT PRIMARY KEY,
+    name          VARCHAR(100),
     department_id INT,
-    FOREIGN KEY (department_id) REFERENCES departments(id)
-);
-
--- Many-to-Many (using junction table)
-CREATE TABLE students (id INT PRIMARY KEY, name VARCHAR(100));
-CREATE TABLE courses (id INT PRIMARY KEY, name VARCHAR(100));
-CREATE TABLE enrollments (
-    student_id INT,
-    course_id INT,
-    enrollment_date DATE,
-    PRIMARY KEY (student_id, course_id),
-    FOREIGN KEY (student_id) REFERENCES students(id),
-    FOREIGN KEY (course_id) REFERENCES courses(id)
-);
-```
-
-### Surrogate Keys
-
-```sql
--- Natural key (business meaningful)
-CREATE TABLE products (
-    sku VARCHAR(20) PRIMARY KEY,  -- Natural key
-    name VARCHAR(100),
-    price DECIMAL(10,2)
-);
-
--- Surrogate key (system generated)
-CREATE TABLE products (
-    id INT IDENTITY(1,1) PRIMARY KEY,  -- Surrogate key
-    sku VARCHAR(20) UNIQUE,            -- Natural key as unique constraint
-    name VARCHAR(100),
-    price DECIMAL(10,2)
-);
-
--- Benefits of surrogate keys:
--- 1. Immutable
--- 2. No business logic
--- 3. Better performance (integers)
--- 4. Easier foreign key relationships
-```
-
-### Composite Keys
-
-```sql
--- Composite primary key
-CREATE TABLE order_items (
-    order_id INT,
-    product_id INT,
-    quantity INT,
-    unit_price DECIMAL(10,2),
-    PRIMARY KEY (order_id, product_id)
-);
-
--- Composite unique key
-CREATE TABLE employee_skills (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    employee_id INT,
-    skill_id INT,
-    proficiency_level INT,
-    UNIQUE (employee_id, skill_id),  -- Composite unique constraint
-    FOREIGN KEY (employee_id) REFERENCES employees(id),
-    FOREIGN KEY (skill_id) REFERENCES skills(id)
-);
-```
-
-### Schema vs Instance
-
-```sql
--- Schema: Structure/definition of database
-CREATE SCHEMA hr;
-
-CREATE TABLE hr.employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    salary DECIMAL(10,2)
-);
-
--- Instance: Actual data at a point in time
-INSERT INTO hr.employees VALUES 
-(1, 'John Doe', 75000),
-(2, 'Jane Smith', 82000);
-
--- Schema remains same, instance changes with DML operations
-```
-
-### Referential Integrity
-
-```sql
--- Referential integrity ensures foreign key values exist in referenced table
-CREATE TABLE departments (
-    id INT PRIMARY KEY,
-    name VARCHAR(100)
-);
-
-CREATE TABLE employees (
-    id INT PRIMARY KEY,
-    name VARCHAR(100),
-    department_id INT,
-    CONSTRAINT fk_emp_dept 
+    CONSTRAINT fk_emp_dept
         FOREIGN KEY (department_id) REFERENCES departments(id)
-        ON DELETE RESTRICT  -- Prevents deletion if referenced
-        ON UPDATE CASCADE   -- Updates cascade to dependent records
+        ON DELETE SET NULL     -- set to NULL if department is deleted
+        ON UPDATE CASCADE      -- propagate department ID changes
 );
 
--- Checking referential integrity
--- Find orphaned records
-SELECT e.* 
-FROM employees e 
-LEFT JOIN departments d ON e.department_id = d.id 
+-- Find orphaned records (broken referential integrity)
+SELECT e.*
+FROM employees e
+LEFT JOIN departments d ON e.department_id = d.id
 WHERE d.id IS NULL AND e.department_id IS NOT NULL;
-
--- Enable/disable referential integrity checks
-ALTER TABLE employees NOCHECK CONSTRAINT fk_emp_dept;  -- Disable
-ALTER TABLE employees CHECK CONSTRAINT fk_emp_dept;     -- Enable
 ```
 
-## 6. Stored Objects (Views, Procedures, Triggers)
+---
 
-### Views in SQL
+### Q59. What is the difference between a VIEW and a TABLE?
 
 ```sql
--- Simple view
+-- VIEW: virtual table; no data stored; always reflects current data
 CREATE VIEW active_employees AS
 SELECT id, name, email, hire_date
 FROM employees
 WHERE status = 'ACTIVE';
 
--- Complex view with joins and calculations
-CREATE VIEW employee_details AS
-SELECT 
-    e.id,
-    e.name,
-    e.salary,
-    d.department_name,
-    e.salary * 12 as annual_salary,
-    CASE 
-        WHEN e.salary > 100000 THEN 'Senior'
-        WHEN e.salary > 50000 THEN 'Mid-level'
-        ELSE 'Junior'
-    END as level
-FROM employees e
-JOIN departments d ON e.department_id = d.id
-WHERE e.status = 'ACTIVE';
-
--- Updatable view
-CREATE VIEW manager_employees AS
-SELECT id, name, salary, department_id
-FROM employees
-WHERE position = 'Manager'
-WITH CHECK OPTION;  -- Ensures updates maintain view conditions
-
--- Update through view
-UPDATE manager_employees SET salary = 95000 WHERE id = 1;
-
--- View with security
-CREATE VIEW public_employee_info AS
-SELECT id, name, department_id, hire_date
-FROM employees;
--- Doesn't expose salary information
+-- Use like a table
+SELECT * FROM active_employees;
 ```
 
-### Materialized Views
+| Aspect       | VIEW                     | TABLE                    |
+|--------------|--------------------------|--------------------------|
+| Storage      | No physical storage      | Data physically stored   |
+| Performance  | Recalculated each query  | Direct data access       |
+| Real-time    | Always current           | Data as of last DML      |
+| Indexes      | Not directly indexable   | Fully indexable          |
+
+---
+
+### Q60. What are Materialized Views?
 
 ```sql
--- Create materialized view (PostgreSQL)
-CREATE MATERIALIZED VIEW sales_summary AS
-SELECT 
-    DATE_TRUNC('month', order_date) as month,
-    SUM(total_amount) as total_sales,
-    COUNT(*) as order_count,
-    AVG(total_amount) as avg_order_value
-FROM orders
-WHERE order_date >= '2023-01-01'
-GROUP BY DATE_TRUNC('month', order_date);
+-- Create (PostgreSQL)
+CREATE MATERIALIZED VIEW dept_stats AS
+SELECT d.department_name, COUNT(e.id) AS emp_count, AVG(e.salary) AS avg_salary
+FROM departments d
+LEFT JOIN employees e ON d.id = e.department_id
+GROUP BY d.id, d.department_name;
 
--- Create indexes on materialized view
-CREATE INDEX idx_sales_summary_month ON sales_summary(month);
+-- Refresh manually
+REFRESH MATERIALIZED VIEW dept_stats;
 
--- Refresh strategies
-REFRESH MATERIALIZED VIEW sales_summary;  -- Full refresh
-REFRESH MATERIALIZED VIEW CONCURRENTLY sales_summary;  -- Non-blocking
-
--- Automatic refresh (using triggers or scheduled jobs)
-CREATE OR REPLACE FUNCTION refresh_sales_summary()
-RETURNS TRIGGER AS $
-BEGIN
-    REFRESH MATERIALIZED VIEW CONCURRENTLY sales_summary;
-    RETURN NULL;
-END;
-$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_refresh_sales
-AFTER INSERT OR UPDATE OR DELETE ON orders
-FOR EACH STATEMENT
-EXECUTE FUNCTION refresh_sales_summary();
+-- Non-blocking refresh
+REFRESH MATERIALIZED VIEW CONCURRENTLY dept_stats;
 ```
 
-### Stored Procedures
+> Materialized views store the query result physically, so reads are fast but data can become stale until refreshed.
+
+---
+
+## 9. Stored Objects — Views, Procedures, Triggers
+
+---
+
+### Q61. What are Stored Procedures and what are their pros/cons?
 
 ```sql
 -- Basic stored procedure (SQL Server)
-CREATE PROCEDURE GetEmployeesByDepartment
-    @DepartmentId INT,
+CREATE PROCEDURE GetEmployeesByDept
+    @DeptId    INT,
     @MinSalary DECIMAL(10,2) = 0
 AS
 BEGIN
-    SELECT id, name, salary, hire_date
+    SELECT id, name, salary
     FROM employees
-    WHERE department_id = @DepartmentId
-    AND salary >= @MinSalary
+    WHERE department_id = @DeptId AND salary >= @MinSalary
     ORDER BY salary DESC;
 END;
 
--- Execute procedure
-EXEC GetEmployeesByDepartment @DepartmentId = 1, @MinSalary = 50000;
+EXEC GetEmployeesByDept @DeptId = 1, @MinSalary = 50000;
 
--- Procedure with output parameters
-CREATE PROCEDURE GetDepartmentStats
-    @DepartmentId INT,
-    @EmployeeCount INT OUTPUT,
-    @AverageSalary DECIMAL(10,2) OUTPUT
+-- With OUTPUT parameters
+CREATE PROCEDURE GetDeptStats
+    @DeptId      INT,
+    @EmpCount    INT OUTPUT,
+    @AvgSalary   DECIMAL(10,2) OUTPUT
 AS
 BEGIN
-    SELECT 
-        @EmployeeCount = COUNT(*),
-        @AverageSalary = AVG(salary)
-    FROM employees
-    WHERE department_id = @DepartmentId;
-END;
-
--- Execute with output parameters
-DECLARE @Count INT, @AvgSal DECIMAL(10,2);
-EXEC GetDepartmentStats 1, @Count OUTPUT, @AvgSal OUTPUT;
-SELECT @Count as EmployeeCount, @AvgSal as AverageSalary;
-
--- Complex procedure with error handling
-CREATE PROCEDURE TransferEmployee
-    @EmployeeId INT,
-    @NewDepartmentId INT,
-    @EffectiveDate DATE
-AS
-BEGIN
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        -- Validate employee exists
-        IF NOT EXISTS (SELECT 1 FROM employees WHERE id = @EmployeeId)
-            THROW 50001, 'Employee not found', 1;
-        
-        -- Validate department exists
-        IF NOT EXISTS (SELECT 1 FROM departments WHERE id = @NewDepartmentId)
-            THROW 50002, 'Department not found', 1;
-        
-        -- Insert transfer record
-        INSERT INTO employee_transfers (employee_id, old_department_id, new_department_id, transfer_date)
-        SELECT @EmployeeId, department_id, @NewDepartmentId, @EffectiveDate
-        FROM employees WHERE id = @EmployeeId;
-        
-        -- Update employee department
-        UPDATE employees 
-        SET department_id = @NewDepartmentId, updated_at = GETDATE()
-        WHERE id = @EmployeeId;
-        
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH;
+    SELECT @EmpCount = COUNT(*), @AvgSalary = AVG(salary)
+    FROM employees WHERE department_id = @DeptId;
 END;
 ```
 
-### Triggers
+**Pros:** Pre-compiled (fast), centralized logic, parameterized (secure), reduced network round-trips.
+**Cons:** DB-specific (not portable), harder to version-control, tight coupling to schema.
+
+---
+
+### Q62. What are Triggers and when are they used?
 
 ```sql
--- AFTER INSERT trigger
-CREATE TRIGGER tr_employee_audit_insert
+-- AFTER INSERT trigger (audit logging)
+CREATE TRIGGER tr_emp_insert
 ON employees
 AFTER INSERT
 AS
@@ -1359,686 +1219,159 @@ BEGIN
 END;
 
 -- AFTER UPDATE trigger
-CREATE TRIGGER tr_employee_audit_update
+CREATE TRIGGER tr_emp_update
 ON employees
 AFTER UPDATE
 AS
 BEGIN
-    INSERT INTO audit_log (table_name, operation, record_id, old_values, new_values, changed_by, change_date)
-    SELECT 
-        'employees', 
-        'UPDATE', 
-        i.id,
-        CONCAT('salary:', d.salary, '; dept:', d.department_id),
-        CONCAT('salary:', i.salary, '; dept:', i.department_id),
-        SYSTEM_USER, 
-        GETDATE()
-    FROM inserted i
-    JOIN deleted d ON i.id = d.id;
+    INSERT INTO audit_log (table_name, operation, record_id, old_values, new_values, changed_by)
+    SELECT 'employees', 'UPDATE', i.id,
+           CONCAT('salary:', d.salary),
+           CONCAT('salary:', i.salary),
+           SYSTEM_USER
+    FROM inserted i JOIN deleted d ON i.id = d.id;
 END;
 
--- BEFORE INSERT trigger (MySQL)
+-- BEFORE INSERT trigger (MySQL) — validation + defaults
 DELIMITER //
-CREATE TRIGGER tr_employee_before_insert
+CREATE TRIGGER tr_emp_before_insert
 BEFORE INSERT ON employees
 FOR EACH ROW
 BEGIN
-    -- Auto-generate employee code
-    SET NEW.employee_code = CONCAT('EMP', LPAD(NEW.id, 6, '0'));
-    
-    -- Set default values
-    IF NEW.hire_date IS NULL THEN
-        SET NEW.hire_date = CURDATE();
-    END IF;
-    
-    -- Validation
     IF NEW.salary < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Salary cannot be negative';
+    END IF;
+    IF NEW.hire_date IS NULL THEN
+        SET NEW.hire_date = CURDATE();
     END IF;
 END;
 //
 DELIMITER ;
-
--- INSTEAD OF trigger (for views)
-CREATE TRIGGER tr_employee_view_insert
-ON employee_summary_view
-INSTEAD OF INSERT
-AS
-BEGIN
-    INSERT INTO employees (name, salary, department_id)
-    SELECT name, salary, department_id
-    FROM inserted;
-    
-    -- Additional logic for related tables
-    INSERT INTO employee_status (employee_id, status, status_date)
-    SELECT 
-        (SELECT id FROM employees WHERE name = i.name), 
-        'ACTIVE', 
-        GETDATE()
-    FROM inserted i;
-END;
 ```
 
-### Triggers vs Procedures
+---
 
-| Aspect | Triggers | Stored Procedures |
-|--------|----------|-------------------|
-| Execution | Automatic (on DML events) | Manual (called explicitly) |
-| Parameters | No parameters | Can have parameters |
-| Return Values | Cannot return values | Can return values |
-| Transactions | Part of triggering transaction | Can control own transactions |
-| Use Cases | Auditing, validation, auto-updates | Business logic, complex operations |
+### Q63. What is the difference between Triggers and Stored Procedures?
 
-### Pros and Cons of Stored Procedures
+| Aspect         | Triggers                        | Stored Procedures              |
+|----------------|---------------------------------|--------------------------------|
+| Execution      | Automatic on DML events         | Manual / explicit call         |
+| Parameters     | None                            | Supported                      |
+| Return values  | Cannot return values            | Can return values              |
+| Transactions   | Part of triggering transaction  | Can manage own transactions    |
+| Use cases      | Auditing, validation, cascades  | Business logic, complex ops    |
 
-**Pros:**
-- Better performance (compiled, cached)
-- Centralized business logic
-- Enhanced security (parameterized)
-- Reduced network traffic
-- Transaction control
+---
 
-**Cons:**
-- Database-specific (less portable)
-- Harder to version control
-- Limited debugging tools
-- Can create tight coupling
-- Scalability challenges
+## 10. Advanced & Practical Scenarios
+
+---
+
+### Q64. Implement Soft Delete.
 
 ```sql
--- Example showing benefits
--- Without stored procedure (multiple round trips)
--- 1. SELECT to check balance
--- 2. INSERT transaction record
--- 3. UPDATE balance
--- 4. INSERT audit log
-
--- With stored procedure (single call)
-CREATE PROCEDURE ProcessPayment
-    @AccountId INT,
-    @Amount DECIMAL(10,2),
-    @Description VARCHAR(100)
-AS
-BEGIN
-    BEGIN TRANSACTION;
-    -- All operations in single atomic unit
-    -- Reduced network traffic
-    -- Centralized validation logic
-    COMMIT;
-END;
-```
-
-## 7. Advanced & Practical Scenarios
-
-### E-commerce Database Design
-
-```sql
--- Core entities
-CREATE TABLE customers (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    phone VARCHAR(20),
-    created_at DATETIME2 DEFAULT GETDATE(),
-    updated_at DATETIME2 DEFAULT GETDATE(),
-    is_active BIT DEFAULT 1
-);
-
-CREATE TABLE addresses (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    customer_id INT NOT NULL,
-    type VARCHAR(20) CHECK (type IN ('billing', 'shipping')) NOT NULL,
-    street_address VARCHAR(255),
-    city VARCHAR(100),
-    state VARCHAR(100),
-    postal_code VARCHAR(20),
-    country VARCHAR(100),
-    is_default BIT DEFAULT 0,
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
-);
-
-CREATE TABLE categories (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    parent_id INT,
-    description TEXT,
-    is_active BIT DEFAULT 1,
-    FOREIGN KEY (parent_id) REFERENCES categories(id)
-);
-
-CREATE TABLE products (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    sku VARCHAR(50) UNIQUE NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    category_id INT,
-    price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
-    cost DECIMAL(10,2) CHECK (cost >= 0),
-    weight DECIMAL(8,2),
-    dimensions VARCHAR(50),
-    is_active BIT DEFAULT 1,
-    created_at DATETIME2 DEFAULT GETDATE(),
-    updated_at DATETIME2 DEFAULT GETDATE(),
-    FOREIGN KEY (category_id) REFERENCES categories(id)
-);
-
-CREATE TABLE inventory (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    product_id INT NOT NULL,
-    warehouse_location VARCHAR(100),
-    quantity_available INT NOT NULL DEFAULT 0,
-    quantity_reserved INT NOT NULL DEFAULT 0,
-    reorder_point INT DEFAULT 10,
-    max_stock_level INT,
-    last_restocked DATETIME2,
-    FOREIGN KEY (product_id) REFERENCES products(id)
-);
-
-CREATE TABLE orders (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    customer_id INT NOT NULL,
-    order_number VARCHAR(50) UNIQUE NOT NULL,
-    status VARCHAR(20) CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')) DEFAULT 'pending',
-    order_date DATETIME2 DEFAULT GETDATE(),
-    shipped_date DATETIME2,
-    delivered_date DATETIME2,
-    subtotal DECIMAL(10,2) NOT NULL,
-    tax_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-    shipping_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-    total_amount DECIMAL(10,2) NOT NULL,
-    billing_address_id INT,
-    shipping_address_id INT,
-    payment_method VARCHAR(50),
-    payment_status VARCHAR(20) DEFAULT 'pending',
-    notes TEXT,
-    FOREIGN KEY (customer_id) REFERENCES customers(id),
-    FOREIGN KEY (billing_address_id) REFERENCES addresses(id),
-    FOREIGN KEY (shipping_address_id) REFERENCES addresses(id)
-);
-
-CREATE TABLE order_items (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    order_id INT NOT NULL,
-    product_id INT NOT NULL,
-    quantity INT NOT NULL CHECK (quantity > 0),
-    unit_price DECIMAL(10,2) NOT NULL,
-    total_price AS (quantity * unit_price) PERSISTED,
-    FOREIGN KEY (order_id) REFERENCES orders(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
-);
-
--- Shopping cart for session management
-CREATE TABLE cart_items (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    customer_id INT,
-    session_id VARCHAR(255),
-    product_id INT NOT NULL,
-    quantity INT NOT NULL CHECK (quantity > 0),
-    added_at DATETIME2 DEFAULT GETDATE(),
-    FOREIGN KEY (customer_id) REFERENCES customers(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
-);
-
--- Reviews and ratings
-CREATE TABLE product_reviews (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    product_id INT NOT NULL,
-    customer_id INT NOT NULL,
-    rating INT CHECK (rating BETWEEN 1 AND 5),
-    title VARCHAR(255),
-    review_text TEXT,
-    is_verified_purchase BIT DEFAULT 0,
-    created_at DATETIME2 DEFAULT GETDATE(),
-    is_approved BIT DEFAULT 0,
-    FOREIGN KEY (product_id) REFERENCES products(id),
-    FOREIGN KEY (customer_id) REFERENCES customers(id),
-    UNIQUE (product_id, customer_id)  -- One review per customer per product
-);
-
--- Coupons and promotions
-CREATE TABLE coupons (
-    id INT IDENTITY(1,1) PRIMARY KEY,
-    code VARCHAR(50) UNIQUE NOT NULL,
-    description VARCHAR(255),
-    discount_type VARCHAR(20) CHECK (discount_type IN ('percentage', 'fixed_amount')),
-    discount_value DECIMAL(10,2),
-    min_order_amount DECIMAL(10,2) DEFAULT 0,
-    max_discount_amount DECIMAL(10,2),
-    start_date DATETIME2,
-    end_date DATETIME2,
-    usage_limit INT,
-    used_count INT DEFAULT 0,
-    is_active BIT DEFAULT 1
-);
-```
-
-### Schema Migrations
-
-```sql
--- Migration versioning table
-CREATE TABLE schema_migrations (
-    version VARCHAR(50) PRIMARY KEY,
-    description VARCHAR(255),
-    applied_at DATETIME2 DEFAULT GETDATE(),
-    applied_by VARCHAR(100) DEFAULT SYSTEM_USER
-);
-
--- Migration script example
--- Migration: 20231201_001_add_customer_loyalty_program.sql
-BEGIN TRANSACTION;
-
--- Check if migration already applied
-IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '20231201_001')
-BEGIN
-    -- Add loyalty program tables
-    CREATE TABLE loyalty_programs (
-        id INT IDENTITY(1,1) PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        points_per_dollar DECIMAL(5,2) DEFAULT 1.0,
-        redemption_rate DECIMAL(5,2) DEFAULT 0.01,
-        is_active BIT DEFAULT 1
-    );
-    
-    CREATE TABLE customer_loyalty (
-        customer_id INT PRIMARY KEY,
-        program_id INT NOT NULL,
-        points_balance INT DEFAULT 0,
-        points_lifetime INT DEFAULT 0,
-        tier_level VARCHAR(20) DEFAULT 'Bronze',
-        joined_date DATETIME2 DEFAULT GETDATE(),
-        FOREIGN KEY (customer_id) REFERENCES customers(id),
-        FOREIGN KEY (program_id) REFERENCES loyalty_programs(id)
-    );
-    
-    -- Add new column to existing table
-    ALTER TABLE orders ADD loyalty_points_earned INT DEFAULT 0;
-    ALTER TABLE orders ADD loyalty_points_redeemed INT DEFAULT 0;
-    
-    -- Create indexes
-    CREATE INDEX idx_customer_loyalty_points ON customer_loyalty(points_balance);
-    CREATE INDEX idx_orders_loyalty_points ON orders(loyalty_points_earned);
-    
-    -- Insert default loyalty program
-    INSERT INTO loyalty_programs (name, points_per_dollar, redemption_rate)
-    VALUES ('Standard Program', 1.0, 0.01);
-    
-    -- Record migration
-    INSERT INTO schema_migrations (version, description)
-    VALUES ('20231201_001', 'Add customer loyalty program tables and columns');
-    
-    PRINT 'Migration 20231201_001 applied successfully';
-END
-ELSE
-BEGIN
-    PRINT 'Migration 20231201_001 already applied, skipping';
-END
-
-COMMIT TRANSACTION;
-
--- Rollback script (separate file)
--- Rollback: 20231201_001_rollback_add_customer_loyalty_program.sql
-BEGIN TRANSACTION;
-
--- Remove added columns
-ALTER TABLE orders DROP COLUMN loyalty_points_earned;
-ALTER TABLE orders DROP COLUMN loyalty_points_redeemed;
-
--- Drop tables (in reverse order due to foreign keys)
-DROP TABLE customer_loyalty;
-DROP TABLE loyalty_programs;
-
--- Remove migration record
-DELETE FROM schema_migrations WHERE version = '20231201_001';
-
-COMMIT TRANSACTION;
-```
-
-### Database Backup and Restore
-
-```sql
--- Full database backup (SQL Server)
-BACKUP DATABASE ECommerceDB 
-TO DISK = 'C:\Backups\ECommerceDB_Full_20231201.bak'
-WITH FORMAT, COMPRESSION, CHECKSUM;
-
--- Differential backup
-BACKUP DATABASE ECommerceDB 
-TO DISK = 'C:\Backups\ECommerceDB_Diff_20231201.bak'
-WITH DIFFERENTIAL, COMPRESSION, CHECKSUM;
-
--- Transaction log backup
-BACKUP LOG ECommerceDB 
-TO DISK = 'C:\Backups\ECommerceDB_Log_20231201.trn';
-
--- Automated backup script
-CREATE PROCEDURE sp_BackupDatabase
-    @DatabaseName NVARCHAR(128),
-    @BackupPath NVARCHAR(500),
-    @BackupType VARCHAR(20) = 'FULL'  -- FULL, DIFF, LOG
-AS
-BEGIN
-    DECLARE @FileName NVARCHAR(500);
-    DECLARE @Timestamp VARCHAR(20) = FORMAT(GETDATE(), 'yyyyMMdd_HHmmss');
-    
-    SET @FileName = @BackupPath + @DatabaseName + '_' + @BackupType + '_' + @Timestamp + 
-                   CASE @BackupType 
-                       WHEN 'LOG' THEN '.trn' 
-                       ELSE '.bak' 
-                   END;
-    
-    IF @BackupType = 'FULL'
-        BACKUP DATABASE @DatabaseName TO DISK = @FileName WITH COMPRESSION, CHECKSUM;
-    ELSE IF @BackupType = 'DIFF'
-        BACKUP DATABASE @DatabaseName TO DISK = @FileName WITH DIFFERENTIAL, COMPRESSION, CHECKSUM;
-    ELSE IF @BackupType = 'LOG'
-        BACKUP LOG @DatabaseName TO DISK = @FileName;
-        
-    PRINT 'Backup completed: ' + @FileName;
-END;
-
--- Restore database
-RESTORE DATABASE ECommerceDB_Test 
-FROM DISK = 'C:\Backups\ECommerceDB_Full_20231201.bak'
-WITH MOVE 'ECommerceDB' TO 'C:\Data\ECommerceDB_Test.mdf',
-     MOVE 'ECommerceDB_Log' TO 'C:\Data\ECommerceDB_Test.ldf',
-     REPLACE;
-```
-
-### Audit Logging and Change Tracking
-
-```sql
--- Audit table design
-CREATE TABLE audit_log (
-    id BIGINT IDENTITY(1,1) PRIMARY KEY,
-    table_name VARCHAR(100) NOT NULL,
-    operation VARCHAR(10) NOT NULL,  -- INSERT, UPDATE, DELETE
-    record_id VARCHAR(50),
-    old_values NVARCHAR(MAX),  -- JSON format
-    new_values NVARCHAR(MAX),  -- JSON format
-    changed_by VARCHAR(100) NOT NULL,
-    changed_at DATETIME2 DEFAULT GETDATE(),
-    ip_address VARCHAR(45),
-    user_agent VARCHAR(500),
-    session_id VARCHAR(100)
-);
-
--- Generic audit trigger
-CREATE TRIGGER tr_audit_products
-ON products
-AFTER INSERT, UPDATE, DELETE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    DECLARE @operation VARCHAR(10);
-    
-    IF EXISTS (SELECT * FROM inserted) AND EXISTS (SELECT * FROM deleted)
-        SET @operation = 'UPDATE';
-    ELSE IF EXISTS (SELECT * FROM inserted)
-        SET @operation = 'INSERT';
-    ELSE
-        SET @operation = 'DELETE';
-    
-    -- For INSERT operations
-    IF @operation = 'INSERT'
-    BEGIN
-        INSERT INTO audit_log (table_name, operation, record_id, new_values, changed_by)
-        SELECT 
-            'products',
-            'INSERT',
-            CAST(i.id AS VARCHAR(50)),
-            (SELECT i.* FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
-            SYSTEM_USER
-        FROM inserted i;
-    END
-    
-    -- For UPDATE operations
-    IF @operation = 'UPDATE'
-    BEGIN
-        INSERT INTO audit_log (table_name, operation, record_id, old_values, new_values, changed_by)
-        SELECT 
-            'products',
-            'UPDATE',
-            CAST(i.id AS VARCHAR(50)),
-            (SELECT d.* FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
-            (SELECT i.* FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
-            SYSTEM_USER
-        FROM inserted i
-        JOIN deleted d ON i.id = d.id;
-    END
-    
-    -- For DELETE operations
-    IF @operation = 'DELETE'
-    BEGIN
-        INSERT INTO audit_log (table_name, operation, record_id, old_values, changed_by)
-        SELECT 
-            'products',
-            'DELETE',
-            CAST(d.id AS VARCHAR(50)),
-            (SELECT d.* FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
-            SYSTEM_USER
-        FROM deleted d;
-    END
-END;
-
--- Query audit history
-SELECT 
-    table_name,
-    operation,
-    record_id,
-    changed_by,
-    changed_at,
-    JSON_VALUE(old_values, '$.name') as old_name,
-    JSON_VALUE(new_values, '$.name') as new_name
-FROM audit_log
-WHERE table_name = 'products' 
-    AND record_id = '123'
-ORDER BY changed_at DESC;
-```
-
-### Soft Delete Implementation
-
-```sql
--- Add soft delete columns to tables
+-- Add soft-delete columns
 ALTER TABLE products ADD is_deleted BIT DEFAULT 0;
 ALTER TABLE products ADD deleted_at DATETIME2;
 ALTER TABLE products ADD deleted_by VARCHAR(100);
 
 -- Soft delete procedure
-CREATE PROCEDURE sp_SoftDeleteProduct
-    @ProductId INT,
-    @DeletedBy VARCHAR(100)
+CREATE PROCEDURE sp_SoftDelete
+    @ProductId INT, @DeletedBy VARCHAR(100)
 AS
 BEGIN
     UPDATE products
-    SET is_deleted = 1,
-        deleted_at = GETDATE(),
-        deleted_by = @DeletedBy,
-        is_active = 0
+    SET is_deleted = 1, deleted_at = GETDATE(), deleted_by = @DeletedBy, is_active = 0
     WHERE id = @ProductId;
-    
-    -- Audit the soft delete
-    INSERT INTO audit_log (table_name, operation, record_id, changed_by)
-    VALUES ('products', 'SOFT_DELETE', @ProductId, @DeletedBy);
 END;
 
--- Views to hide soft-deleted records
+-- View to hide deleted records
 CREATE VIEW active_products AS
 SELECT * FROM products WHERE is_deleted = 0;
 
--- Restore soft-deleted record
-CREATE PROCEDURE sp_RestoreProduct
-    @ProductId INT,
-    @RestoredBy VARCHAR(100)
-AS
-BEGIN
-    UPDATE products
-    SET is_deleted = 0,
-        deleted_at = NULL,
-        deleted_by = NULL,
-        is_active = 1
-    WHERE id = @ProductId;
-    
-    INSERT INTO audit_log (table_name, operation, record_id, changed_by)
-    VALUES ('products', 'RESTORE', @ProductId, @RestoredBy);
-END;
-
--- Permanent delete (after retention period)
-CREATE PROCEDURE sp_PermanentDeleteOldRecords
-    @TableName VARCHAR(100),
-    @RetentionDays INT = 2555  -- 7 years default
-AS
-BEGIN
-    DECLARE @SQL NVARCHAR(MAX);
-    DECLARE @CutoffDate DATETIME2 = DATEADD(DAY, -@RetentionDays, GETDATE());
-    
-    SET @SQL = 'DELETE FROM ' + QUOTENAME(@TableName) + 
-               ' WHERE is_deleted = 1 AND deleted_at < @CutoffDate';
-    
-    EXEC sp_executesql @SQL, N'@CutoffDate DATETIME2', @CutoffDate;
-END;
+-- Restore a soft-deleted record
+UPDATE products
+SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL, is_active = 1
+WHERE id = @ProductId;
 ```
 
-### Data Consistency Across Microservices
+---
+
+### Q65. Implement Audit Logging.
 
 ```sql
--- Outbox pattern for eventual consistency
-CREATE TABLE outbox_events (
-    id BIGINT IDENTITY(1,1) PRIMARY KEY,
-    aggregate_id VARCHAR(100) NOT NULL,
-    event_type VARCHAR(100) NOT NULL,
-    event_data NVARCHAR(MAX) NOT NULL,  -- JSON payload
-    created_at DATETIME2 DEFAULT GETDATE(),
-    processed_at DATETIME2,
-    retry_count INT DEFAULT 0,
-    status VARCHAR(20) DEFAULT 'PENDING'  -- PENDING, PROCESSED, FAILED
+CREATE TABLE audit_log (
+    id          BIGINT IDENTITY(1,1) PRIMARY KEY,
+    table_name  VARCHAR(100)  NOT NULL,
+    operation   VARCHAR(10)   NOT NULL,   -- INSERT / UPDATE / DELETE
+    record_id   VARCHAR(50),
+    old_values  NVARCHAR(MAX),            -- JSON
+    new_values  NVARCHAR(MAX),            -- JSON
+    changed_by  VARCHAR(100)  NOT NULL,
+    changed_at  DATETIME2     DEFAULT GETDATE()
 );
 
--- Saga pattern for distributed transactions
-CREATE TABLE saga_orchestrator (
-    id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    saga_type VARCHAR(100) NOT NULL,
-    status VARCHAR(20) DEFAULT 'STARTED',  -- STARTED, COMPLETED, FAILED, COMPENSATING
-    current_step INT DEFAULT 1,
-    context_data NVARCHAR(MAX),  -- JSON with saga state
-    created_at DATETIME2 DEFAULT GETDATE(),
-    updated_at DATETIME2 DEFAULT GETDATE()
-);
-
-CREATE TABLE saga_steps (
-    id BIGINT IDENTITY(1,1) PRIMARY KEY,
-    saga_id UNIQUEIDENTIFIER NOT NULL,
-    step_number INT NOT NULL,
-    service_name VARCHAR(100) NOT NULL,
-    operation VARCHAR(100) NOT NULL,
-    compensation_operation VARCHAR(100),
-    request_data NVARCHAR(MAX),
-    response_data NVARCHAR(MAX),
-    status VARCHAR(20) DEFAULT 'PENDING',
-    executed_at DATETIME2,
-    compensated_at DATETIME2,
-    FOREIGN KEY (saga_id) REFERENCES saga_orchestrator(id)
-);
-
--- Example: Order processing saga
-CREATE PROCEDURE sp_StartOrderSaga
-    @OrderId INT,
-    @CustomerId INT,
-    @TotalAmount DECIMAL(10,2)
-AS
-BEGIN
-    DECLARE @SagaId UNIQUEIDENTIFIER = NEWID();
-    DECLARE @ContextData NVARCHAR(MAX) = JSON_OBJECT(
-        'orderId', @OrderId,
-        'customerId', @CustomerId,
-        'totalAmount', @TotalAmount
-    );
-    
-    BEGIN TRANSACTION;
-    
-    -- Create saga orchestrator record
-    INSERT INTO saga_orchestrator (id, saga_type, context_data)
-    VALUES (@SagaId, 'OrderProcessing', @ContextData);
-    
-    -- Define saga steps
-    INSERT INTO saga_steps (saga_id, step_number, service_name, operation, compensation_operation, request_data)
-    VALUES 
-    (@SagaId, 1, 'PaymentService', 'ProcessPayment', 'RefundPayment', 
-     JSON_OBJECT('customerId', @CustomerId, 'amount', @TotalAmount)),
-    (@SagaId, 2, 'InventoryService', 'ReserveItems', 'ReleaseItems',
-     JSON_OBJECT('orderId', @OrderId)),
-    (@SagaId, 3, 'ShippingService', 'CreateShipment', 'CancelShipment',
-     JSON_OBJECT('orderId', @OrderId)),
-    (@SagaId, 4, 'OrderService', 'ConfirmOrder', 'CancelOrder',
-     JSON_OBJECT('orderId', @OrderId));
-    
-    COMMIT TRANSACTION;
-    
-    SELECT @SagaId as SagaId;
-END;
-
--- Compensation handling
-CREATE PROCEDURE sp_CompensateSaga
-    @SagaId UNIQUEIDENTIFIER
-AS
-BEGIN
-    -- Mark saga as compensating
-    UPDATE saga_orchestrator 
-    SET status = 'COMPENSATING', updated_at = GETDATE()
-    WHERE id = @SagaId;
-    
-    -- Execute compensation operations in reverse order
-    DECLARE step_cursor CURSOR FOR
-    SELECT step_number, service_name, compensation_operation, request_data
-    FROM saga_steps
-    WHERE saga_id = @SagaId AND status = 'COMPLETED'
-    ORDER BY step_number DESC;
-    
-    -- Process each compensation step
-    -- (Implementation would involve calling external services)
-END;
-
--- Event sourcing pattern
-CREATE TABLE event_store (
-    id BIGINT IDENTITY(1,1) PRIMARY KEY,
-    stream_id VARCHAR(100) NOT NULL,
-    event_type VARCHAR(100) NOT NULL,
-    event_data NVARCHAR(MAX) NOT NULL,
-    metadata NVARCHAR(MAX),
-    version INT NOT NULL,
-    timestamp DATETIME2 DEFAULT GETDATE(),
-    INDEX idx_stream_version (stream_id, version)
-);
-
--- Projections for read models
-CREATE TABLE order_projection (
-    order_id INT PRIMARY KEY,
-    customer_id INT,
-    status VARCHAR(50),
-    total_amount DECIMAL(10,2),
-    created_at DATETIME2,
-    last_updated DATETIME2
-);
-
--- Event replay for projections
-CREATE PROCEDURE sp_RebuildOrderProjection
-    @OrderId INT
-AS
-BEGIN
-    DELETE FROM order_projection WHERE order_id = @OrderId;
-    
-    DECLARE event_cursor CURSOR FOR
-    SELECT event_type, event_data, timestamp
-    FROM event_store
-    WHERE stream_id = 'order-' + CAST(@OrderId AS VARCHAR(10))
-    ORDER BY version;
-    
-    -- Process each event to rebuild projection
-    -- (Implementation specific to event types)
-END;
+-- Query audit history for a record
+SELECT table_name, operation, record_id, changed_by, changed_at,
+       JSON_VALUE(old_values, '$.name') AS old_name,
+       JSON_VALUE(new_values, '$.name') AS new_name
+FROM audit_log
+WHERE table_name = 'products' AND record_id = '123'
+ORDER BY changed_at DESC;
 ```
 
-This comprehensive SQL guide covers all the essential concepts from basic queries to advanced database design patterns. Each section includes practical examples and real-world scenarios that you'll encounter in production environments. The examples demonstrate best practices for performance, security, and maintainability while showing how different SQL concepts work together to create robust database
+---
+
+### Q66. What is the Outbox Pattern for microservices consistency?
+
+```sql
+CREATE TABLE outbox_events (
+    id           BIGINT IDENTITY(1,1) PRIMARY KEY,
+    aggregate_id VARCHAR(100)   NOT NULL,
+    event_type   VARCHAR(100)   NOT NULL,
+    event_data   NVARCHAR(MAX)  NOT NULL,  -- JSON payload
+    created_at   DATETIME2      DEFAULT GETDATE(),
+    processed_at DATETIME2,
+    retry_count  INT            DEFAULT 0,
+    status       VARCHAR(20)    DEFAULT 'PENDING'  -- PENDING / PROCESSED / FAILED
+);
+```
+
+The application writes to the `outbox_events` table **in the same transaction** as the business data change. A separate process picks up pending events and publishes them to the message broker, guaranteeing at-least-once delivery without distributed transactions.
+
+---
+
+### Q67. What is Schema Migration and how is it versioned?
+
+```sql
+-- Track applied migrations
+CREATE TABLE schema_migrations (
+    version      VARCHAR(50)  PRIMARY KEY,
+    description  VARCHAR(255),
+    applied_at   DATETIME2    DEFAULT GETDATE(),
+    applied_by   VARCHAR(100) DEFAULT SYSTEM_USER
+);
+
+-- Example migration script
+BEGIN TRANSACTION;
+IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '20240101_001')
+BEGIN
+    ALTER TABLE orders ADD loyalty_points INT DEFAULT 0;
+
+    CREATE INDEX idx_orders_loyalty ON orders(loyalty_points);
+
+    INSERT INTO schema_migrations (version, description)
+    VALUES ('20240101_001', 'Add loyalty_points column to orders');
+END
+COMMIT;
+
+-- Rollback script
+BEGIN TRANSACTION;
+    ALTER TABLE orders DROP COLUMN loyalty_points;
+    DELETE FROM schema_migrations WHERE version = '20240101_001';
+COMMIT;
+```
+
+---
+
+*End of SQL Complete Reference*
