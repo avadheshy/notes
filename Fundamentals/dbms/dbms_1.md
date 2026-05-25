@@ -19,6 +19,8 @@ what is dbms languages
 
 how an app access db
 
+DBMS (Database Management System) is a software system that manages, stores, and retrieves data efficiently in a structured format. DBMS acts as a bridge between a central database and multiple clients, including apps and users.
+
 ---
 # ER Diagrams | ER Diagram Symbols
 - ER diagram or Entity Relationship diagram is a conceptual model that gives the graphical representation of the logical structure of the database.

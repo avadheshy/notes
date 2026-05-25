@@ -1374,4 +1374,99 @@ COMMIT;
 
 ---
 
+---
+
+## 11. DBMS Fundamentals
+
+---
+
+### Q68. What is DBMS and how is it different from a File System?
+
+A **DBMS** is software that manages, stores, and retrieves structured data. It acts as a bridge between the database and client applications.
+
+Key advantages over a file system:
+
+| Aspect | File System | DBMS |
+|---|---|---|
+| Redundancy | High (data duplicated across files) | Controlled via normalization |
+| Integrity | Manual enforcement | Constraints (PK, FK, CHECK) |
+| Concurrency | No built-in control | Locking & isolation levels |
+| Security | OS-level only | Role-based access (DCL) |
+| Query | No standard language | SQL with optimizer |
+| Relationships | Not supported | Foreign keys, joins |
+
+---
+
+### Q69. What are the SQL sub-languages? (DDL / DML / DCL / TCL / DQL)
+
+This is a very common interview question. Know all five with examples.
+
+**DDL — Data Definition Language** *(defines structure)*
+```sql
+CREATE TABLE employees (...);
+ALTER TABLE employees ADD column_name datatype;
+DROP TABLE employees;
+TRUNCATE TABLE employees;   -- DDL, not DML (cannot be rolled back in MySQL)
+RENAME TABLE old_name TO new_name;
+```
+
+**DML — Data Manipulation Language** *(manipulates data)*
+```sql
+INSERT INTO employees (name, salary) VALUES ('Alice', 90000);
+UPDATE employees SET salary = 95000 WHERE id = 1;
+DELETE FROM employees WHERE id = 1;
+MERGE INTO target USING source ON (condition) ...;  -- UPSERT
+```
+
+**DCL — Data Control Language** *(manages permissions)*
+```sql
+GRANT SELECT, INSERT ON employees TO analyst_role;
+REVOKE INSERT ON employees FROM analyst_role;
+```
+
+**TCL — Transaction Control Language** *(manages transactions)*
+```sql
+BEGIN TRANSACTION;
+    UPDATE accounts SET balance = balance - 500 WHERE id = 1;
+    SAVEPOINT after_debit;          -- partial rollback point
+    UPDATE accounts SET balance = balance + 500 WHERE id = 2;
+COMMIT;
+
+-- Rollback to savepoint (not full rollback)
+ROLLBACK TO SAVEPOINT after_debit;
+```
+
+**DQL — Data Query Language** *(retrieves data)*
+```sql
+SELECT name, salary FROM employees WHERE department_id = 3;
+```
+
+> **Key distinction asked in interviews:** `TRUNCATE` is **DDL** (not DML), so it cannot be rolled back in most databases and does not fire row-level triggers.
+
+---
+
+### Q70. What are the three types of table cloning?
+
+```sql
+-- 1. Simple Clone — copies structure AND data
+CREATE TABLE employees_copy AS
+SELECT * FROM employees;
+-- Result: new table with data but NO constraints, indexes, or keys
+
+-- 2. Shallow Clone — copies structure ONLY (no data, no constraints)
+CREATE TABLE employees_shell LIKE employees;  -- MySQL only
+-- Result: empty table with column definitions only
+
+-- 3. Deep Clone — copies structure WITH constraints AND data
+CREATE TABLE employees_full LIKE employees;   -- Step 1: structure + constraints
+INSERT INTO employees_full SELECT * FROM employees;  -- Step 2: copy data
+-- Result: full replica including indexes and constraints
+```
+
+| Clone Type | Data | Constraints / Indexes |
+|---|---|---|
+| Simple | ✅ Yes | ❌ No |
+| Shallow | ❌ No | ❌ No |
+| Deep | ✅ Yes | ✅ Yes |
+
 *End of SQL Complete Reference*
