@@ -1,12 +1,12 @@
-# Go (Golang) — Quick Reference
+# Go (Golang) — Complete Quick Reference
 
 ---
 
 ## 1. Introduction to Go
 
-Go is a statically typed, compiled language developed by Google. It's designed for simplicity, performance, and built-in concurrency support.
+Go is a statically typed, compiled language by Google. Designed for simplicity, performance, and built-in concurrency.
 
-**Key features:** Fast compilation, garbage collection, strong typing, goroutines for concurrency, and a rich standard library.
+**Key traits:** No classes (structs + methods instead), no exceptions (errors as values), no inheritance (embedding instead), first-class functions, garbage collected, native concurrency via goroutines + channels.
 
 ---
 
@@ -18,27 +18,53 @@ package main
 import "fmt"
 
 func main() {
-    fmt.Println("Hello, World!")
+    message := greetMe("world")
+    fmt.Println(message)
+}
+
+func greetMe(name string) string {
+    return "Hello, " + name + "!"
 }
 ```
 
-- Every Go file belongs to a `package`
-- `main` package → entry point
-- `import` brings in standard/external packages
+```bash
+$ go run hello.go
+$ go build        # compiles to binary
+```
 
 ---
 
-## 3. Fundamentals of Go
+## 3. Packages
+
+```go
+// Single import
+import "fmt"
+
+// Grouped import
+import (
+    "fmt"
+    "math/rand"
+)
+
+// Alias
+import r "math/rand"
+r.Intn(10)
+```
+
+- Every file starts with `package <name>`
+- Executables use `package main`
+- **Uppercase** identifier = exported (public); **lowercase** = private
+- Convention: package name = last segment of import path (`math/rand` → `rand`)
+
+---
+
+## 4. Fundamentals
 
 ### Identifiers
-Names given to variables, functions, types, etc.
-- Must start with a letter or `_`
-- Case-sensitive (`age` ≠ `Age`)
-- Exported (public) if it starts with an uppercase letter
+- Must start with a letter or `_`; case-sensitive
+- Exported (visible outside package) if it starts with uppercase
 
 ### Keywords
-Reserved words — cannot be used as identifiers.
-
 ```
 break    case     chan      const    continue
 default  defer    else      fallthrough  for
@@ -49,60 +75,87 @@ select   struct   switch    type     var
 
 ### Data Types
 
-| Category  | Types |
-|-----------|-------|
-| Integer   | `int`, `int8`, `int16`, `int32`, `int64`, `uint`, `uint8`… |
-| Float     | `float32`, `float64` |
-| Complex   | `complex64`, `complex128` |
-| Boolean   | `bool` |
-| String    | `string` |
-| Other     | `byte` (alias `uint8`), `rune` (alias `int32`) |
+| Category | Types |
+|----------|-------|
+| Integer  | `int`, `int8`, `int16`, `int32`, `int64`, `uint`, `uint8`… |
+| Float    | `float32`, `float64` |
+| Complex  | `complex64`, `complex128` |
+| Boolean  | `bool` |
+| String   | `string` |
+| Aliases  | `byte` = `uint8`, `rune` = `int32` |
 
 ### Variables
 
 ```go
-// Using var
-var name string = "Go"
-var age int     // zero value: 0
+var msg string                   // zero value ""
+var msg = "Hello"                // type inferred
+var msg string = "Hello"         // explicit type
+var x, y int = 1, 2              // multiple
 
-// Short declaration (inside functions only)
-city := "Delhi"
+// Declaration block
+var (
+    x int
+    y = 20
+    z int = 30
+    d, e = 40, "Hello"
+)
+
+// Short declaration (functions only)
+msg := "Hello"
+x, msg := 1, "Hello"
 ```
 
-### Constants
+### Constants & iota
 
 ```go
 const Pi = 3.14
+const Size int64 = 1024
+
 const (
-    A = 1
-    B = 2
+    Pi = 3.14
+    E  = 2.718
+)
+
+// iota — auto-incrementing within const block
+const (
+    _  = iota      // 0 skipped
+    A               // 1
+    B               // 2
+    C = 1 << iota   // 8  (2^3)
+    D               // 16 (2^4)
+)
+
+// Classic use: days of week
+const (
+    Sunday = iota   // 0
+    Monday          // 1
+    Tuesday         // 2
+    // ...
 )
 ```
 
 ### Rune
 
-A `rune` represents a Unicode code point (`int32`).
-
 ```go
-var r rune = 'A'   // single quotes
-fmt.Println(r)     // 65
+var r rune = 'A'    // single quotes; stores Unicode code point
+fmt.Println(r)      // 65
 ```
 
 ### Operators
 
-| Type        | Operators |
-|-------------|-----------|
-| Arithmetic  | `+` `-` `*` `/` `%` |
-| Relational  | `==` `!=` `<` `>` `<=` `>=` |
-| Logical     | `&&` `\|\|` `!` |
-| Bitwise     | `&` `\|` `^` `<<` `>>` |
-| Assignment  | `=` `+=` `-=` `*=` `/=` |
+| Type       | Operators |
+|------------|-----------|
+| Arithmetic | `+` `-` `*` `/` `%` |
+| Bitwise    | `&` `\|` `^` `&^` `<<` `>>` |
+| Comparison | `==` `!=` `<` `>` `<=` `>=` |
+| Logical    | `&&` `\|\|` `!` |
+| Pointer    | `&` (address of) `*` (dereference) `<-` (channel) |
 
-### Scope of Variables
+### Scope
 
-- **Package-level:** declared outside functions, accessible throughout the package
-- **Function-level:** declared inside a function
-- **Block-level:** declared inside `{}`, visible only within that block
+- **Package-level:** outside functions, whole package
+- **Function-level:** inside a function
+- **Block-level:** inside `{}`, only within that block
 
 ### Type Casting
 
@@ -116,18 +169,18 @@ var u uint = uint(f)
 
 | Feature | `var` | `:=` |
 |---------|-------|------|
-| Scope | Package + function | Function only |
-| Type | Explicit or inferred | Inferred |
+| Where | Package + function | Function only |
+| Type | Explicit or inferred | Always inferred |
 | Zero value | Yes | No (must assign) |
+| New var required | No | At least one new var on left |
 
 ---
 
-## 4. Control Statements
+## 5. Control Statements
 
-### Decision Making
+### if / else
 
 ```go
-// if-else
 if x > 10 {
     fmt.Println("big")
 } else if x == 10 {
@@ -136,84 +189,118 @@ if x > 10 {
     fmt.Println("small")
 }
 
-// if with init statement
+// Init statement before condition
 if val := compute(); val > 0 {
     fmt.Println(val)
 }
+
+// Type assertion inside if
+var val interface{} = "foo"
+if str, ok := val.(string); ok {
+    fmt.Println(str)
+}
 ```
 
-### Loops
-
-Go has only one loop keyword: `for`
+### Loops (only `for`)
 
 ```go
-// Classic
-for i := 0; i < 5; i++ { }
+for i := 0; i < 5; i++ { }          // classic
+for i < 10 { i++ }                  // while-style
+for { }                              // infinite
 
-// While-style
-for i < 10 { i++ }
+for i, v := range slice { }         // range with index + value
+for _, v := range slice { }         // range value only
+for i := range slice { }            // range index only
 
-// Infinite
-for { }
-
-// Range
-for index, value := range slice { }
+// Labels for nested loops
+outer:
+    for i := 0; i < 3; i++ {
+        for j := 0; j < 3; j++ {
+            if j == 1 { continue outer }
+            if i == 2 { break outer }
+        }
+    }
 ```
 
-### Loop Control Statements
+### Loop Control
 
-| Statement  | Description |
-|------------|-------------|
-| `break`    | Exit the loop |
-| `continue` | Skip to next iteration |
-| `goto`     | Jump to a label |
+| Statement | Description |
+|-----------|-------------|
+| `break` | Exit loop (or labeled outer loop) |
+| `continue` | Next iteration (or labeled outer loop) |
+| `goto label` | Jump to label |
 
-### Switch Statement
+### Switch
 
 ```go
 switch day {
 case "Mon":
     fmt.Println("Monday")
-case "Tue", "Wed":
+case "Tue", "Wed":         // comma-separated cases
     fmt.Println("Midweek")
 default:
     fmt.Println("Other")
 }
 
-// Expressionless switch (acts like if-else)
+// Switch with init statement
+switch os := runtime.GOOS; os {
+case "darwin": fmt.Println("Mac")
+}
+
+// Expressionless switch (if-else chain)
 switch {
-case x < 0:
-    fmt.Println("negative")
+case x < 0:  fmt.Println("negative")
+case x == 0: fmt.Println("zero")
+}
+
+// fallthrough (explicit)
+switch day {
+case "sunday":
+    fallthrough
+case "saturday":
+    rest()
 }
 ```
 
 ### Select + Deadlock & Default
 
-`select` works like `switch` but for channels.
-
 ```go
 select {
 case msg := <-ch1:
-    fmt.Println(msg)
+    fmt.Println("ch1:", msg)
 case msg := <-ch2:
-    fmt.Println(msg)
+    fmt.Println("ch2:", msg)
+case <-time.After(time.Second):
+    fmt.Println("timeout")
 default:
-    fmt.Println("no message") // prevents deadlock
+    fmt.Println("no message")  // prevents blocking/deadlock
 }
 ```
 
-> Without a `default` case, `select` blocks until a channel is ready — this can cause a **deadlock**.
+> Without `default`, `select` blocks until a channel is ready — can cause **deadlock**.
 
 ---
 
-## 5. Functions & Methods
+## 6. Functions & Methods
 
 ### Basic Function
 
 ```go
-func add(a int, b int) int {
-    return a + b
-}
+func add(a, b int) int { return a + b }
+```
+
+### Function Arguments — Pass by Value vs Reference
+
+```go
+// Pass by value — original unchanged
+func double(x int) { x *= 2 }
+
+// Pass by pointer — mutates original
+func doublePtr(x *int) { *x *= 2 }
+
+n := 5
+doublePtr(&n)
+fmt.Println(n) // 10
 ```
 
 ### Variadic Function
@@ -224,30 +311,44 @@ func sum(nums ...int) int {
     for _, n := range nums { total += n }
     return total
 }
+sum(1, 2, 3)
+
+nums := []int{10, 20, 30}
+sum(nums...)   // spread slice
 ```
 
-### Anonymous Function
+### Anonymous Function & Closures
 
 ```go
-result := func(x, y int) int {
-    return x + y
-}(3, 4)
+// Anonymous function (immediately invoked)
+result := func(x, y int) int { return x + y }(3, 4)
+
+// Closure — captures outer variable
+func counter() func() int {
+    count := 0
+    return func() int {
+        count++
+        return count
+    }
+}
+c := counter()
+c() // 1
+c() // 2
 ```
 
 ### `main` and `init`
 
-- `main()` — program entry point
-- `init()` — runs before `main()`, used for setup; multiple `init()` allowed per package
+- `main()` — program entry point (package main only)
+- `init()` — runs before `main()`, auto-called, used for setup; multiple allowed per file/package
 
 ### Multiple Return Values
 
 ```go
 func divide(a, b float64) (float64, error) {
-    if b == 0 {
-        return 0, fmt.Errorf("division by zero")
-    }
+    if b == 0 { return 0, fmt.Errorf("division by zero") }
     return a / b, nil
 }
+val, err := divide(10, 2)
 ```
 
 ### Named Return Values
@@ -262,34 +363,46 @@ func minMax(a, b int) (min, max int) {
 ### Blank Identifier
 
 ```go
-value, _ := divide(10, 2) // discard error
+value, _ := divide(10, 2)   // discard second return
 ```
 
 ### Defer
 
-Deferred calls execute after the surrounding function returns (LIFO order).
-
 ```go
+// Runs after surrounding function returns (LIFO order)
 func main() {
-    defer fmt.Println("world")
-    fmt.Println("hello")
+    defer fmt.Println("3rd")
+    defer fmt.Println("2nd")
+    fmt.Println("1st")
 }
-// Output: hello → world
+// Output: 1st → 2nd → 3rd
+
+// Defer with closure (captures final value)
+func main() {
+    d := 0
+    defer func() { fmt.Println(d) }()   // prints final d
+    d = 42
+}
+// Output: 42
 ```
 
-### Methods
+### Methods & Pointer Receivers
 
 ```go
 type Circle struct { Radius float64 }
 
-func (c Circle) Area() float64 {
-    return 3.14 * c.Radius * c.Radius
-}
+// Value receiver — struct is copied, cannot mutate
+func (c Circle) Area() float64 { return 3.14 * c.Radius * c.Radius }
+
+// Pointer receiver — can mutate the original struct
+func (c *Circle) Scale(factor float64) { c.Radius *= factor }
+
+c := Circle{5}
+c.Scale(2)
+fmt.Println(c.Area())
 ```
 
-### Methods With Same Name (Different Receivers)
-
-Two different types can have methods with the same name.
+### Methods With Same Name (Different Types)
 
 ```go
 func (r Rect) Area() float64   { return r.W * r.H }
@@ -298,9 +411,7 @@ func (c Circle) Area() float64 { return 3.14 * c.R * c.R }
 
 ---
 
-## 6. Structures
-
-### Define & Use
+## 7. Structures
 
 ```go
 type Person struct {
@@ -308,16 +419,15 @@ type Person struct {
     Age  int
 }
 p := Person{Name: "Alice", Age: 25}
+p.Age = 26
 ```
 
 ### Structure Equality
 
-Two structs are equal if all their fields are equal (and fields are comparable).
-
 ```go
 p1 := Person{"Alice", 25}
 p2 := Person{"Alice", 25}
-fmt.Println(p1 == p2) // true
+fmt.Println(p1 == p2) // true — all fields must be comparable
 ```
 
 ### Nested Structure
@@ -328,6 +438,8 @@ type Employee struct {
     Name    string
     Address Address
 }
+e := Employee{"Bob", Address{"Delhi"}}
+fmt.Println(e.Address.City)
 ```
 
 ### Anonymous Structure & Fields
@@ -336,23 +448,24 @@ type Employee struct {
 // Anonymous struct
 p := struct{ Name string }{Name: "Bob"}
 
-// Anonymous field (embedded)
+// Anonymous field (embedded type)
 type Animal struct { string }
 a := Animal{"Dog"}
+fmt.Println(a.string)
 ```
 
 ### Promoted Fields & Methods
 
-When a struct embeds another struct, its fields and methods are **promoted** — accessible directly.
+Embedding a struct promotes its fields and methods to the outer struct.
 
 ```go
 type Base struct { ID int }
-func (b Base) Show() { fmt.Println(b.ID) }
+func (b Base) Describe() { fmt.Println("ID:", b.ID) }
 
-type Child struct { Base }
-c := Child{Base{1}}
-c.Show()    // promoted method
-fmt.Println(c.ID) // promoted field
+type Child struct { Base; Extra string }
+c := Child{Base{1}, "extra"}
+c.Describe()       // promoted method
+fmt.Println(c.ID)  // promoted field
 ```
 
 ### Function as a Field
@@ -367,40 +480,50 @@ fmt.Println(t.Transform(5)) // 10
 
 ---
 
-## 7. Arrays & Slices
+## 8. Arrays & Slices
 
-### Arrays
-
-Fixed-size, same type.
+### Arrays (fixed size)
 
 ```go
-var arr [3]int = [3]int{1, 2, 3}
-arr2 := [...]int{4, 5, 6} // compiler counts
+var arr [3]int               // [0 0 0]
+arr := [3]int{1, 2, 3}
+arr := [...]int{1, 2, 3}     // compiler counts length
+
+arr[0] = 42
+fmt.Println(len(arr))
 ```
 
-**Copying:** Arrays are value types — assignment copies the whole array.
+**Copy:** Arrays are value types — assignment = full copy.
 
 ```go
-arr2 := arr1 // full copy
+arr2 := arr1  // independent copy
 ```
 
-**Passing to function:** Also a copy; use pointer to mutate original.
+**Pass to function:** Also copied; use pointer to mutate original.
 
 ```go
 func modify(a *[3]int) { a[0] = 99 }
+modify(&arr)
 ```
 
-### Slices
-
-Dynamic, reference to an underlying array.
+### Slices (dynamic, reference type)
 
 ```go
 s := []int{1, 2, 3}
-s = append(s, 4)
+s = append(s, 4, 5)
 
-// from array
-arr := [5]int{1,2,3,4,5}
-sl := arr[1:4] // {2,3,4}
+// From array
+arr := [5]int{1, 2, 3, 4, 5}
+sl := arr[1:4]      // {2,3,4} — shares underlying array
+sl2 := arr[:3]      // {1,2,3}
+sl3 := arr[3:]      // {4,5}
+
+// make
+s := make([]int, 5)        // len=5, cap=5
+s := make([]int, 3, 10)    // len=3, cap=10
+
+// Concatenate
+c := append(a, b...)
 ```
 
 **Composite Literal:**
@@ -408,123 +531,203 @@ sl := arr[1:4] // {2,3,4}
 s := []string{"a", "b", "c"}
 ```
 
-**Copy:**
+**Passing to function:** Slices are reference types — changes inside a function affect the original.
+
+```go
+func addOne(s []int) {
+    for i := range s { s[i]++ }
+}
+nums := []int{1, 2, 3}
+addOne(nums)
+fmt.Println(nums) // [2 3 4]
+```
+
+**Copy (independent):**
 ```go
 dst := make([]int, len(src))
 copy(dst, src)
 ```
 
-**Compare:** Slices cannot be compared with `==` (except to `nil`); use `reflect.DeepEqual` or loop.
+**Trim (re-slice):**
+```go
+s = s[1:]            // remove first element
+s = s[:len(s)-1]     // remove last element
+s = s[1:len(s)-1]    // remove both ends
+```
+
+**Split:**
+```go
+mid := len(s) / 2
+first, second := s[:mid], s[mid:]
+```
+
+**Compare / Equality:**
+```go
+// Cannot use == (except with nil)
+import "reflect"
+reflect.DeepEqual(s1, s2)   // true if same elements
+
+// Manual
+func equal(a, b []int) bool {
+    if len(a) != len(b) { return false }
+    for i := range a { if a[i] != b[i] { return false } }
+    return true
+}
+```
 
 **Sort:**
 ```go
 import "sort"
 sort.Ints(s)
 sort.Strings(s)
+sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
 ```
-
-**Trim / Split:** (string-based slices → see Strings section)
 
 ---
 
-## 8. Strings
+## 9. Maps
+
+```go
+// Create
+m := make(map[string]int)
+m["age"] = 25
+
+// Map literal
+m := map[string]int{"alice": 30, "bob": 25}
+
+// Read
+val := m["alice"]
+
+// Check existence
+val, ok := m["charlie"]   // ok=false if key doesn't exist
+
+// Delete
+delete(m, "alice")
+
+// Iterate
+for key, value := range m { fmt.Println(key, value) }
+
+// Map of structs
+users := map[string]Person{
+    "a": {Name: "Alice", Age: 30},
+}
+```
+
+> Maps are reference types. Zero value is `nil` — must be initialized with `make` or literal before use.
+
+---
+
+## 10. Strings
 
 ```go
 s := "Hello, Go"
+s2 := `Multiline
+string`                   // raw string literal (backticks)
 ```
 
-| Operation | Example |
-|-----------|---------|
+| Operation | Code |
+|-----------|------|
 | Compare | `s1 == s2`, `strings.Compare(s1, s2)` |
-| Concatenate | `s1 + s2`, `strings.Join([]string{s1,s2}, "")`, `fmt.Sprintf` |
-| Trim | `strings.TrimSpace(s)`, `strings.Trim(s, "!")` |
-| Split | `strings.Split(s, ",")` |
-| Contains | `strings.Contains(s, "Go")` |
+| Concatenate | `s1 + s2`, `strings.Join([]string{s1,s2}, "")`, `fmt.Sprintf("%s%s", s1, s2)` |
+| Trim | `strings.TrimSpace(s)`, `strings.Trim(s, "!")`, `strings.TrimLeft/Right` |
+| Split | `strings.Split(s, ",")` → `[]string` |
+| Contains | `strings.Contains(s, "Go")` → `bool` |
 | Repeat | `strings.Repeat("ab", 3)` → `"ababab"` |
-| Index | `strings.Index(s, "Go")` |
+| Index | `strings.Index(s, "Go")` → `-1` if not found |
 | Count | `strings.Count(s, "l")` |
+| Has prefix/suffix | `strings.HasPrefix(s, "He")`, `strings.HasSuffix(s, "Go")` |
+| To upper/lower | `strings.ToUpper(s)`, `strings.ToLower(s)` |
 
 ---
 
-## 9. Pointers
-
-A pointer stores the memory address of a value.
+## 11. Pointers
 
 ```go
 x := 42
-p := &x         // p holds address of x
-fmt.Println(*p) // dereference → 42
-*p = 100        // change x via pointer
+p := &x           // p is *int, holds address of x
+fmt.Println(*p)   // dereference → 42
+*p = 100          // modifies x through pointer
+```
+
+**`new` keyword:**
+```go
+p := new(int)    // allocates zeroed int, returns *int
+*p = 42
 ```
 
 ### Double Pointer
 
 ```go
-var p *int
-var pp **int = &p
+x := 10
+p := &x
+pp := &p          // **int
+fmt.Println(**pp) // 10
 ```
 
 ### Pointer to Function
 
 ```go
 func greet() { fmt.Println("Hi") }
-f := greet
-f() // calls greet
+f := greet     // function value
+f()
 ```
 
 ### Returning Pointer from Function
 
 ```go
-func newInt(v int) *int { return &v }
+func newInt(v int) *int { return &v }  // safe in Go — heap allocated
 ```
 
-### Pointer to Array
+### Pointer to Array (as function argument)
 
 ```go
 func double(arr *[3]int) {
     for i := range arr { arr[i] *= 2 }
 }
+double(&arr)
 ```
 
 ### Pointer to Struct
 
 ```go
 p := &Person{Name: "Alice"}
-p.Name = "Bob" // auto-dereferenced
+p.Name = "Bob"   // auto-dereferenced (same as (*p).Name)
 ```
 
 ### Comparing Pointers
 
 ```go
-fmt.Println(p1 == p2) // true only if same address
+fmt.Println(p1 == p2)  // true only if they point to same address
 ```
 
-### Length & Capacity of Pointer (to array)
+### Length & Capacity of Pointer to Array
 
 ```go
-arr := [5]int{1,2,3,4,5}
+arr := [5]int{1, 2, 3, 4, 5}
 p := &arr
-fmt.Println(len(p)) // 5
-fmt.Println(cap(p)) // 5
+fmt.Println(len(p), cap(p)) // 5 5
 ```
 
 ---
 
-## 10. Interfaces
-
-Defines a set of method signatures. Implemented implicitly.
+## 12. Interfaces
 
 ```go
 type Shape interface {
     Area() float64
+    Perimeter() float64
 }
 
-type Circle struct { Radius float64 }
-func (c Circle) Area() float64 { return 3.14 * c.Radius * c.Radius }
+type Rectangle struct{ Length, Width float64 }
 
-var s Shape = Circle{5}
+func (r Rectangle) Area() float64      { return r.Length * r.Width }
+func (r Rectangle) Perimeter() float64 { return 2 * (r.Length + r.Width) }
+
+var s Shape = Rectangle{3, 4}
 fmt.Println(s.Area())
 ```
+
+> Types implement interfaces **implicitly** — no `implements` keyword needed.
 
 ### Multiple Interfaces
 
@@ -541,59 +744,141 @@ func (d Doc) Size() int      { return 10 }
 
 ```go
 type ReadWriter interface {
-    Reader
-    Writer
+    Reader    // embeds Reader interface
+    Writer    // embeds Writer interface
 }
 ```
 
 ### Polymorphism
 
 ```go
-func printArea(s Shape) {
-    fmt.Println(s.Area())
+func printArea(s Shape) { fmt.Println(s.Area()) }
+
+printArea(Rectangle{3, 4})
+printArea(Circle{5})
+```
+
+### Type Assertion
+
+```go
+var i interface{} = "hello"
+
+s, ok := i.(string)    // safe assertion
+fmt.Println(s, ok)     // "hello" true
+
+n, ok := i.(int)       // won't panic — ok is false
+```
+
+### Type Switch
+
+```go
+func describe(i interface{}) {
+    switch v := i.(type) {
+    case int:
+        fmt.Printf("int: %v\n", v*2)
+    case string:
+        fmt.Printf("string: %q, len=%d\n", v, len(v))
+    default:
+        fmt.Printf("unknown type: %T\n", v)
+    }
 }
-printArea(Circle{3})
-printArea(Rect{4, 5})
 ```
 
 ---
 
-## 11. Concurrency
+## 13. Error Handling
+
+Go has no exceptions — errors are return values.
+
+```go
+// error is a built-in interface
+type error interface {
+    Error() string
+}
+```
+
+```go
+func sqrt(x float64) (float64, error) {
+    if x < 0 {
+        return 0, errors.New("negative value")
+    }
+    return math.Sqrt(x), nil
+}
+
+val, err := sqrt(-1)
+if err != nil {
+    fmt.Println("Error:", err)
+    return
+}
+fmt.Println(val)
+```
+
+**Custom errors:**
+```go
+type ValidationError struct {
+    Field   string
+    Message string
+}
+func (e *ValidationError) Error() string {
+    return fmt.Sprintf("%s: %s", e.Field, e.Message)
+}
+```
+
+---
+
+## 14. Concurrency
 
 ### Goroutines
 
-A goroutine is a lightweight thread managed by the Go runtime.
-
 ```go
-go func() {
-    fmt.Println("runs concurrently")
-}()
+go func() { fmt.Println("concurrent") }()
+
+// Named function
+go doWork("task1")
 ```
 
 ### Channels
 
-Used to communicate between goroutines.
-
 ```go
-ch := make(chan int)
+ch := make(chan int)         // unbuffered — blocks until both sides ready
 
 go func() { ch <- 42 }()
 val := <-ch
-fmt.Println(val)
+
+// Buffered — doesn't block until buffer full
+ch := make(chan int, 3)
+ch <- 1; ch <- 2; ch <- 3
+// ch <- 4  ← would deadlock here
 ```
 
-**Buffered channel:**
+### Closing Channels
+
 ```go
-ch := make(chan int, 2)
-ch <- 1
-ch <- 2
+close(ch)               // only the sender should close
+
+// Check if closed
+val, ok := <-ch         // ok=false means channel is closed
+
+// Range over channel until closed
+for v := range ch {
+    fmt.Println(v)
+}
 ```
 
-### Unidirectional Channel
+### Channel Axioms (important for interviews!)
+
+| Operation | Result |
+|-----------|--------|
+| Send on `nil` channel | Blocks forever (deadlock) |
+| Receive from `nil` channel | Blocks forever (deadlock) |
+| Send on **closed** channel | **Panics** |
+| Receive from **closed** channel | Returns zero value immediately |
+
+### Unidirectional Channels
 
 ```go
-func send(ch chan<- int)    { ch <- 1 }   // send-only
-func receive(ch <-chan int) { <-ch }       // receive-only
+func send(ch chan<- int)    { ch <- 1 }    // send-only
+func receive(ch <-chan int) { fmt.Println(<-ch) }  // receive-only
 ```
 
 ### Select Statement
@@ -604,12 +889,18 @@ case v := <-ch1:
     fmt.Println("ch1:", v)
 case v := <-ch2:
     fmt.Println("ch2:", v)
+case <-time.After(time.Second):
+    fmt.Println("timeout")
+default:
+    fmt.Println("non-blocking")
 }
 ```
 
-### Multiple Goroutines
+### Multiple Goroutines with WaitGroup
 
 ```go
+import "sync"
+
 var wg sync.WaitGroup
 for i := 0; i < 5; i++ {
     wg.Add(1)
@@ -625,12 +916,85 @@ wg.Wait()
 
 | Feature | Goroutine | OS Thread |
 |---------|-----------|-----------|
-| Stack size | ~2 KB (grows) | ~1–8 MB (fixed) |
+| Stack size | ~2 KB (grows dynamically) | ~1–8 MB (fixed) |
 | Managed by | Go runtime | OS |
-| Cost | Very cheap | Expensive |
+| Cost | Very cheap (millions possible) | Expensive |
 | Communication | Channels | Shared memory / mutex |
-| Switching | Cooperative (M:N) | Preemptive (1:1) |
+| Scheduling | M:N (cooperative + preemptive) | 1:1 (preemptive) |
 
 ---
 
-> **Tip:** Use `go vet` and `go fmt` regularly to catch errors and keep code clean.
+## 15. fmt — Printing & Formatting
+
+```go
+fmt.Println("Hello", name)           // adds spaces, newline
+fmt.Printf("Name: %s, Age: %d\n", name, age)  // formatted
+
+// Format verbs
+// %v  — default format
+// %T  — type of value
+// %d  — integer
+// %f  — float  (%0.2f for 2 decimal places)
+// %s  — string
+// %q  — quoted string
+// %b  — binary
+// %x  — hex
+// %e  — scientific notation
+// %t  — boolean
+// %p  — pointer address
+
+s := fmt.Sprintf("Hello, %s!", name)   // returns string
+fmt.Fprintln(os.Stderr, "error msg")   // write to writer
+```
+
+---
+
+## 16. Reflection
+
+```go
+import "reflect"
+
+x := 42
+fmt.Println(reflect.TypeOf(x))   // int
+fmt.Println(reflect.ValueOf(x))  // 42
+```
+
+---
+
+## 17. Snippets
+
+### HTTP Server
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/http"
+)
+
+type Hello struct{}
+
+func (h Hello) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprint(w, "Hello!")
+}
+
+func main() {
+    http.ListenAndServe(":4000", Hello{})
+}
+```
+
+### File Embedding
+
+```go
+import "embed"
+
+//go:embed hello.txt
+var content string   // or embed.FS for multiple files
+
+fmt.Println(content)
+```
+
+---
+
+> **Quick tips:** `go fmt` — format code | `go vet` — catch bugs | `go test` — run tests | `go mod init` — start a module
