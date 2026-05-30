@@ -32,22 +32,22 @@ class Vehicle:
         return f"{self.__class__.__name__}({self.number_plate})"
 
 
-class MotorCycle(Vehicle):               # Bug 1: class name was "MotorByke"
+class MotorCycle(Vehicle):               
     def __init__(self, number_plate: str):
-        super().__init__(number_plate, VehicleType.MotorCycle)   # Bug 2: wrong super() call everywhere
+        super().__init__(number_plate, VehicleType.MotorCycle)   
 
 
-class Car(Vehicle):                      # Bug 3: Car didn't inherit from Vehicle
+class Car(Vehicle):                     
     def __init__(self, number_plate: str):
         super().__init__(number_plate, VehicleType.Car)
 
 
-class Truck(Vehicle):                    # Bug 4: Truck didn't inherit from Vehicle
+class Truck(Vehicle):                    
     def __init__(self, number_plate: str):
         super().__init__(number_plate, VehicleType.Truck)
 
 
-# ─── ParkingSpot ─────────────────────────────────────────────────────────────
+
 
 class ParkingSpot:
     def __init__(self, spot_id: int, vehicle_type: VehicleType):
@@ -56,13 +56,13 @@ class ParkingSpot:
         self.vehicle: Vehicle | None = None
 
     def is_available(self) -> bool:
-        return self.vehicle is None          # Bug 5: was inverted (None means EMPTY, not full)
+        return self.vehicle is None        
 
     def park(self, vehicle: Vehicle) -> bool:
         if not self.is_available():
             print(f"  [Spot {self.spot_id}] Already occupied by {self.vehicle}")
             return False
-        if self.vehicle_type != vehicle.vehicle_type:    # Bug 6: was comparing spot.vehicle to vehicle.vehicle_type
+        if self.vehicle_type != vehicle.vehicle_type:    
             print(f"  [Spot {self.spot_id}] Type mismatch: spot={self.vehicle_type.name}, vehicle={vehicle.vehicle_type.name}")
             return False
         self.vehicle = vehicle
@@ -90,11 +90,9 @@ class ParkingLot:
     """
 
     def __init__(self, park_config: list[list[VehicleType]]):
-        self._lock = Lock()                         # for concurrent access
+        self._lock = Lock()                         
         self.num_levels = len(park_config)
 
-        # Bug 7: original code appended to the list instead of indexing into it.
-        # self.parking_location is a 2-D list: [level][spot_index] → ParkingSpot
         self.parking_location: list[list[ParkingSpot]] = []
         spot_id = 0
         for level_spots in park_config:
@@ -111,7 +109,7 @@ class ParkingLot:
         result = []
         for lvl, spots in enumerate(self.parking_location):
             for idx, spot in enumerate(spots):
-                # Bug 8: was accessing .ParkingSpot attribute (doesn't exist); spot IS the ParkingSpot
+            
                 if spot.vehicle_type == vehicle_type and spot.is_available():
                     result.append((lvl, idx))
         return result
@@ -168,7 +166,7 @@ class ParkingLot:
 # ─── Demo ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Bug 9: original arr had extra wrapping lists → wrong level structure
+    
     config = [
         [VehicleType.MotorCycle] * 10 + [VehicleType.Car] * 20 + [VehicleType.Truck] * 20,
         [VehicleType.MotorCycle] * 20 + [VehicleType.Car] * 20 + [VehicleType.Truck] * 10,
