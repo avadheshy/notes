@@ -1,159 +1,4 @@
-# from typing import List
-# from abc import ABC
-# from enum import Enum
 
-
-# class VehicleType(Enum):
-#     CAR = 1
-#     MOTORCYCLE = 2
-#     TRUCK = 3
-
-
-# class Vehicle(ABC):
-#     def __init__(self, license_plate: str, vehicle_type: VehicleType):
-#         self.license_plate = license_plate
-#         self.type = vehicle_type
-
-#     def get_type(self) -> VehicleType:
-#         return self.type
-
-
-# class Truck(Vehicle):
-#     def __init__(self, license_plate: str):
-#         super().__init__(license_plate, VehicleType.TRUCK)
-
-
-# class Car(Vehicle):
-#     def __init__(self, license_plate: str):
-#         super().__init__(license_plate, VehicleType.CAR)
-
-
-# class Motorcycle(Vehicle):
-#     def __init__(self, license_plate: str):
-#         super().__init__(license_plate, VehicleType.MOTORCYCLE)
-
-
-# class ParkingSpot:
-#     def __init__(self, spot_number: int, vehicle_type: VehicleType):
-#         self.spot_number = spot_number
-#         self.vehicle_type = vehicle_type
-#         self.parked_vehicle: Vehicle = None
-
-#     def is_available(self) -> bool:
-#         return self.parked_vehicle is None
-
-#     def park_vehicle(self, vehicle: Vehicle) -> None:
-#         if self.is_available() and vehicle.get_type() == self.vehicle_type:
-#             self.parked_vehicle = vehicle
-#         else:
-#             raise ValueError(f"Spot {self.spot_number} is not suitable or already occupied.")
-
-#     def unpark_vehicle(self) -> None:
-#         if self.parked_vehicle:
-#             self.parked_vehicle = None
-#         else:
-#             raise ValueError(f"Spot {self.spot_number} is already empty.")
-
-#     def get_spot_number(self) -> int:
-#         return self.spot_number
-
-
-# class Level:
-#     def __init__(self, floor: int, spot_types: List[VehicleType]):
-#         self.floor = floor
-#         self.parking_spots: List[ParkingSpot] = [
-#             ParkingSpot(i, vehicle_type) for i, vehicle_type in enumerate(spot_types)
-#         ]
-
-#     def park_vehicle(self, vehicle: Vehicle) -> bool:
-#         for spot in self.parking_spots:
-#             if spot.is_available() and spot.vehicle_type == vehicle.get_type():
-#                 spot.park_vehicle(vehicle)
-#                 return True
-#         return False
-
-#     def unpark_vehicle(self, vehicle: Vehicle) -> bool:
-#         for spot in self.parking_spots:
-#             if not spot.is_available() and spot.parked_vehicle == vehicle:
-#                 spot.unpark_vehicle()
-#                 return True
-#         return False
-
-#     def display_availability(self) -> None:
-#         print(f"Level {self.floor} Availability:")
-#         for spot in self.parking_spots:
-#             status = "Available" if spot.is_available() else f"Occupied by {spot.parked_vehicle.license_plate}"
-#             print(f"  Spot {spot.get_spot_number()}: {status}")
-
-
-# class ParkingLot:
-#     _instance = None
-
-#     def __new__(cls, *args, **kwargs):
-#         if not cls._instance:
-#             cls._instance = super().__new__(cls)
-#         return cls._instance
-
-#     def __init__(self):
-#         if not hasattr(self, "levels"):
-#             self.levels: List[Level] = []
-
-#     def add_level(self, level: Level) -> None:
-#         self.levels.append(level)
-
-#     def park_vehicle(self, vehicle: Vehicle) -> bool:
-#         for level in self.levels:
-#             if level.park_vehicle(vehicle):
-#                 return True
-#         return False
-
-#     def unpark_vehicle(self, vehicle: Vehicle) -> bool:
-#         for level in self.levels:
-#             if level.unpark_vehicle(vehicle):
-#                 return True
-#         return False
-
-#     def display_availability(self) -> None:
-#         for level in self.levels:
-#             level.display_availability()
-
-
-# class ParkingLotDemo:
-#     @staticmethod
-#     def run():
-#         parking_lot = ParkingLot()
-
-#         # Define mixed levels with different vehicle types
-#         level_1_spots = [VehicleType.CAR] * 70 + [VehicleType.MOTORCYCLE] * 20 + [VehicleType.TRUCK] * 10
-#         level_2_spots = [VehicleType.CAR] * 50 + [VehicleType.MOTORCYCLE] * 30
-
-#         parking_lot.add_level(Level(1, level_1_spots))
-#         parking_lot.add_level(Level(2, level_2_spots))
-
-#         # Create vehicles
-#         car = Car("ABC123")
-#         truck = Truck("XYZ789")
-#         motorcycle = Motorcycle("M1234")
-
-#         # Park vehicles
-#         assert parking_lot.park_vehicle(car), "Failed to park car"
-#         assert parking_lot.park_vehicle(truck), "Failed to park truck"
-#         assert parking_lot.park_vehicle(motorcycle), "Failed to park motorcycle"
-
-#         # Display availability
-#         print("\nInitial Parking Lot Availability:")
-#         parking_lot.display_availability()
-
-#         # Unpark a vehicle
-#         parking_lot.unpark_vehicle(motorcycle)
-
-#         # Display updated availability
-#         print("\nUpdated Parking Lot Availability after Unparking Motorcycle:")
-#         parking_lot.display_availability()
-
-
-# if __name__ == "__main__":
-#     ParkingLotDemo.run()
 """
 Designing a Parking Lot System
 Requirements
@@ -164,81 +9,198 @@ The system should assign a parking spot to a vehicle upon entry and release it w
 The system should track the availability of parking spots and provide real-time information to customers.
 The system should handle multiple entry and exit points and support concurrent access.
 """
+"""
+Parking Lot System
+"""
 
 from enum import Enum
+from threading import Lock
 class VehicleType(Enum):
-    MotorCycle=1
-    Car=2
-    Truck=3
-class Vehicle():
-    def __init__(self,number_plate,vehicle_type):
-        self.number_plate=number_plate
-        self.vehicle_type=vehicle_type
-class MotorByke(Vehicle):
-    def __init__(self,number_pate,vehicle_type):
-        super(MotorByke).__init__(number_pate,vehicle_type)
+    MotorCycle = 1
+    Car = 2
+    Truck = 3
 
-class Car:
-    def __init__(self,number_pate,vehicle_type):
-        super(MotorByke).__init__(number_pate,vehicle_type)
 
-class Truck:
-    def __init__(self,number_pate,vehicle_type):
-        super(MotorByke).__init__(number_pate,vehicle_type)
+# ─── Vehicles ────────────────────────────────────────────────────────────────
 
-class ParkingSpot():
-    def __init__(self,vehicle_type):
-        self.vehicle_type=vehicle_type
-        self.vehicle:VehicleType=None
-        
-    def is_full(self,vehicle_type):
-        return self.vehicle is None
-    
-    def park(self,vehicle):
-        if self.is_full:
-            return "parking lot is already full"
-        elif self.vehicle!=vehicle.vehicle_type:
-            return "parki lot is not suitable for this type of vehicle"
-        self.vehicle=vehicle
-        
-    def un_park(self):
-        self.vehicle=None
+class Vehicle:
+    def __init__(self, number_plate: str, vehicle_type: VehicleType):
+        self.number_plate = number_plate
+        self.vehicle_type = vehicle_type
 
-class ParkingLot():
-    def __init__(self,park_locacation):
-        self.level=len(park_locacation)
-        self.parking_location=[[] for _ in range(self.level)]
-        for i in range(self.level):
-            for j in range(len(park_locacation[i])):
-                self.parking_location.append(ParkingSpot(park_locacation[i][j]))
-        
-    def get_available_spot(self,vehicle_type):
-        for i in range(self.level):
-            for j in range(len(self.parking_location)):
-                if self.parking_location[i][j].ParkingSpot.vehicle_type==vehicle_type and self.parking_location[i][j].ParkingSpot.vehicle is None:
-                    print(f"parking number is {j} and parking level is {i}")
-    
-    def check_empty_spot(self,level,spot_number):
-        return self.parking_location[level][spot_number].ParkingSpot is None
-    
-    def park_vehicle(self,level,spot_number,vehicle,vehicle_type):
-        if not self.check_empty_spot(level,spot_number):
-            raise ValueError('Spot is not free')
-        elif self.parking_location[level][spot_number].ParkingSpot.vehicle_type!=vehicle_type:
-            raise ValueError("vehicle type is not matching at that spot")
-        self.parking_location[level][spot_number].ParkingSpot.vehicle=vehicle
-    
-    def unpark_vehicle(self,level,spot_number,vehicle):
-        if self.parking_location[level][spot_number].ParkingSpot.vehicle is None:
-            raise ValueError("spot is all ready empty")
-        self.parking_location[level][spot_number].ParkingSpot.vehicle =None
-        
-if __name__=="__main__":
-    arr=[[[VehicleType.MotorCycle]*10+[VehicleType.Car]*20+[VehicleType.Truck]*20],
-         [[VehicleType.MotorCycle]*20+[VehicleType.Car]*20+[VehicleType.Truck]*10],
-         [[VehicleType.MotorCycle]*30+[VehicleType.Car]*10+[VehicleType.Truck]*10]
-         ]
-    parking_lot=ParkingLot(arr)
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.number_plate})"
+
+
+class MotorCycle(Vehicle):               # Bug 1: class name was "MotorByke"
+    def __init__(self, number_plate: str):
+        super().__init__(number_plate, VehicleType.MotorCycle)   # Bug 2: wrong super() call everywhere
+
+
+class Car(Vehicle):                      # Bug 3: Car didn't inherit from Vehicle
+    def __init__(self, number_plate: str):
+        super().__init__(number_plate, VehicleType.Car)
+
+
+class Truck(Vehicle):                    # Bug 4: Truck didn't inherit from Vehicle
+    def __init__(self, number_plate: str):
+        super().__init__(number_plate, VehicleType.Truck)
+
+
+# ─── ParkingSpot ─────────────────────────────────────────────────────────────
+
+class ParkingSpot:
+    def __init__(self, spot_id: int, vehicle_type: VehicleType):
+        self.spot_id = spot_id
+        self.vehicle_type = vehicle_type
+        self.vehicle: Vehicle | None = None
+
+    def is_available(self) -> bool:
+        return self.vehicle is None          # Bug 5: was inverted (None means EMPTY, not full)
+
+    def park(self, vehicle: Vehicle) -> bool:
+        if not self.is_available():
+            print(f"  [Spot {self.spot_id}] Already occupied by {self.vehicle}")
+            return False
+        if self.vehicle_type != vehicle.vehicle_type:    # Bug 6: was comparing spot.vehicle to vehicle.vehicle_type
+            print(f"  [Spot {self.spot_id}] Type mismatch: spot={self.vehicle_type.name}, vehicle={vehicle.vehicle_type.name}")
+            return False
+        self.vehicle = vehicle
+        return True
+
+    def un_park(self) -> Vehicle | None:
+        if self.is_available():
+            print(f"  [Spot {self.spot_id}] Already empty")
+            return None
+        removed = self.vehicle
+        self.vehicle = None
+        return removed
+
+    def __repr__(self):
+        status = str(self.vehicle) if self.vehicle else "empty"
+        return f"Spot({self.spot_id}, {self.vehicle_type.name}, {status})"
+
+
+# ─── ParkingLot ──────────────────────────────────────────────────────────────
+
+class ParkingLot:
+    """
+    park_config: list of levels, each level is a flat list of VehicleType values.
+    Example: [[VehicleType.Car]*3, [VehicleType.MotorCycle]*5]
+    """
+
+    def __init__(self, park_config: list[list[VehicleType]]):
+        self._lock = Lock()                         # for concurrent access
+        self.num_levels = len(park_config)
+
+        # Bug 7: original code appended to the list instead of indexing into it.
+        # self.parking_location is a 2-D list: [level][spot_index] → ParkingSpot
+        self.parking_location: list[list[ParkingSpot]] = []
+        spot_id = 0
+        for level_spots in park_config:
+            level: list[ParkingSpot] = []
+            for v_type in level_spots:
+                level.append(ParkingSpot(spot_id, v_type))
+                spot_id += 1
+            self.parking_location.append(level)
+
+    # ── Queries ──────────────────────────────────────────────────────────────
+
+    def get_available_spots(self, vehicle_type: VehicleType) -> list[tuple[int, int]]:
+        """Return [(level, spot_index), ...] for every free compatible spot."""
+        result = []
+        for lvl, spots in enumerate(self.parking_location):
+            for idx, spot in enumerate(spots):
+                # Bug 8: was accessing .ParkingSpot attribute (doesn't exist); spot IS the ParkingSpot
+                if spot.vehicle_type == vehicle_type and spot.is_available():
+                    result.append((lvl, idx))
+        return result
+
+    def check_available(self, level: int, spot_index: int) -> bool:
+        return self.parking_location[level][spot_index].is_available()
+
+    def availability_summary(self) -> dict:
+        summary = {}
+        for v_type in VehicleType:
+            summary[v_type.name] = len(self.get_available_spots(v_type))
+        return summary
+
+    # ── Operations ───────────────────────────────────────────────────────────
+
+    def park_vehicle(self, vehicle: Vehicle, level: int = None, spot_index: int = None) -> tuple[int, int] | None:
+        """
+        Auto-assign if level/spot_index are omitted.
+        Returns (level, spot_index) on success, None on failure.
+        Thread-safe.
+        """
+        with self._lock:
+            if level is None or spot_index is None:
+                candidates = self.get_available_spots(vehicle.vehicle_type)
+                if not candidates:
+                    print(f"No available spot for {vehicle.vehicle_type.name}")
+                    return None
+                level, spot_index = candidates[0]
+
+            spot = self.parking_location[level][spot_index]
+            success = spot.park(vehicle)
+            if success:
+                print(f"  Parked {vehicle} → Level {level}, Spot {spot_index}")
+                return (level, spot_index)
+            return None
+
+    def unpark_vehicle(self, level: int, spot_index: int) -> Vehicle | None:
+        """Release a spot. Returns the vehicle that was parked, or None."""
+        with self._lock:
+            spot = self.parking_location[level][spot_index]
+            vehicle = spot.un_park()
+            if vehicle:
+                print(f"  Unparked {vehicle} ← Level {level}, Spot {spot_index}")
+            return vehicle
+
+    def __repr__(self):
+        lines = [f"ParkingLot ({self.num_levels} levels)"]
+        for lvl, spots in enumerate(self.parking_location):
+            occupied = sum(1 for s in spots if not s.is_available())
+            lines.append(f"  Level {lvl}: {occupied}/{len(spots)} occupied")
+        return "\n".join(lines)
+
+
+# ─── Demo ─────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    # Bug 9: original arr had extra wrapping lists → wrong level structure
+    config = [
+        [VehicleType.MotorCycle] * 10 + [VehicleType.Car] * 20 + [VehicleType.Truck] * 20,
+        [VehicleType.MotorCycle] * 20 + [VehicleType.Car] * 20 + [VehicleType.Truck] * 10,
+        [VehicleType.MotorCycle] * 30 + [VehicleType.Car] * 10 + [VehicleType.Truck] * 10,
+    ]
+
+    lot = ParkingLot(config)
+    print(lot)
+    print("\nAvailability:", lot.availability_summary())
+
+    print("\n--- Parking vehicles ---")
+    bike1  = MotorCycle("MH01-AA-1234")
+    car1   = Car("DL01-BB-5678")
+    truck1 = Truck("UP01-CC-9012")
+    car2   = Car("HR01-DD-3456")
+
+    pos_bike  = lot.park_vehicle(bike1)
+    pos_car1  = lot.park_vehicle(car1)
+    pos_truck = lot.park_vehicle(truck1)
+    pos_car2  = lot.park_vehicle(car2)
+
+    print("\nAvailability after parking:", lot.availability_summary())
+
+    print("\n--- Unparking car1 ---")
+    if pos_car1:
+        lot.unpark_vehicle(*pos_car1)
+
+    print("\nAvailability after unpark:", lot.availability_summary())
+
+    print("\n--- Specific spot query ---")
+    spots = lot.get_available_spots(VehicleType.Truck)
+    print(f"Free truck spots (first 3): {spots[:3]}")
         
         
         
