@@ -1,297 +1,3 @@
-# from enum import Enum
-# from abc import ABC, abstractmethod
-# from threading import Lock
-
-
-# class Coin(Enum):
-#     PENNY = 0.01
-#     NICKEL = 0.05
-#     DIME = 0.1
-#     QUARTER = 0.25
-
-
-# class Note(Enum):
-#     ONE = 1
-#     FIVE = 5
-#     TEN = 10
-#     TWENTY = 20
-
-
-# class Product:
-#     def __init__(self, name, price):
-#         self.name = name
-#         self.price = price
-
-
-# class VendingMachineState(ABC):
-#     def __init__(self, vending_machine):
-#         self.vending_machine = vending_machine
-
-#     @abstractmethod
-#     def select_product(self, product):
-#         pass
-
-#     @abstractmethod
-#     def insert_coin(self, coin):
-#         pass
-
-#     @abstractmethod
-#     def insert_note(self, note):
-#         pass
-
-#     @abstractmethod
-#     def dispense_product(self):
-#         pass
-
-#     @abstractmethod
-#     def return_change(self):
-#         pass
-
-
-# class ReadyState(VendingMachineState):
-#     def __init__(self, vending_machine):
-#         self.vending_machine = vending_machine
-
-#     def select_product(self, product: Product):
-#         print("Product already selected. Please make payment.")
-
-#     def insert_coin(self, coin: Coin):
-#         self.vending_machine.add_coin(coin)
-#         print(f"Coin inserted: {coin.name}")
-#         self.check_payment_status()
-
-#     def insert_note(self, note: Note):
-#         self.vending_machine.add_note(note)
-#         print(f"Note inserted: {note.name}")
-#         self.check_payment_status()
-
-#     def dispense_product(self):
-#         print("Please make payment first.")
-
-#     def return_change(self):
-#         change = self.vending_machine.total_payment - \
-#             self.vending_machine.selected_product.price
-#         if change > 0:
-#             print(f"Change returned: ${change:.2f}")
-#             self.vending_machine.reset_payment()
-#         else:
-#             print("No change to return.")
-#         self.vending_machine.set_state(self.vending_machine.idle_state)
-
-#     def check_payment_status(self):
-#         if self.vending_machine.total_payment >= self.vending_machine.selected_product.price:
-#             self.vending_machine.set_state(self.vending_machine.dispense_state)
-
-
-# class ReturnChangeState(VendingMachineState):
-#     def __init__(self, vending_machine):
-#         self.vending_machine = vending_machine
-
-#     def select_product(self, product: Product):
-#         print("Please collect the change first.")
-
-#     def insert_coin(self, coin: Coin):
-#         print("Please collect the change first.")
-
-#     def insert_note(self, note: Note):
-#         print("Please collect the change first.")
-
-#     def dispense_product(self):
-#         print("Product already dispensed. Please collect the change.")
-
-#     def return_change(self):
-#         change = self.vending_machine.total_payment - \
-#             self.vending_machine.selected_product.price
-#         if change > 0:
-#             print(f"Change returned: ${change:.2f}")
-#             self.vending_machine.reset_payment()
-#         else:
-#             print("No change to return.")
-#         self.vending_machine.reset_selected_product()
-#         self.vending_machine.set_state(self.vending_machine.idle_state)
-
-
-# class DispenseState(VendingMachineState):
-#     def __init__(self, vending_machine):
-#         self.vending_machine = vending_machine
-
-#     def select_product(self, product: Product):
-#         print("Product already selected. Please collect the dispensed product.")
-
-#     def insert_coin(self, coin: Coin):
-#         print("Payment already made. Please collect the dispensed product.")
-
-#     def insert_note(self, note: Note):
-#         print("Payment already made. Please collect the dispensed product.")
-
-#     def dispense_product(self):
-#         self.vending_machine.set_state(self.vending_machine.ready_state)
-#         product = self.vending_machine.selected_product
-#         self.vending_machine.inventory.update_quantity(
-#             product, self.vending_machine.inventory.get_quantity(product) - 1)
-#         print(f"Product dispensed: {product.name}")
-#         self.vending_machine.set_state(
-#             self.vending_machine.return_change_state)
-
-#     def return_change(self):
-#         print("Please collect the dispensed product first.")
-
-
-# class IdleState(VendingMachineState):
-#     def __init__(self, vending_machine):
-#         self.vending_machine = vending_machine
-
-#     def select_product(self, product: Product):
-#         if self.vending_machine.inventory.is_available(product):
-#             self.vending_machine.selected_product = product
-#             self.vending_machine.set_state(self.vending_machine.ready_state)
-#             print(f"Product selected: {product.name}")
-#         else:
-#             print(f"Product not available: {product.name}")
-
-#     def insert_coin(self, coin: Coin):
-#         print("Please select a product first.")
-
-#     def insert_note(self, note: Note):
-#         print("Please select a product first.")
-
-#     def dispense_product(self):
-#         print("Please select a product and make payment.")
-
-#     def return_change(self):
-#         print("No change to return.")
-
-
-# class Inventory:
-#     def __init__(self):
-#         self.products = {}
-
-#     def add_product(self, product, quantity):
-#         self.products[product] = quantity
-
-#     def remove_product(self, product):
-#         del self.products[product]
-
-#     def update_quantity(self, product, quantity):
-#         self.products[product] = quantity
-
-#     def get_quantity(self, product):
-#         return self.products.get(product, 0)
-
-#     def is_available(self, product):
-#         return product in self.products and self.products[product] > 0
-
-
-# class VendingMachine:
-#     _instance = None
-#     _lock = Lock()
-
-#     def __new__(cls):
-#         with cls._lock:
-#             if cls._instance is None:
-#                 cls._instance = super().__new__(cls)
-#                 cls._instance.inventory = Inventory()
-#                 cls._instance.idle_state = IdleState(cls._instance)
-#                 cls._instance.ready_state = ReadyState(cls._instance)
-#                 cls._instance.dispense_state = DispenseState(cls._instance)
-#                 cls._instance.return_change_state = ReturnChangeState(
-#                     cls._instance)
-#                 cls._instance.current_state = cls._instance.idle_state
-#                 cls._instance.selected_product = None
-#                 cls._instance.total_payment = 0.0
-#         return cls._instance
-
-#     @classmethod
-#     def get_instance(cls):
-#         return cls()
-
-#     def select_product(self, product: Product):
-#         self.current_state.select_product(product)
-
-#     def insert_coin(self, coin: Coin):
-#         self.current_state.insert_coin(coin)
-
-#     def insert_note(self, note: Note):
-#         self.current_state.insert_note(note)
-
-#     def dispense_product(self):
-#         self.current_state.dispense_product()
-
-#     def return_change(self):
-#         self.current_state.return_change()
-
-#     def set_state(self, state: VendingMachineState):
-#         self.current_state = state
-
-#     def add_coin(self, coin: Coin):
-#         self.total_payment += coin.value
-
-#     def add_note(self, note: Note):
-#         self.total_payment += note.value
-
-#     def reset_payment(self):
-#         self.total_payment = 0.0
-
-#     def reset_selected_product(self):
-#         self.selected_product = None
-
-
-# class VendingMachineDemo:
-#     @staticmethod
-#     def run():
-#         vending_machine = VendingMachine.get_instance()
-
-#         # Add products to the inventory
-#         coke = Product("Coke", 1.5)
-#         pepsi = Product("Pepsi", 1.5)
-#         water = Product("Water", 1.0)
-
-#         vending_machine.inventory.add_product(coke, 5)
-#         vending_machine.inventory.add_product(pepsi, 3)
-#         vending_machine.inventory.add_product(water, 2)
-
-#         # Select a product
-#         vending_machine.select_product(coke)
-
-#         # Insert coins
-#         vending_machine.insert_coin(Coin.QUARTER)
-#         vending_machine.insert_coin(Coin.QUARTER)
-#         vending_machine.insert_coin(Coin.QUARTER)
-#         vending_machine.insert_coin(Coin.QUARTER)
-
-#         # Insert a note
-#         vending_machine.insert_note(Note.FIVE)
-
-#         # Dispense the product
-#         vending_machine.dispense_product()
-
-#         # Return change
-#         vending_machine.return_change()
-
-#         # Select another product
-#         vending_machine.select_product(pepsi)
-
-#         # Insert insufficient payment
-#         vending_machine.insert_coin(Coin.QUARTER)
-
-#         # Try to dispense the product
-#         vending_machine.dispense_product()
-
-#         # Insert more coins
-#         vending_machine.insert_coin(Coin.QUARTER)
-#         vending_machine.insert_coin(Coin.QUARTER)
-#         vending_machine.insert_coin(Coin.QUARTER)
-#         vending_machine.insert_coin(Coin.QUARTER)
-
-#         # Dispense the product
-#         vending_machine.dispense_product()
-
-#         # Return change
-#         vending_machine.return_change()
-
-
-# if __name__ == "__main__":
-#     VendingMachineDemo.run()
 
 
 """
@@ -306,73 +12,285 @@ The machine should provide an interface for restocking products and collecting m
 There should be product with quantity and price
 price with notes and coins
 """
+"""
+Vending Machine — complete implementation
+"""
 from enum import Enum
 from collections import defaultdict
+import threading
 
 
 class Note(Enum):
-    ONE = 1
-    TWO = 2
-    FIVE = 5
-    TEN = 10
-    TWENTY = 20
+    FIVE_HUNDRED = 500
+    HUNDRED = 100
     FIFTY = 50
-    HUNDRADE = 100
-    FIVE_HUNDRADE = 500
+    TWENTY = 20
+    TEN = 10
+    FIVE = 5
+    TWO = 2
+    ONE = 1
 
 
 class Coin(Enum):
-    ONE = 1
-    TWO = 2
-    FIVE = 5
     TEN = 10
+    FIVE = 5
+    TWO = 2
+    ONE = 1
 
 
 class Product:
-    def __init__(self, name, quantity, price):
+    def __init__(self, name, price, quantity):
         self.name = name
-        self.quantity = quantity
         self.price = price
+        self.quantity = quantity
 
-    def add_quantity(self, quantity):
-        self.quantity += quantity
+    def add_quantity(self, qty):
+        self.quantity += qty
 
-    def remove_quantity(self, quantity):
-        if quantity > self.quantity:
-            raise ValueError("less quantity is available")
-        self.quantity -= quantity
+    def remove_quantity(self, qty):
+        if qty > self.quantity:
+            raise ValueError(f"Only {self.quantity} unit(s) of '{self.name}' available")
+        self.quantity -= qty
 
-    def get_price(self, quantity):
-        return self.price*quantity
+    def get_price(self, qty=1):
+        return self.price * qty
+
+    def __repr__(self):
+        return f"Product(name={self.name!r}, price={self.price}, quantity={self.quantity})"
+
+
+class InsufficientFundsError(Exception):
+    pass
+
+
+class ChangeUnavailableError(Exception):
+    pass
 
 
 class Machine:
     def __init__(self):
-        self.products = []
-        self.notes = defaultdict(int)
-        self.coins = defaultdict(int)
+        self.products: list[Product] = []
+        # Denomination -> count stored in the machine
+        self.notes: dict[Note, int] = defaultdict(int)
+        self.coins: dict[Coin, int] = defaultdict(int)
+        self._lock = threading.Lock()
 
-    def add_product(self, name, price, quantity):
-        prod = Product(name, quantity, price)
-        self.products.append(prod)
-        return prod
+
+    def add_product(self, name: str, price: int, quantity: int) -> Product:
+        with self._lock:
+            prod = Product(name, price, quantity)
+            self.products.append(prod)
+            return prod
+
+    def restock_product(self, product: Product, qty: int):
+        with self._lock:
+            product.add_quantity(qty)
 
     def available_products(self):
-        for product in self.products:
-            print(product.name, product.price, product.quantity)
+        with self._lock:
+            if not self.products:
+                print("No products available.")
+                return
+            print(f"{'Name':<20} {'Price':>8} {'Stock':>6}")
+            print("-" * 36)
+            for p in self.products:
+                status = f"{p.quantity}" if p.quantity > 0 else "OUT OF STOCK"
+                print(f"{p.name:<20} ₹{p.price:>7} {status:>6}")
 
-    def add_coins(self, coins):
-        for coin in coins:
-            self.coins[coin] += 1
+    # ------------------------------------------------------------------ #
+    #  Cash management                                                    #
+    # ------------------------------------------------------------------ #
 
-    def add_notes(self, notes):
-        for note in notes:
-            self.notes[note] += 1
-    def return_money(self,ammount):
-        pass
-    def buy_product(self,product,notes,coins):
-        pass
+    def add_notes(self, notes: list[Note]):
+        with self._lock:
+            for note in notes:
+                self.notes[note] += 1
+
+    def add_coins(self, coins: list[Coin]):
+        with self._lock:
+            for coin in coins:
+                self.coins[coin] += 1
+
+    def collect_cash(self) -> int:
+        """Empty the machine and return total collected."""
+        with self._lock:
+            total = sum(d.value * cnt for d, cnt in self.notes.items())
+            total += sum(d.value * cnt for d, cnt in self.coins.items())
+            self.notes.clear()
+            self.coins.clear()
+            print(f"Collected ₹{total} from the machine.")
+            return total
+
+    def _machine_balance(self) -> int:
+        total = sum(d.value * cnt for d, cnt in self.notes.items())
+        total += sum(d.value * cnt for d, cnt in self.coins.items())
+        return total
+
+    # ------------------------------------------------------------------ #
+    #  Change-making (greedy, largest denomination first)                 #
+    # ------------------------------------------------------------------ #
+
+    def _make_change(self, amount: int) -> dict:
+        """
+        Return the denominations to give back as change.
+        Raises ChangeUnavailableError if exact change can't be made.
+        NOTE: caller must hold self._lock.
+        """
+        if amount == 0:
+            return {}
+
+        change = {}
+        remaining = amount
+
+        # All denominations sorted largest → smallest
+        all_denoms = sorted(
+            [(d, self.notes[d]) for d in Note] +
+            [(d, self.coins[d]) for d in Coin],
+            key=lambda x: x[0].value,
+            reverse=True
+        )
+
+        for denom, count in all_denoms:
+            if remaining <= 0:
+                break
+            use = min(count, remaining // denom.value)
+            if use:
+                change[denom] = use
+                remaining -= use * denom.value
+
+        if remaining != 0:
+            raise ChangeUnavailableError(
+                f"Cannot make exact change of ₹{amount}. "
+                f"Still need ₹{remaining}."
+            )
+        return change
+
+    def _apply_change(self, change: dict):
+        """Deduct change denominations from machine stock. Caller holds lock."""
+        for denom, count in change.items():
+            if isinstance(denom, Note):
+                self.notes[denom] -= count
+            else:
+                self.coins[denom] -= count
+
+    def return_money(self, amount: int):
+        """Public helper to return a specific amount to the user (e.g. on cancel)."""
+        with self._lock:
+            change = self._make_change(amount)
+            self._apply_change(change)
+            self._print_change(change)
+
+    @staticmethod
+    def _print_change(change: dict):
+        if not change:
+            print("  No change returned.")
+            return
+        print("  Change returned:")
+        for denom, count in sorted(change.items(), key=lambda x: x[0].value, reverse=True):
+            print(f"    {count} × ₹{denom.value}")
+
+    # ------------------------------------------------------------------ #
+    #  Core transaction                                                   #
+    # ------------------------------------------------------------------ #
+
+    def buy_product(
+        self,
+        product: Product,
+        notes: list[Note] | None = None,
+        coins: list[Coin] | None = None,
+        quantity: int = 1,
+    ):
+        notes = notes or []
+        coins = coins or []
+
+        with self._lock:
+            # 1. Validate stock
+            if product.quantity < quantity:
+                raise ValueError(
+                    f"Only {product.quantity} unit(s) of '{product.name}' in stock."
+                )
+
+            # 2. Count inserted money
+            inserted = sum(n.value for n in notes) + sum(c.value for c in coins)
+            cost = product.get_price(quantity)
+
+            if inserted < cost:
+                raise InsufficientFundsError(
+                    f"Inserted ₹{inserted} but '{product.name}' costs ₹{cost}."
+                )
+
+            # 3. Add inserted money to machine first (so change can use it)
+            for note in notes:
+                self.notes[note] += 1
+            for coin in coins:
+                self.coins[coin] += 1
+
+            # 4. Calculate and reserve change
+            change_amount = inserted - cost
+            try:
+                change = self._make_change(change_amount)
+            except ChangeUnavailableError:
+                # Rollback inserted cash
+                for note in notes:
+                    self.notes[note] -= 1
+                for coin in coins:
+                    self.coins[coin] -= 1
+                raise
+
+            # 5. Commit: deduct product, apply change
+            product.remove_quantity(quantity)
+            self._apply_change(change)
+
+            # 6. Receipt
+            print(f"\n✓ Dispensing {quantity} × '{product.name}'  (₹{cost})")
+            print(f"  Inserted: ₹{inserted}")
+            self._print_change(change)
+            print(f"  Machine balance: ₹{self._machine_balance()}\n")
 
 
-if __name__ == '__main__':
+# ------------------------------------------------------------------ #
+#  Demo                                                               #
+# ------------------------------------------------------------------ #
+
+if __name__ == "__main__":
     machine = Machine()
+
+    # Seed the machine with change float
+    machine.add_notes([Note.TEN, Note.FIVE, Note.TWO, Note.TWO])
+    machine.add_coins([Coin.FIVE, Coin.TWO, Coin.ONE, Coin.ONE])
+
+    # Add products
+    chips  = machine.add_product("Lays Chips",   20, 5)
+    water  = machine.add_product("Water Bottle",  15, 3)
+    cola   = machine.add_product("Coca-Cola",     35, 2)
+    coffee = machine.add_product("Coffee",        50, 1)
+
+    print("=== Available Products ===")
+    machine.available_products()
+
+    print("\n=== Transaction 1: Buy Chips with ₹50 ===")
+    machine.buy_product(chips, notes=[Note.FIFTY])
+
+    print("=== Transaction 2: Buy Water with exact change ===")
+    machine.buy_product(water, notes=[Note.TEN], coins=[Coin.FIVE])
+
+    print("=== Transaction 3: Buy 2 × Cola with ₹100 ===")
+    machine.buy_product(cola, notes=[Note.HUNDRED], quantity=2)
+
+    print("=== Products after transactions ===")
+    machine.available_products()
+
+    print("\n=== Collect cash ===")
+    machine.collect_cash()
+
+    print("\n=== Error case: insufficient funds ===")
+    try:
+        machine.buy_product(coffee, coins=[Coin.TEN])
+    except InsufficientFundsError as e:
+        print(f"  Error: {e}")
+
+    print("\n=== Error case: out of stock ===")
+    try:
+        machine.buy_product(cola, notes=[Note.HUNDRED])
+    except ValueError as e:
+        print(f"  Error: {e}")
