@@ -13,6 +13,7 @@ pip install redis
 ```python
 import redis
 import time
+import uuid
 import math
 
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
@@ -104,11 +105,14 @@ def sliding_window_log_is_allowed(user_id: str, limit: int, window_seconds: int)
     now = time.time()
     window_start = now - window_seconds
 
+    # Create a unique member identifier to prevent overwriting at the same millisecond
+    unique_member = f"{now}:{uuid.uuid4()}"
+
     pipe = r.pipeline()
     # Remove timestamps outside the window
     pipe.zremrangebyscore(key, '-inf', window_start)
-    # Add current request with current timestamp as score
-    pipe.zadd(key, {str(now): now})
+    # Add current request with current timestamp as score and a unique member string
+    pipe.zadd(key, {unique_member: now})
     # Count requests in window
     pipe.zcard(key)
     # Auto-expire the key after the window
