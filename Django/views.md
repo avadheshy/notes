@@ -1,812 +1,984 @@
-# DRF Views — Complete Reference
+# Django REST Framework — Complete Views Reference
 
 ---
 
-## Table of Contents
+## The Big Picture (Mental Model First)
 
-- [DRF Views — Complete Reference](#drf-views--complete-reference)
-  - [Table of Contents](#table-of-contents)
-  - [1. Django View Basics](#1-django-view-basics)
-  - [2. Function-Based Views (FBV)](#2-function-based-views-fbv)
-  - [3. APIView](#3-apiview)
-  - [4. GenericAPIView](#4-genericapiview)
-  - [5. Mixins](#5-mixins)
-  - [6. Concrete Generic Views](#6-concrete-generic-views)
-  - [7. GenericViewSet](#7-genericviewset)
-  - [8. ViewSet](#8-viewset)
-  - [9. ModelViewSet](#9-modelviewset)
-  - [10. Custom Queries](#10-custom-queries)
-    - [10.1 `get_queryset()` — filter the list](#101-get_queryset--filter-the-list)
-    - [10.2 IDOR Protection](#102-idor-protection)
-    - [10.3 `get_object()` — custom single-object lookup](#103-get_object--custom-single-object-lookup)
-    - [10.4 `perform_create()` — inject fields before save](#104-perform_create--inject-fields-before-save)
-    - [10.5 `perform_update()` — hook before update](#105-perform_update--hook-before-update)
-    - [10.6 `perform_destroy()` — soft delete](#106-perform_destroy--soft-delete)
-    - [10.7 `get_serializer_class()` — different serializer per action](#107-get_serializer_class--different-serializer-per-action)
-    - [10.8 Annotated queryset example](#108-annotated-queryset-example)
-  - [11. Custom Actions](#11-custom-actions)
-  - [12. URL Routing Summary](#12-url-routing-summary)
-    - [Manual URL (APIView, GenericAPIView, Concrete views)](#manual-url-apiview-genericapiview-concrete-views)
-    - [Router URL (ViewSet, GenericViewSet, ModelViewSet)](#router-url-viewset-genericviewset-modelviewset)
-  - [13. Override Hook Cheatsheet](#13-override-hook-cheatsheet)
-  - [14. When to Use What](#14-when-to-use-what)
-    - [FBV vs CBV summary](#fbv-vs-cbv-summary)
-  - [Quick Reference: View Hierarchy](#quick-reference-view-hierarchy)
-
----
-
-## 1. Django View Basics
-
-Every Django view must:
-- Be **callable** (function or class with `.as_view()`)
-- Accept an `HttpRequest` as its first positional argument
-- Return an `HttpResponse` or raise an exception
-
-CBVs inherit `as_view()`, which calls `dispatch()` internally — this routes the request to the correct method (`get()`, `post()`, etc.) based on the HTTP verb.
+```
+Django Views
+│
+├── FBV  (Function-Based Views)          @api_view decorator
+│
+└── CBV  (Class-Based Views)
+    │
+    ├── APIView                          raw CBV, you write everything
+    │
+    ├── Generic Views (generics.*)       APIView + mixins baked in
+    │   ├── GenericAPIView               base class, no actions alone
+    │   ├── Concrete Generic Views       GenericAPIView + 1-2 mixins
+    │   │   ├── ListAPIView
+    │   │   ├── CreateAPIView
+    │   │   ├── RetrieveAPIView
+    │   │   ├── UpdateAPIView
+    │   │   ├── DestroyAPIView
+    │   │   ├── ListCreateAPIView
+    │   │   ├── RetrieveUpdateAPIView
+    │   │   ├── RetrieveDestroyAPIView
+    │   │   └── RetrieveUpdateDestroyAPIView
+    │   └── Mixins (mixed in above)
+    │       ├── ListModelMixin
+    │       ├── CreateModelMixin
+    │       ├── RetrieveModelMixin
+    │       ├── UpdateModelMixin
+    │       └── DestroyModelMixin
+    │
+    └── ViewSets (viewsets.*)            CBV + Router magic
+        ├── ViewSet                      raw, you define actions
+        ├── GenericViewSet               ViewSet + GenericAPIView
+        ├── ModelViewSet                 full CRUD auto
+        └── ReadOnlyModelViewSet         list + retrieve only
+```
 
 ---
 
-## 2. Function-Based Views (FBV)
+## 1. Function-Based Views (FBV)
 
-Simple Python functions decorated with `@api_view`.
+The simplest entry point. A plain Python function decorated with `@api_view`.
+
+### 1.1 Basic FBV
 
 ```python
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Book
-from .serializers import BookSerializer
+from .models import Article
+from .serializers import ArticleSerializer
 
 @api_view(['GET', 'POST'])
-def book_list(request):
+def article_list(request):
     if request.method == 'GET':
-        books = Book.objects.all()
-        serializer = BookSerializer(books, many=True)
+        articles = Article.objects.all()
+        serializer = ArticleSerializer(articles, many=True)
         return Response(serializer.data)
 
-    if request.method == 'POST':
-        serializer = BookSerializer(data=request.data)
+    elif request.method == 'POST':
+        serializer = ArticleSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def article_detail(request, pk):
+    try:
+        article = Article.objects.get(pk=pk)
+    except Article.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = ArticleSerializer(article)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = ArticleSerializer(article, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        article.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 ```
 
-**URL:**
+### 1.2 FBV with authentication/permission decorators
+
 ```python
-path('books/', book_list),
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def protected_view(request):
+    return Response({'message': f'Hello {request.user.username}'})
 ```
 
-**Pros:** Simple, explicit, easy to read, good for one-off views.  
-**Cons:** Repetitive for CRUD-heavy apps, harder to reuse/extend.
+### 1.3 FBV URLs
+
+```python
+# urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('articles/', views.article_list),
+    path('articles/<int:pk>/', views.article_detail),
+]
+```
+
+**When to use FBV:** one-off endpoints, simple logic, quick prototypes, or when the view doesn't map cleanly to CRUD.
 
 ---
 
-## 3. APIView
+## 2. APIView (Raw Class-Based View)
 
-Base class for all DRF class-based views. Full manual control — no built-in queryset or serializer helpers.
+`APIView` is the base class for all DRF CBVs. It gives you request parsing, authentication, permissions, throttling — but zero business logic. You write every HTTP method handler yourself.
 
 ```python
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import get_object_or_404
-from .models import Book
-from .serializers import BookSerializer
+from rest_framework.permissions import IsAuthenticated
+from .models import Article
+from .serializers import ArticleSerializer
 
-class BookListView(APIView):
+
+class ArticleListView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        books = Book.objects.filter(owner=request.user)  # custom query inline
-        serializer = BookSerializer(books, many=True)
+        articles = Article.objects.all()
+        serializer = ArticleSerializer(articles, many=True)
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = BookSerializer(data=request.data)
+        serializer = ArticleSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(owner=request.user)          # inject field on save
+            serializer.save(author=request.user)    # inject extra data
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class BookDetailView(APIView):
+class ArticleDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk):
+        try:
+            return Article.objects.get(pk=pk)
+        except Article.DoesNotExist:
+            raise Http404
 
     def get(self, request, pk):
-        book = get_object_or_404(Book, pk=pk, owner=request.user)  # IDOR safe
-        serializer = BookSerializer(book)
+        article = self.get_object(pk)
+        serializer = ArticleSerializer(article)
         return Response(serializer.data)
 
+    def put(self, request, pk):
+        article = self.get_object(pk)
+        serializer = ArticleSerializer(article, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def patch(self, request, pk):
-        book = get_object_or_404(Book, pk=pk, owner=request.user)
-        serializer = BookSerializer(book, data=request.data, partial=True)
+        article = self.get_object(pk)
+        serializer = ArticleSerializer(article, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        book = get_object_or_404(Book, pk=pk, owner=request.user)
-        book.delete()
+        article = self.get_object(pk)
+        article.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 ```
 
-**URL:**
 ```python
-path('books/',      BookListView.as_view()),
-path('books/<int:pk>/', BookDetailView.as_view()),
+# urls.py
+urlpatterns = [
+    path('articles/', ArticleListView.as_view()),
+    path('articles/<int:pk>/', ArticleDetailView.as_view()),
+]
 ```
 
-**When to use:** Highly customised APIs, non-model responses, aggregations, proxying external services.
+**When to use APIView:** non-standard logic (e.g., aggregating multiple models, custom actions), or when generic views would require more overrides than they save.
 
 ---
 
-## 4. GenericAPIView
+## 3. Generic Views
 
-Extends `APIView` with queryset/serializer support and helper methods. **Does NOT auto-provide CRUD** — you still write every HTTP method manually, but now you use `self.get_queryset()` and `self.get_serializer()` instead of raw ORM calls.
+This is where DRF eliminates boilerplate. Three layers build on each other:
+
+```
+GenericAPIView          ← base: queryset, serializer_class, lookup_field hooks
+    + Mixins            ← list(), create(), retrieve(), update(), destroy()
+        = Concrete views ← ready-to-use classes (ListAPIView, etc.)
+```
+
+### 3.1 GenericAPIView (base, never used alone)
+
+`GenericAPIView` extends `APIView` and adds:
+
+| Attribute / Method | Purpose |
+|---|---|
+| `queryset` | default queryset |
+| `serializer_class` | default serializer |
+| `lookup_field` | URL kwarg for single-object lookup (default: `pk`) |
+| `lookup_url_kwarg` | override the URL kwarg name |
+| `filter_backends` | list of filter classes |
+| `pagination_class` | pagination class |
+| `get_queryset()` | override for dynamic queryset |
+| `get_serializer_class()` | override for dynamic serializer |
+| `get_object()` | get single object + run permissions |
+| `get_serializer()` | instantiate serializer with context |
+| `filter_queryset(qs)` | apply filter backends |
+| `paginate_queryset(qs)` | paginate if configured |
+| `get_paginated_response(data)` | wrap paginated data |
 
 ```python
+# GenericAPIView alone — you still have to define handlers
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
-from rest_framework import status
-from .models import Book
-from .serializers import BookSerializer
 
-class BookListView(GenericAPIView):
-    serializer_class = BookSerializer
-
-    def get_queryset(self):                          # custom query here
-        return Book.objects.filter(owner=self.request.user)
+class ArticleBase(GenericAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
     def get(self, request):
-        serializer = self.get_serializer(self.get_queryset(), many=True)
+        qs = self.get_queryset()
+        serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(owner=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 ```
 
-**Key attributes and methods:**
-
-| Attribute / Method       | Purpose                                               |
-|--------------------------|-------------------------------------------------------|
-| `queryset`               | Default queryset (class-level, static)                |
-| `serializer_class`       | Serializer to use                                     |
-| `lookup_field`           | Field used for single-object lookup (default: `pk`)   |
-| `pagination_class`       | Paginator class                                       |
-| `filter_backends`        | List of filter backend classes                        |
-| `get_queryset()`         | Override for dynamic queryset                         |
-| `get_object()`           | Override for custom single-object lookup              |
-| `get_serializer()`       | Returns serializer instance                           |
-| `get_serializer_class()` | Override to switch serializer per action/user         |
-| `filter_queryset(qs)`    | Applies filter backends to a queryset                 |
-| `paginate_queryset(qs)`  | Paginates queryset, returns page or None              |
-
-**URL:** Same as APIView — manage manually.
+That's pointless — use a mixin or concrete view instead (shown below).
 
 ---
 
-## 5. Mixins
+### 3.2 Mixins
 
-Pre-built action methods that work on top of `GenericAPIView`. Each mixin adds one method you call explicitly from your HTTP handler.
+Mixins live in `rest_framework.mixins`. Each adds one action method.
+
+| Mixin | Method added | HTTP action |
+|---|---|---|
+| `ListModelMixin` | `list(request)` | GET list |
+| `CreateModelMixin` | `create(request)` | POST |
+| `RetrieveModelMixin` | `retrieve(request, pk)` | GET detail |
+| `UpdateModelMixin` | `update(request, pk)` | PUT / PATCH |
+| `DestroyModelMixin` | `destroy(request, pk)` | DELETE |
+
+**Using mixins manually with GenericAPIView:**
 
 ```python
-from rest_framework import mixins
-from rest_framework.generics import GenericAPIView
+from rest_framework import generics, mixins
 
-class BookListCreateView(mixins.ListModelMixin,
-                         mixins.CreateModelMixin,
-                         GenericAPIView):
-    serializer_class = BookSerializer
-
-    def get_queryset(self):
-        return Book.objects.filter(owner=self.request.user)
+class ArticleListCreateView(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    generics.GenericAPIView
+):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
     def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
+        return self.list(request, *args, **kwargs)     # from ListModelMixin
 
     def post(self, request, *args, **kwargs):
-        return self.create(request, *args, **kwargs)
+        return self.create(request, *args, **kwargs)   # from CreateModelMixin
+
+
+class ArticleDetailView(
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    generics.GenericAPIView
+):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
+    def patch(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)  # also from UpdateModelMixin
+
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 ```
 
-**All 5 mixins:**
+You almost never write mixin + GenericAPIView manually. Use concrete views instead.
 
-| Mixin                 | Method added   | HTTP verb | Action               |
-|-----------------------|----------------|-----------|----------------------|
-| `ListModelMixin`      | `list()`       | GET       | Return list          |
-| `CreateModelMixin`    | `create()`     | POST      | Create instance      |
-| `RetrieveModelMixin`  | `retrieve()`   | GET       | Return single object |
-| `UpdateModelMixin`    | `update()` / `partial_update()` | PUT/PATCH | Update instance |
-| `DestroyModelMixin`   | `destroy()`    | DELETE    | Delete instance      |
+---
 
-**Mixin source (what they do internally):**
+### 3.3 Concrete Generic Views (the ones you actually use)
+
+These are pre-combined `GenericAPIView + mixins`. Import from `rest_framework.generics`.
+
+#### ListAPIView — GET list
 
 ```python
-class CreateModelMixin:
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+from rest_framework.generics import ListAPIView
+
+class ArticleListView(ListAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### CreateAPIView — POST
+
+```python
+from rest_framework.generics import CreateAPIView
+
+class ArticleCreateView(CreateAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### RetrieveAPIView — GET single object
+
+```python
+from rest_framework.generics import RetrieveAPIView
+
+class ArticleDetailView(RetrieveAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+    # lookup_field = 'pk'  ← default; change to 'slug' etc. if needed
+```
+
+#### UpdateAPIView — PUT / PATCH
+
+```python
+from rest_framework.generics import UpdateAPIView
+
+class ArticleUpdateView(UpdateAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### DestroyAPIView — DELETE
+
+```python
+from rest_framework.generics import DestroyAPIView
+
+class ArticleDeleteView(DestroyAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### ListCreateAPIView — GET list + POST (most common list endpoint)
+
+```python
+from rest_framework.generics import ListCreateAPIView
+
+class ArticleListCreateView(ListCreateAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### RetrieveUpdateAPIView — GET + PUT + PATCH
+
+```python
+from rest_framework.generics import RetrieveUpdateAPIView
+
+class ArticleRetrieveUpdateView(RetrieveUpdateAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### RetrieveDestroyAPIView — GET + DELETE
+
+```python
+from rest_framework.generics import RetrieveDestroyAPIView
+
+class ArticleRetrieveDestroyView(RetrieveDestroyAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### RetrieveUpdateDestroyAPIView — GET + PUT + PATCH + DELETE (most common detail endpoint)
+
+```python
+from rest_framework.generics import RetrieveUpdateDestroyAPIView
+
+class ArticleDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+```
+
+#### URLs for generic views
+
+```python
+urlpatterns = [
+    path('articles/', ArticleListCreateView.as_view()),
+    path('articles/<int:pk>/', ArticleDetailView.as_view()),
+]
+```
+
+---
+
+### 3.4 Customizing Generic Views — The Override Hooks
+
+This is where most real-world customization happens.
+
+#### get_queryset() — dynamic queryset
+
+```python
+class UserArticleListView(ListAPIView):
+    serializer_class = ArticleSerializer
+
+    def get_queryset(self):
+        # Only return articles belonging to the logged-in user
+        return Article.objects.filter(author=self.request.user)
+```
+
+```python
+class ArticleByStatusView(ListAPIView):
+    serializer_class = ArticleSerializer
+
+    def get_queryset(self):
+        status = self.kwargs['status']           # from URL: /articles/published/
+        return Article.objects.filter(status=status)
+```
+
+#### get_serializer_class() — dynamic serializer
+
+```python
+class ArticleView(RetrieveUpdateDestroyAPIView):
+    queryset = Article.objects.all()
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return ArticleWriteSerializer
+        return ArticleReadSerializer
+```
+
+#### get_serializer() — inject extra context
+
+```python
+class ArticleListCreateView(ListCreateAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+
+    def get_serializer(self, *args, **kwargs):
+        kwargs['context'] = self.get_serializer_context()
+        kwargs['context']['extra_data'] = {'user': self.request.user}
+        return super().get_serializer(*args, **kwargs)
+```
+
+#### perform_create() — inject data on save
+
+```python
+class ArticleListCreateView(ListCreateAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
     def perform_create(self, serializer):
-        serializer.save()                        # ← override this to inject fields
+        # Automatically attach the logged-in user as author
+        serializer.save(author=self.request.user)
+```
 
+#### perform_update() — hook into update
 
-class ListModelMixin:
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+```python
+class ArticleDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+```
 
-class DestroyModelMixin:
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+#### perform_destroy() — hook into delete
+
+```python
+class ArticleDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
     def perform_destroy(self, instance):
-        instance.delete()                        # ← override for soft delete
+        # soft-delete instead of hard delete
+        instance.is_deleted = True
+        instance.save()
 ```
 
-**URL:** Manage manually.
-
----
-
-## 6. Concrete Generic Views
-
-Pre-built views that combine a mixin + `GenericAPIView` in one class. Most commonly used in practice.
+#### get_object() — custom object lookup
 
 ```python
-from rest_framework.generics import (
-    ListAPIView, CreateAPIView, RetrieveAPIView,
-    UpdateAPIView, DestroyAPIView,
-    ListCreateAPIView, RetrieveUpdateAPIView,
-    RetrieveDestroyAPIView, RetrieveUpdateDestroyAPIView
-)
+class ArticleDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+    lookup_field = 'slug'           # use slug instead of pk in URL
+
+    def get_object(self):
+        obj = super().get_object()
+        # Run extra permission check
+        if obj.author != self.request.user:
+            raise PermissionDenied
+        return obj
 ```
 
-**All concrete views:**
+#### Overriding the response (override the method handler itself)
 
-| Class                          | Mixins used                             | Methods available        |
-|--------------------------------|-----------------------------------------|--------------------------|
-| `ListAPIView`                  | List                                    | GET (list)               |
-| `CreateAPIView`                | Create                                  | POST                     |
-| `RetrieveAPIView`              | Retrieve                                | GET (detail)             |
-| `UpdateAPIView`                | Update                                  | PUT, PATCH               |
-| `DestroyAPIView`               | Destroy                                 | DELETE                   |
-| `ListCreateAPIView`            | List + Create                           | GET, POST                |
-| `RetrieveUpdateAPIView`        | Retrieve + Update                       | GET, PUT, PATCH          |
-| `RetrieveDestroyAPIView`       | Retrieve + Destroy                      | GET, DELETE              |
-| `RetrieveUpdateDestroyAPIView` | Retrieve + Update + Destroy             | GET, PUT, PATCH, DELETE  |
-
-**Minimal usage:**
 ```python
-class BookListCreateView(ListCreateAPIView):
-    serializer_class = BookSerializer
+class ArticleListCreateView(ListCreateAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
-    def get_queryset(self):
-        return Book.objects.filter(owner=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-
-
-class BookDetailView(RetrieveUpdateDestroyAPIView):
-    serializer_class = BookSerializer
-
-    def get_queryset(self):
-        return Book.objects.filter(owner=self.request.user)
-```
-
-**URL:**
-```python
-path('books/',          BookListCreateView.as_view()),
-path('books/<int:pk>/', BookDetailView.as_view()),
-```
-
-**Overriding a method to customise response:**
-```python
-class BookCreateView(CreateAPIView):
-    serializer_class = BookSerializer
-    queryset = Book.objects.all()
-
-    def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
-        response.data['message'] = 'Book created successfully'
-        return response
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        # Wrap the default response
+        return Response({
+            'count': len(response.data),
+            'results': response.data
+        })
 ```
 
 ---
 
-## 7. GenericViewSet
-
-`GenericAPIView` + `ViewSet` behaviour. Uses router for URL generation but does **NOT** auto-provide CRUD. You combine it with mixins to pick exactly which actions you want.
+### 3.5 Generic Views with Filtering, Search, Ordering, Pagination
 
 ```python
-from rest_framework.viewsets import GenericViewSet
-from rest_framework import mixins
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
-# Read-only viewset (list + retrieve, no create/update/delete)
-class BookReadOnlyViewSet(mixins.ListModelMixin,
-                          mixins.RetrieveModelMixin,
-                          GenericViewSet):
-    serializer_class = BookSerializer
+class ArticleListView(ListAPIView):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
-    def get_queryset(self):
-        return Book.objects.filter(owner=self.request.user)
+    # Filtering
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status', 'author']        # ?status=published&author=1
+    search_fields = ['title', 'content']           # ?search=django
+    ordering_fields = ['created_at', 'title']      # ?ordering=-created_at
+    ordering = ['-created_at']                     # default ordering
+
+    # Pagination (set globally in settings or per-view)
+    # pagination_class = PageNumberPagination
 ```
-
-```python
-# LCRD viewset (no update)
-class BookLCRDViewSet(mixins.ListModelMixin,
-                      mixins.CreateModelMixin,
-                      mixins.RetrieveModelMixin,
-                      mixins.DestroyModelMixin,
-                      GenericViewSet):
-    serializer_class = BookSerializer
-    queryset = Book.objects.all()
-```
-
-**URL with router:**
-```python
-router = DefaultRouter()
-router.register(r'books', BookReadOnlyViewSet, basename='book')
-urlpatterns = [path('', include(router.urls))]
-```
-
-**When to use:** You want router-generated URLs but need to restrict which actions are available.
 
 ---
 
-## 8. ViewSet
+## 4. ViewSets
 
-Bare ViewSet — flexible, not tied to a model. You write `list()`, `retrieve()`, `create()`, etc. yourself. Uses router.
+ViewSets combine the logic for multiple related views into a single class. The Router maps HTTP methods to ViewSet actions automatically.
+
+| ViewSet type | Based on | Provides |
+|---|---|---|
+| `ViewSet` | `APIView` | nothing — define actions manually |
+| `GenericViewSet` | `GenericAPIView` + ViewSet | queryset/serializer hooks, no actions |
+| `ModelViewSet` | GenericViewSet + all mixins | list, create, retrieve, update, destroy |
+| `ReadOnlyModelViewSet` | GenericViewSet + List + Retrieve | list, retrieve |
+
+### 4.1 ViewSet (raw)
 
 ```python
 from rest_framework.viewsets import ViewSet
 from rest_framework.response import Response
 
-class BookViewSet(ViewSet):
+class ArticleViewSet(ViewSet):
 
     def list(self, request):
-        books = Book.objects.filter(owner=request.user)
-        serializer = BookSerializer(books, many=True)
+        queryset = Article.objects.all()
+        serializer = ArticleSerializer(queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
-        book = get_object_or_404(Book, pk=pk, owner=request.user)
-        serializer = BookSerializer(book)
+        article = get_object_or_404(Article, pk=pk)
+        serializer = ArticleSerializer(article)
         return Response(serializer.data)
 
     def create(self, request):
-        serializer = BookSerializer(data=request.data)
+        serializer = ArticleSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(owner=request.user)
+            serializer.save()
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
-
-    def update(self, request, pk=None):
-        book = get_object_or_404(Book, pk=pk, owner=request.user)
-        serializer = BookSerializer(book, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
-
-    def partial_update(self, request, pk=None):
-        book = get_object_or_404(Book, pk=pk, owner=request.user)
-        serializer = BookSerializer(book, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
-
-    def destroy(self, request, pk=None):
-        book = get_object_or_404(Book, pk=pk, owner=request.user)
-        book.delete()
-        return Response(status=204)
 ```
 
-**URL:**
+### 4.2 GenericViewSet (base, mixed with mixins)
+
+`GenericViewSet` is `ViewSet + GenericAPIView`. Add mixins to get actions.
+
 ```python
-router = DefaultRouter()
-router.register(r'books', BookViewSet, basename='book')
+from rest_framework.viewsets import GenericViewSet
+from rest_framework import mixins
+
+class ArticleViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    GenericViewSet                       # note: GenericViewSet goes last
+):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+    # Now has: list, create, retrieve — but NOT update or destroy
 ```
 
-**When to use:** Non-model responses, aggregation endpoints, proxying another service, or when you want router URL generation without model assumptions.
+This pattern gives you precise control over which actions are available.
 
----
-
-## 9. ModelViewSet
-
-The highest-level view. Full CRUD auto-provided. Needs only `queryset` + `serializer_class`.
+### 4.3 ModelViewSet (full CRUD)
 
 ```python
 from rest_framework.viewsets import ModelViewSet
 
-class BookViewSet(ModelViewSet):
-    serializer_class = BookSerializer
+class ArticleViewSet(ModelViewSet):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Book.objects.filter(owner=self.request.user)
+        return Article.objects.filter(author=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        serializer.save(author=self.request.user)
 ```
 
-**URL:**
+Provides all 5 actions: `list`, `create`, `retrieve`, `update`, `destroy`.
+
+### 4.4 ReadOnlyModelViewSet
+
 ```python
+from rest_framework.viewsets import ReadOnlyModelViewSet
+
+class PublicArticleViewSet(ReadOnlyModelViewSet):
+    queryset = Article.objects.filter(status='published')
+    serializer_class = ArticleSerializer
+    # Only: list, retrieve
+```
+
+### 4.5 Router — wiring ViewSets to URLs
+
+```python
+# urls.py
+from rest_framework.routers import DefaultRouter
+from .views import ArticleViewSet
+
 router = DefaultRouter()
-router.register(r'books', BookViewSet, basename='book')
-urlpatterns = [path('', include(router.urls))]
+router.register(r'articles', ArticleViewSet, basename='article')
+
+urlpatterns = router.urls
 ```
 
-**URLs auto-generated by router:**
+**What the router generates:**
 
-| URL pattern             | Method | Action          |
-|-------------------------|--------|-----------------|
-| `/books/`               | GET    | `list()`        |
-| `/books/`               | POST   | `create()`      |
-| `/books/{pk}/`          | GET    | `retrieve()`    |
-| `/books/{pk}/`          | PUT    | `update()`      |
-| `/books/{pk}/`          | PATCH  | `partial_update()` |
-| `/books/{pk}/`          | DELETE | `destroy()`     |
+| URL | Method | Action | Name |
+|---|---|---|---|
+| `/articles/` | GET | `list` | `article-list` |
+| `/articles/` | POST | `create` | `article-list` |
+| `/articles/{pk}/` | GET | `retrieve` | `article-detail` |
+| `/articles/{pk}/` | PUT | `update` | `article-detail` |
+| `/articles/{pk}/` | PATCH | `partial_update` | `article-detail` |
+| `/articles/{pk}/` | DELETE | `destroy` | `article-detail` |
 
-**ModelViewSet internally is just:**
-```python
-class ModelViewSet(CreateModelMixin, RetrieveModelMixin, UpdateModelMixin,
-                   DestroyModelMixin, ListModelMixin, GenericViewSet):
-    pass
-```
-
-**Overridable methods:**
-
-| Method                  | Called by              | Override reason                                  |
-|-------------------------|------------------------|--------------------------------------------------|
-| `get_queryset()`        | All actions            | Filter by user, query params, tenant             |
-| `get_object()`          | retrieve/update/destroy| Custom lookup (slug, composite key), IDOR check  |
-| `get_serializer_class()`| All actions            | Different serializer for list vs detail          |
-| `perform_create()`      | `create()`             | Auto-assign fields, trigger side effects         |
-| `perform_update()`      | `update()`             | Audit logs, modified_by                          |
-| `perform_destroy()`     | `destroy()`            | Soft delete instead of hard delete               |
-| `list()`                | GET list               | Custom response shape                            |
-| `retrieve()`            | GET detail             | Custom response shape                            |
-| `create()`              | POST                   | Custom response, pre-validation logic            |
-
----
-
-## 10. Custom Queries
-
-This is the most important section for real-world usage. The articles use `queryset = Model.objects.all()` only for simplicity — in production you always customise.
-
-### 10.1 `get_queryset()` — filter the list
-
-Override this instead of setting the static `queryset =` attribute whenever the result depends on the request.
-
-```python
-class BookViewSet(ModelViewSet):
-    serializer_class = BookSerializer
-
-    def get_queryset(self):
-        # Base: scope to current user (multi-tenant / IDOR protection)
-        qs = Book.objects.filter(owner=self.request.user)
-
-        # Search: GET /books/?q=django
-        q = self.request.query_params.get('q')
-        if q:
-            qs = qs.filter(title__icontains=q)
-
-        # Filter: GET /books/?status=published
-        status = self.request.query_params.get('status')
-        if status:
-            qs = qs.filter(status=status)
-
-        # Ordering: GET /books/?ordering=-created_at
-        ordering = self.request.query_params.get('ordering', '-created_at')
-        qs = qs.order_by(ordering)
-
-        return qs.select_related('author').prefetch_related('tags')
-```
-
-### 10.2 IDOR Protection
-
-**Always scope `get_queryset()` to the current user.** If you leave `queryset = Book.objects.all()`, a logged-in user can access any other user's object by guessing the pk.
-
-```python
-# BAD — user can GET /books/999/ even if it belongs to someone else
-class BookViewSet(ModelViewSet):
-    queryset = Book.objects.all()           # ← exposes all records
-    serializer_class = BookSerializer
-
-# GOOD — get_queryset scopes all actions automatically
-class BookViewSet(ModelViewSet):
-    serializer_class = BookSerializer
-
-    def get_queryset(self):
-        return Book.objects.filter(owner=self.request.user)
-    # Now GET /books/999/ returns 404 if not the request user's book
-    # This applies to retrieve, update, destroy too — get_object() calls get_queryset()
-```
-
-### 10.3 `get_object()` — custom single-object lookup
-
-```python
-class BookDetailView(RetrieveUpdateDestroyAPIView):
-    serializer_class = BookSerializer
-
-    def get_object(self):
-        # Lookup by slug instead of pk
-        obj = get_object_or_404(
-            Book,
-            slug=self.kwargs['slug'],
-            owner=self.request.user        # IDOR protection
-        )
-        self.check_object_permissions(self.request, obj)   # run permission classes
-        return obj
-```
-
-```python
-# URL for slug-based lookup
-path('books/<slug:slug>/', BookDetailView.as_view()),
-```
-
-### 10.4 `perform_create()` — inject fields before save
-
-```python
-class BookViewSet(ModelViewSet):
-    serializer_class = BookSerializer
-    queryset = Book.objects.all()
-
-    def perform_create(self, serializer):
-        serializer.save(
-            owner=self.request.user,
-            created_by_ip=self.request.META.get('REMOTE_ADDR'),
-        )
-```
-
-### 10.5 `perform_update()` — hook before update
-
-```python
-    def perform_update(self, serializer):
-        serializer.save(last_edited_by=self.request.user)
-```
-
-### 10.6 `perform_destroy()` — soft delete
-
-```python
-    def perform_destroy(self, instance):
-        instance.is_deleted = True          # soft delete instead of .delete()
-        instance.save()
-```
-
-### 10.7 `get_serializer_class()` — different serializer per action
-
-```python
-class BookViewSet(ModelViewSet):
-    queryset = Book.objects.all()
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return BookListSerializer       # lightweight for list
-        return BookDetailSerializer         # full fields for detail/create/update
-```
-
-### 10.8 Annotated queryset example
-
-```python
-from django.db.models import Count, Avg
-
-class BookViewSet(ModelViewSet):
-    serializer_class = BookSerializer
-
-    def get_queryset(self):
-        return (
-            Book.objects
-            .filter(owner=self.request.user)
-            .annotate(
-                review_count=Count('reviews'),
-                avg_rating=Avg('reviews__rating'),
-            )
-            .select_related('author', 'category')
-            .prefetch_related('tags')
-            .order_by('-created_at')
-        )
-```
-
----
-
-## 11. Custom Actions
-
-Use `@action` to add endpoints beyond standard CRUD inside a ViewSet.
+### 4.6 @action decorator — custom actions on ViewSets
 
 ```python
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-class BookViewSet(ModelViewSet):
-    serializer_class = BookSerializer
+class ArticleViewSet(ModelViewSet):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
 
-    def get_queryset(self):
-        return Book.objects.filter(owner=self.request.user)
-
-    # Collection action — URL: POST /books/bulk_delete/
-    @action(detail=False, methods=['post'])
-    def bulk_delete(self, request):
-        ids = request.data.get('ids', [])
-        Book.objects.filter(pk__in=ids, owner=request.user).delete()
-        return Response({'deleted': len(ids)})
-
-    # Detail action — URL: POST /books/{pk}/mark_as_read/
-    @action(detail=True, methods=['post'])
-    def mark_as_read(self, request, pk=None):
-        book = self.get_object()
-        book.status = 'read'
-        book.save()
-        return Response({'status': 'book marked as read'})
-
-    # Detail GET action — URL: GET /books/{pk}/reviews/
-    @action(detail=True, methods=['get'])
-    def reviews(self, request, pk=None):
-        book = self.get_object()
-        reviews = book.reviews.all()
-        serializer = ReviewSerializer(reviews, many=True)
-        return Response(serializer.data)
-
-    # Custom serializer for an action
+    # detail=False → /articles/published/
     @action(detail=False, methods=['get'])
     def published(self, request):
-        qs = self.get_queryset().filter(status='published')
-        serializer = self.get_serializer(qs, many=True)
+        articles = self.get_queryset().filter(status='published')
+        serializer = self.get_serializer(articles, many=True)
+        return Response(serializer.data)
+
+    # detail=True → /articles/{pk}/publish/
+    @action(detail=True, methods=['post'])
+    def publish(self, request, pk=None):
+        article = self.get_object()
+        article.status = 'published'
+        article.save()
+        return Response({'status': 'published'})
+
+    # Different serializer on a custom action
+    @action(detail=True, methods=['get'], serializer_class=ArticleSummarySerializer)
+    def summary(self, request, pk=None):
+        article = self.get_object()
+        serializer = self.get_serializer(article)
+        return Response(serializer.data)
+
+    # Different permissions on a custom action
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def trending(self, request):
+        articles = Article.objects.order_by('-views')[:10]
+        serializer = self.get_serializer(articles, many=True)
         return Response(serializer.data)
 ```
 
-**`@action` parameters:**
+Router automatically adds these URLs:
+- `GET /articles/published/`
+- `POST /articles/{pk}/publish/`
+- `GET /articles/{pk}/summary/`
+- `GET /articles/trending/`
 
-| Parameter            | Values              | Meaning                                                   |
-|----------------------|---------------------|-----------------------------------------------------------|
-| `detail`             | `True` / `False`    | `True` = operates on single object (`/{pk}/action/`); `False` = collection (`/action/`) |
-| `methods`            | list of HTTP verbs  | e.g. `['get']`, `['post']`, `['get', 'post']`             |
-| `url_path`           | string              | Custom URL segment (default: method name)                 |
-| `url_name`           | string              | Custom name for URL reversing                             |
-| `permission_classes` | list                | Override permissions for this action only                 |
+### 4.7 ViewSet with different serializers per action
+
+```python
+class ArticleViewSet(ModelViewSet):
+    queryset = Article.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ('list', 'retrieve'):
+            return ArticleReadSerializer
+        return ArticleWriteSerializer    # for create/update
+```
+
+### 4.8 ViewSet with different permissions per action
+
+```python
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+
+class ArticleViewSet(ModelViewSet):
+    queryset = Article.objects.all()
+    serializer_class = ArticleSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [AllowAny()]
+        if self.action == 'destroy':
+            return [IsAdminUser()]
+        return [IsAuthenticated()]
+```
 
 ---
 
-## 12. URL Routing Summary
+## 5. Comparison Table
 
-### Manual URL (APIView, GenericAPIView, Concrete views)
+| Feature | FBV | APIView | Generic Views | ViewSet |
+|---|---|---|---|---|
+| Boilerplate | high | medium | low | lowest |
+| Flexibility | highest | high | medium | medium |
+| Auto URL routing | ❌ | ❌ | ❌ | ✅ (Router) |
+| Custom HTTP logic | ✅ | ✅ | override methods | `@action` |
+| Queryset hooks | manual | manual | `get_queryset()` | `get_queryset()` |
+| Filtering/Pagination | manual | manual | built-in | built-in |
+| Good for | one-off | complex logic | standard CRUD | standard CRUD + REST |
 
-```python
-from django.urls import path
-from .views import BookListCreateView, BookDetailView
+---
 
-urlpatterns = [
-    path('books/',          BookListCreateView.as_view()),
-    path('books/<int:pk>/', BookDetailView.as_view()),
-]
+## 6. The Confusing Part — Where Generics and ViewSets Overlap
+
+The internet mixes these up. Here is the exact relationship:
+
+```
+generics.ListAPIView
+    = generics.GenericAPIView + mixins.ListModelMixin
+
+viewsets.ModelViewSet
+    = viewsets.GenericViewSet
+      + mixins.ListModelMixin
+      + mixins.CreateModelMixin
+      + mixins.RetrieveModelMixin
+      + mixins.UpdateModelMixin
+      + mixins.DestroyModelMixin
+
+viewsets.GenericViewSet
+    = viewsets.ViewSetMixin + generics.GenericAPIView
 ```
 
-### Router URL (ViewSet, GenericViewSet, ModelViewSet)
+**Key insight:** ViewSets ARE Generic Views internally — they just add `ViewSetMixin` which handles the action → method dispatch and plugs into the Router. The `get_queryset()`, `get_serializer_class()`, `perform_create()` hooks work identically in both.
+
+---
+
+## 7. Quick Decision Guide
+
+```
+Need a one-off endpoint (login, password reset, health check)?
+    → FBV or APIView
+
+Standard CRUD for a model?
+    → ModelViewSet
+
+CRUD but want Router URLs?
+    → ModelViewSet
+
+CRUD but some actions disabled (e.g. no delete)?
+    → GenericViewSet + only the mixins you need
+
+Two separate URL files (list vs detail), no Router?
+    → ListCreateAPIView + RetrieveUpdateDestroyAPIView
+
+Read-only public API?
+    → ReadOnlyModelViewSet
+
+Need custom actions alongside CRUD (publish, archive, like)?
+    → ModelViewSet + @action
+
+Complex business logic that doesn't fit CRUD?
+    → APIView (write everything yourself)
+
+Need to customize queryset / serializer dynamically?
+    → Any CBV: override get_queryset() or get_serializer_class()
+```
+
+---
+
+## 8. Full Working Example — All Patterns Together
 
 ```python
-from django.urls import path, include
+# models.py
+from django.db import models
+
+class Article(models.Model):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    status = models.CharField(max_length=20, default='draft')
+    author = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+```
+
+```python
+# serializers.py
+from rest_framework import serializers
+from .models import Article
+
+class ArticleReadSerializer(serializers.ModelSerializer):
+    author_name = serializers.CharField(source='author.username', read_only=True)
+
+    class Meta:
+        model = Article
+        fields = ['id', 'title', 'content', 'status', 'author_name', 'created_at']
+
+class ArticleWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Article
+        fields = ['title', 'content', 'status']
+```
+
+```python
+# views.py
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from .models import Article
+from .serializers import ArticleReadSerializer, ArticleWriteSerializer
+
+
+class ArticleViewSet(ModelViewSet):
+    queryset = Article.objects.all()
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['status']
+    search_fields = ['title', 'content']
+    ordering_fields = ['created_at']
+
+    def get_queryset(self):
+        if self.action == 'list' and not self.request.user.is_staff:
+            return Article.objects.filter(author=self.request.user)
+        return Article.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ('list', 'retrieve', 'published', 'trending'):
+            return ArticleReadSerializer
+        return ArticleWriteSerializer
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve', 'trending'):
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    def perform_destroy(self, instance):
+        # soft delete
+        instance.status = 'deleted'
+        instance.save()
+
+    @action(detail=False, methods=['get'])
+    def trending(self, request):
+        articles = Article.objects.filter(status='published')[:5]
+        serializer = self.get_serializer(articles, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def publish(self, request, pk=None):
+        article = self.get_object()
+        if article.author != request.user:
+            return Response({'error': 'Not your article'}, status=403)
+        article.status = 'published'
+        article.save()
+        return Response({'status': 'published'})
+```
+
+```python
+# urls.py
 from rest_framework.routers import DefaultRouter
-from .views import BookViewSet
+from .views import ArticleViewSet
 
 router = DefaultRouter()
-router.register(r'books', BookViewSet, basename='book')
+router.register(r'articles', ArticleViewSet, basename='article')
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
-```
-
-**Which views need which URL approach:**
-
-| View Type             | URL approach   |
-|-----------------------|----------------|
-| FBV                   | Manual         |
-| APIView               | Manual         |
-| GenericAPIView        | Manual         |
-| Mixins + GenericAPIView | Manual       |
-| Concrete views        | Manual         |
-| GenericViewSet        | Router         |
-| ViewSet               | Router         |
-| ModelViewSet          | Router         |
-
----
-
-## 13. Override Hook Cheatsheet
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Hook                  │ When it runs            │ Common use   │
-├─────────────────────────────────────────────────────────────────┤
-│  get_queryset()        │ All list/detail actions │ Filter by    │
-│                        │                         │ user, params │
-├─────────────────────────────────────────────────────────────────┤
-│  get_object()          │ retrieve/update/destroy │ Slug lookup, │
-│                        │                         │ IDOR check   │
-├─────────────────────────────────────────────────────────────────┤
-│  get_serializer_class()│ Every request           │ Different    │
-│                        │                         │ list/detail  │
-│                        │                         │ serializers  │
-├─────────────────────────────────────────────────────────────────┤
-│  perform_create()      │ After POST validated    │ Auto-assign  │
-│                        │                         │ owner, IP    │
-├─────────────────────────────────────────────────────────────────┤
-│  perform_update()      │ After PUT/PATCH valid.  │ Audit fields │
-├─────────────────────────────────────────────────────────────────┤
-│  perform_destroy()     │ Before DELETE           │ Soft delete  │
-├─────────────────────────────────────────────────────────────────┤
-│  list()                │ GET collection          │ Custom shape │
-├─────────────────────────────────────────────────────────────────┤
-│  create()              │ POST                    │ Custom resp. │
-└─────────────────────────────────────────────────────────────────┘
+urlpatterns = router.urls
+# Generates:
+# GET/POST   /articles/
+# GET        /articles/trending/
+# GET/PUT/PATCH/DELETE /articles/{pk}/
+# POST       /articles/{pk}/publish/
 ```
 
 ---
 
-## 14. When to Use What
+## 9. Cheatsheet
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Situation                           │ Recommended view          │
-├──────────────────────────────────────────────────────────────────┤
-│  Simple one-off logic, 1-2 methods   │ FBV or APIView            │
-│  Non-model response (aggregation,    │ APIView or ViewSet        │
-│  external API proxy)                 │                           │
-│  Standard CRUD, full control needed  │ Concrete generic view     │
-│  Standard CRUD, minimal code         │ ModelViewSet              │
-│  Some CRUD actions, not all          │ GenericViewSet + mixins   │
-│  Custom actions beyond CRUD          │ ModelViewSet + @action    │
-│  Non-model viewset with router URLs  │ ViewSet                   │
-└──────────────────────────────────────────────────────────────────┘
-```
+```python
+# --- FBV ---
+@api_view(['GET', 'POST'])
+def my_view(request): ...
 
-### FBV vs CBV summary
+# --- APIView ---
+class MyView(APIView):
+    def get(self, request): ...
+    def post(self, request): ...
 
-| Feature          | FBV                        | CBV                            |
-|------------------|----------------------------|--------------------------------|
-| Simplicity       | Very simple, explicit      | More abstraction               |
-| Reusability      | Low                        | High — inheritance and mixins  |
-| Best for         | Small / one-off views      | CRUD-heavy apps, DRY code      |
-| Decorators       | `@api_view`, `@permission_required` | Mixins like `IsAuthenticated` |
-| HTTP dispatch    | Manual `if request.method` | Auto via `dispatch()`          |
+# --- Generic: list only ---
+class MyList(ListAPIView):
+    queryset = Model.objects.all()
+    serializer_class = MySerializer
 
----
+# --- Generic: list + create ---
+class MyListCreate(ListCreateAPIView):
+    queryset = Model.objects.all()
+    serializer_class = MySerializer
 
-## Quick Reference: View Hierarchy
+# --- Generic: retrieve + update + delete ---
+class MyDetail(RetrieveUpdateDestroyAPIView):
+    queryset = Model.objects.all()
+    serializer_class = MySerializer
 
-```
-HttpRequest
-    │
-    ▼
-FBV (@api_view)
-    │
-    ▼
-APIView                         ← full manual control
-    │
-    ▼
-GenericAPIView                  ← adds get_queryset(), get_serializer()
-    │
-    ├── + Mixin(s)              ← adds list(), create(), retrieve() etc.
-    │       │
-    │       └── ConcreteView    ← ListCreateAPIView, RetrieveUpdateDestroyAPIView, etc.
-    │
-    └── GenericViewSet          ← GenericAPIView + ViewSet routing
-            │
-            ├── + Mixin(s)      ← custom partial CRUD viewset
-            │
-            └── ModelViewSet   ← full CRUD auto-provided
+# --- ViewSet: full CRUD ---
+class MyViewSet(ModelViewSet):
+    queryset = Model.objects.all()
+    serializer_class = MySerializer
+
+# --- ViewSet: read only ---
+class MyViewSet(ReadOnlyModelViewSet):
+    queryset = Model.objects.all()
+    serializer_class = MySerializer
+
+# --- ViewSet: pick specific actions ---
+class MyViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, GenericViewSet):
+    queryset = Model.objects.all()
+    serializer_class = MySerializer
+
+# --- Router ---
+router = DefaultRouter()
+router.register(r'items', MyViewSet, basename='item')
+urlpatterns = router.urls
+
+# --- Dynamic overrides (work in generics AND viewsets) ---
+def get_queryset(self): ...
+def get_serializer_class(self): ...
+def get_permissions(self): ...
+def perform_create(self, serializer): ...
+def perform_update(self, serializer): ...
+def perform_destroy(self, instance): ...
+def get_object(self): ...
 ```
